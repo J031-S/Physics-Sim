@@ -1246,3 +1246,69 @@ body.studio header {
     display: none;
   }
 }
+
+/* Object context editor */
+.object-menu[hidden] {
+  display: none;
+}
+.object-menu {
+  position: fixed;
+  z-index: 100;
+  width: min(340px, calc(100vw - 20px));
+  display: flex;
+  flex-direction: column;
+  background: #fffefa;
+  border: 1px solid #cdd3c6;
+  border-radius: 12px;
+  box-shadow: 0 14px 48px #26352c30;
+  color: #3d443f;
+  overflow: hidden;
+}
+.object-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 13px 16px 8px;
+}
+.object-menu-header strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.object-menu-header button {
+  font-size: 21px;
+  padding: 0 5px;
+  border: 0;
+  background: transparent;
+  flex-shrink: 0;
+}
+.object-menu-hint {
+  font-size: 10px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 0 16px 11px;
+  color: #87917f;
+  border-bottom: 1px solid #e4e6dc;
+}
+.object-menu-content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px 16px;
+  min-height: 0;
+}
+.object-menu-content .motion-panel {
+  margin-top: 12px;
+}
+.object-menu .field input {
+  background: #fbfaf6;
+}
+.object-menu-inspect {
+  flex-shrink: 0;
+  border: 0;
+  border-top: 1px solid #e4e6dc;
+  border-radius: 0;
+  background: #f2f5ec;
+  padding: 12px;
+  font-size: 11px;
+  text-align: left;
+}

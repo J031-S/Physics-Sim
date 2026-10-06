@@ -6,7 +6,11 @@ export const SCALE = 100;
 export const DT = 1 / 120;
 const point = (p) => ({ x: p.x * SCALE, y: -p.y * SCALE });
 export class Simulation {
-  constructor(scene, behaviourFactories = defaultBehaviourFactories) {
+  constructor(
+    scene,
+    behaviourFactories = defaultBehaviourFactories,
+    live = null,
+  ) {
     this.engine = Engine.create({
       positionIterations: 10,
       velocityIterations: 10,
@@ -14,20 +18,24 @@ export class Simulation {
     });
     this.engine.gravity = { x: 0, y: scene.gravity, scale: SCALE / 1e6 };
     this.scene = scene;
-    this.time = 0;
+    this.time = live?.time ?? 0;
+    this.behaviourFactories = behaviourFactories;
     this.bodies = new Map();
     this.constraints = new Map();
     this.forces = new Map();
     for (const spec of scene.bodies) {
-      const body = makeBody(spec, globalThis.Matter, SCALE);
+      const pose = { ...spec, ...(live?.states.get(spec.id) || {}) };
+      if (live?.id === spec.id)
+        for (const key of live.keys) pose[key] = spec[key];
+      const body = makeBody(pose, globalThis.Matter, SCALE);
       Body.setMass(body, spec.mass);
       Body.setStatic(body, spec.fixed);
       if (!spec.fixed) {
         Body.setVelocity(body, {
-          x: (spec.vx * SCALE) / 60,
-          y: (-spec.vy * SCALE) / 60,
+          x: (pose.vx * SCALE) / 60,
+          y: (-pose.vy * SCALE) / 60,
         });
-        Body.setAngularVelocity(body, -spec.omega / 60);
+        Body.setAngularVelocity(body, -pose.omega / 60);
       }
       this.bodies.set(spec.id, body);
       Composite.add(this.engine.world, body);
@@ -51,6 +59,18 @@ export class Simulation {
     this.modules = behaviourFactories.map((factory) => factory(scene));
     this.accelerations = new Map();
     this.computeForces();
+  }
+  reconfigure(scene, id = null, keys = []) {
+    // Rebuild geometry/constraints atomically while keeping the entire live state.
+    // Scene remains the saved initial setup, so equation x0/y0 do not drift.
+    return new Simulation(scene, this.behaviourFactories, {
+      time: this.time,
+      states: new Map(
+        [...this.bodies.keys()].map((id) => [id, this.state(id)]),
+      ),
+      id,
+      keys,
+    });
   }
   endpoint(l, side) {
     const id = l[side.toLowerCase()];

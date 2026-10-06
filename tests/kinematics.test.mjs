@@ -154,3 +154,58 @@ test("validation rejects degenerate geometry, unsupported behaviours and invalid
   };
   assert.throws(() => validateScene(p), /Unknown/);
 });
+
+test("live property changes preserve time and every unedited body state", () => {
+  const p = preset("Collisions"),
+    before = new Simulation(p);
+  run(before, 0.5);
+  const a = before.state("a"),
+    b = before.state("b");
+  const changed = structuredClone(p);
+  changed.bodies[0].mass = 3;
+  changed.bodies[0].radius = 0.7;
+  const after = before.reconfigure(changed, "a", ["mass", "radius"]);
+  close(after.time, before.time, 1e-9);
+  for (const key of Object.keys(a)) {
+    close(after.state("a")[key], a[key], 1e-8);
+    close(after.state("b")[key], b[key], 1e-8);
+  }
+  close(after.bodies.get("a").mass, 3, 1e-9);
+  after.step();
+  assert.ok(after.time > before.time);
+  before.dispose();
+  after.dispose();
+});
+test("live state edits explicitly override one component, even if equal to initial value", () => {
+  const p = preset("Constant acceleration"),
+    before = new Simulation(p);
+  run(before, 1);
+  const changed = structuredClone(p);
+  changed.bodies[0].vx = 0;
+  const after = before.reconfigure(changed, "mover", ["vx"]);
+  close(after.state("mover").vx, 0, 1e-9);
+  close(after.state("mover").x, before.state("mover").x, 1e-9);
+  close(after.time, 1, 1e-8);
+  before.dispose();
+  after.dispose();
+});
+test("live equations retain original origins and current time; failed edit leaves original usable", () => {
+  const p = blank([
+    object("a", "circle", 1, 0, {
+      vx: 2,
+      motion: { type: "acceleration", ax: "0", ay: "0", gravity: false },
+    }),
+  ]);
+  const before = new Simulation(p);
+  run(before, 1);
+  const changed = structuredClone(p);
+  changed.bodies[0].motion.ax = "x-x0+t";
+  const after = before.reconfigure(changed);
+  close(after.acceleration("a").x, 3, 0.001);
+  changed.bodies[0].motion.ax = "1/0";
+  assert.throws(() => before.reconfigure(changed), /undefined/);
+  before.step();
+  assert.ok(Number.isFinite(before.state("a").x));
+  before.dispose();
+  after.dispose();
+});

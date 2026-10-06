@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check src/app.js && node --check src/physics.js && node --check src/scenes.js && node --check src/geometry.js && node --check src/expressions.js && node --check src/behaviours.js && node --check src/motion-panel.js",
+    "check": "node --check src/app.js && node --check src/physics.js && node --check src/scenes.js && node --check src/geometry.js && node --check src/expressions.js && node --check src/behaviours.js && node --check src/motion-panel.js && node --check src/object-menu.js",
     "test:ui": "node tests/editor-smoke.mjs"
   },
   "devDependencies": {

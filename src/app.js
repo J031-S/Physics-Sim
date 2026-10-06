@@ -1,3 +1,4 @@
+import { createObjectMenu } from "./object-menu.js";
 import { motionPanel } from "./motion-panel.js";
 import { hull } from "./geometry.js";
 import { Simulation, DT } from "./physics.js";
@@ -36,6 +37,17 @@ try {
 } catch {
   storageError = true;
 }
+const objectMenu = createObjectMenu({
+  render: (root) => renderProperties(root, true),
+  getSelected: () =>
+    scene.bodies.find((b) => b.id === selected) ||
+    scene.links.find((l) => l.id === selected),
+  onInspector: () => {
+    document.body.classList.remove("hide-inspector");
+    $("toggle-inspector").setAttribute("aria-pressed", "true");
+    $("selection").focus();
+  },
+});
 function toast(text) {
   $("toast").textContent = text;
   $("toast").classList.add("show");
@@ -86,6 +98,35 @@ function commit(change) {
   redo = [];
   scene = next;
   rebuild();
+  persist();
+  return true;
+}
+function applyProperties(change, id = null, keys = []) {
+  const next = clone(scene);
+  change(next);
+  let replacement;
+  try {
+    validateScene(next);
+    replacement = sim.reconfigure(next, id, keys);
+  } catch (error) {
+    toast(error.message);
+    return false;
+  }
+  const active = document.activeElement;
+  const focusedLabel = $("properties").contains(active)
+    ? active.getAttribute("aria-label")
+    : null;
+  undo.push(clone(scene));
+  if (undo.length > 80) undo.shift();
+  redo = [];
+  scene = next;
+  sim.dispose();
+  sim = replacement;
+  refresh();
+  if (focusedLabel)
+    [...$("properties").querySelectorAll("[aria-label]")]
+      .find((el) => el.getAttribute("aria-label") === focusedLabel)
+      ?.focus();
   persist();
   return true;
 }
@@ -158,6 +199,7 @@ function refresh() {
     );
   sel.value = selected || "";
   renderProperties();
+  objectMenu.refresh();
 }
 const fields = {
   thickness: ["Wall thickness", "m", 0.02, 10, 0.01],
@@ -180,14 +222,15 @@ const fields = {
   k: ["Spring stiffness", "N/m", 0.1, 1000, 0.1],
   damping: ["Damping", "N·s/m", 0, 100, 0.1],
 };
-function renderProperties() {
-  const root = $("properties");
+function renderProperties(root = $("properties"), popup = false) {
   root.replaceChildren();
   const b = scene.bodies.find((b) => b.id === selected),
     l = scene.links.find((l) => l.id === selected),
     target = b || l;
-  $("tracking").textContent = b ? b.name : "Select an object";
-  $("readouts").replaceChildren();
+  if (!popup) {
+    $("tracking").textContent = b ? b.name : "Select an object";
+    $("readouts").replaceChildren();
+  }
   if (!target) {
     const p = document.createElement("p");
     p.className = "empty";
@@ -196,7 +239,7 @@ function renderProperties() {
     root.append(p);
     return;
   }
-  if (b) root.append(motionPanel(b, commit));
+  if (b) root.append(motionPanel(b, applyProperties));
   const grid = document.createElement("div");
   grid.className = "property-grid";
   root.append(grid);
@@ -209,7 +252,12 @@ function renderProperties() {
     el.append(u);
     const input = document.createElement("input");
     input.type = type;
-    input.value = target[key];
+    const liveKey = b && ["x", "y", "vx", "vy", "angle", "omega"].includes(key);
+    input.value = liveKey ? sim.state(b.id)[key] : target[key];
+    if (liveKey) {
+      input.dataset.stateKey = key;
+      input.dataset.bodyId = b.id;
+    }
     input.setAttribute("aria-label", label);
     if (type === "text") input.maxLength = 100;
     if (type === "number") {
@@ -224,16 +272,24 @@ function renderProperties() {
         return;
       }
       const id = selected;
-      commit((s) => {
-        const t = (b ? s.bodies : s.links).find((v) => v.id === id);
-        if (t.points && ["width", "height"].includes(key)) {
-          const axis = key === "width" ? "x" : "y",
-            factor = Number(input.value) / t[key];
-          t.points = t.points.map((p) => ({ ...p, [axis]: p[axis] * factor }));
-        }
-        t[key] = type === "number" ? Number(input.value) : input.value;
-        if (b && ["x", "y"].includes(key)) updateLinkLengths(s, t.id);
-      });
+      applyProperties(
+        (s) => {
+          const t = (b ? s.bodies : s.links).find((v) => v.id === id);
+          if (t.points && ["width", "height"].includes(key)) {
+            const axis = key === "width" ? "x" : "y",
+              factor = Number(input.value) / t[key];
+            t.points = t.points.map((p) => ({
+              ...p,
+              [axis]: p[axis] * factor,
+            }));
+          }
+          t[key] = type === "number" ? Number(input.value) : input.value;
+          if (b && sim.time === 0 && ["x", "y"].includes(key))
+            updateLinkLengths(s, t.id);
+        },
+        id,
+        [key],
+      );
     });
     el.append(input);
     grid.append(el);
@@ -270,28 +326,29 @@ function renderProperties() {
     input.type = "checkbox";
     input.checked = b.fixed;
     input.onchange = () =>
-      commit((s) => {
+      applyProperties((s) => {
         s.bodies.find((v) => v.id === selected).fixed = input.checked;
       });
     label.append(input, document.createTextNode("Fixed in place"));
     grid.append(label);
-    for (const [id, title] of [
-      ["speed-readout", "SPEED · m/s"],
-      ["energy-readout", "KINETIC ENERGY · J"],
-      ["x-readout", "POSITION X · m"],
-      ["y-readout", "POSITION Y · m"],
-      ["ax-readout", "ACCELERATION X · m/s²"],
-      ["ay-readout", "ACCELERATION Y · m/s²"],
-    ]) {
-      const div = document.createElement("div");
-      div.className = "readout";
-      const span = document.createElement("span");
-      span.textContent = title;
-      const strong = document.createElement("strong");
-      strong.id = id;
-      div.append(span, strong);
-      $("readouts").append(div);
-    }
+    if (!popup)
+      for (const [id, title] of [
+        ["speed-readout", "SPEED · m/s"],
+        ["energy-readout", "KINETIC ENERGY · J"],
+        ["x-readout", "POSITION X · m"],
+        ["y-readout", "POSITION Y · m"],
+        ["ax-readout", "ACCELERATION X · m/s²"],
+        ["ay-readout", "ACCELERATION Y · m/s²"],
+      ]) {
+        const div = document.createElement("div");
+        div.className = "readout";
+        const span = document.createElement("span");
+        span.textContent = title;
+        const strong = document.createElement("strong");
+        strong.id = id;
+        div.append(span, strong);
+        $("readouts").append(div);
+      }
   } else {
     for (const key of [
       "length",
@@ -439,6 +496,26 @@ canvas.addEventListener(
   },
   { passive: false },
 );
+canvas.addEventListener("contextmenu", (e) => {
+  const at = locate(e),
+    object = hit(world(at.x, at.y));
+  objectMenu.close();
+  if (!object) return; // Keep the browser menu on empty canvas.
+  e.preventDefault();
+  drag = null;
+  pending = null;
+  select(object.id);
+  objectMenu.open(e.clientX, e.clientY);
+});
+canvas.addEventListener("keydown", (e) => {
+  if (e.key !== "ContextMenu" && !(e.shiftKey && e.key === "F10")) return;
+  if (!sim.bodies.has(selected)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const at = screen(sim.state(selected)),
+    bounds = canvas.getBoundingClientRect();
+  objectMenu.open(bounds.left + at.x, bounds.top + at.y);
+});
 canvas.addEventListener("pointerdown", (e) => {
   if (e.button !== 0 && e.button !== 1) return;
   canvas.focus();
@@ -1119,6 +1196,17 @@ function drawGraph() {
   $("csv").disabled = !samples.length;
 }
 function readouts() {
+  // Never overwrite a value while the user is typing into it.
+  for (const input of document.querySelectorAll("[data-state-key]")) {
+    if (
+      input === document.activeElement ||
+      !sim.bodies.has(input.dataset.bodyId)
+    )
+      continue;
+    input.value = Number(
+      sim.state(input.dataset.bodyId)[input.dataset.stateKey].toFixed(4),
+    );
+  }
   $("time").innerHTML = sim.time.toFixed(2) + " <small>s</small>";
   if ($("speed-readout") && sim.bodies.has(selected)) {
     const s = sim.state(selected);
@@ -1209,12 +1297,12 @@ $("gravity").onchange = (e) => {
     e.target.value = scene.gravity;
     return;
   }
-  commit((s) => {
+  applyProperties((s) => {
     s.gravity = n;
   });
 };
 $("title").onchange = (e) =>
-  commit((s) => {
+  applyProperties((s) => {
     s.title = e.target.value.trim().slice(0, 100) || "Untitled experiment";
   });
 $("selection").onchange = (e) => select(e.target.value || null);
