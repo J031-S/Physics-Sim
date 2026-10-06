@@ -11,7 +11,13 @@
       <a class="brand" href="./"><span>φ</span> Physics Sim</a
       ><span class="subtitle">A simple mechanics sandbox</span>
       <div class="playback">
-        <button id="shortcuts" title="Keyboard shortcuts (?)">Keys ?</button
+        <button
+          id="settings-toggle"
+          aria-expanded="false"
+          aria-controls="settings-panel"
+        >
+          Settings</button
+        ><button id="shortcuts" title="Keyboard shortcuts (?)">Keys ?</button
         ><button id="pause" title="Play / pause (Space)">Ⅱ Pause</button
         ><button id="clear">Clear scene</button>
       </div>
@@ -25,6 +31,7 @@
       <div class="tools" role="toolbar" aria-label="Creation tools">
         <button data-tool="grab" class="active" aria-pressed="true">
           <b>↖</b> Grab</button
+        ><button data-tool="select" aria-pressed="false"><b>⬚</b> Select</button
         ><button data-tool="ball" aria-pressed="false"><b>○</b> Ball</button
         ><button data-tool="block" aria-pressed="false"><b>□</b> Block</button
         ><span class="divider"></span
@@ -95,6 +102,59 @@
       <p id="menu-note">Changes apply while the simulation runs.</p>
       <form id="constants"></form>
     </section>
+    <section id="settings-panel" hidden aria-labelledby="settings-title">
+      <div class="menu-header">
+        <strong id="settings-title">Simulation settings</strong
+        ><button id="close-settings" aria-label="Close simulation settings">
+          ×
+        </button>
+      </div>
+      <p>Changes apply immediately, including while running.</p>
+      <label for="setting-gravity">Gravity ↓ <span>m/s²</span></label>
+      <input
+        id="setting-gravity"
+        type="number"
+        min="-50"
+        max="50"
+        step="any"
+        value="9.81"
+      />
+      <input
+        id="range-gravity"
+        type="range"
+        min="-50"
+        max="50"
+        step="0.01"
+        value="9.81"
+        aria-label="Gravity slider"
+      />
+      <small
+        >Positive pulls down; zero disables gravity; negative pulls up.</small
+      >
+      <label for="setting-airResistance">Air resistance <span>s⁻¹</span></label>
+      <input
+        id="setting-airResistance"
+        type="number"
+        min="0"
+        max="10"
+        step="any"
+        value="0"
+      />
+      <input
+        id="range-airResistance"
+        type="range"
+        min="0"
+        max="10"
+        step="0.01"
+        value="0"
+        aria-label="Air resistance slider"
+      />
+      <small
+        >Global linear drag and spin damping, added to each object's own
+        damping. Zero means no air resistance.</small
+      >
+      <button id="reset-settings">Restore defaults</button>
+    </section>
     <section id="keys-panel" hidden aria-label="Keyboard shortcuts">
       <div class="menu-header">
         <strong>Keyboard &amp; mouse</strong
@@ -103,6 +163,8 @@
       <dl>
         <dt>Space</dt>
         <dd>Play / pause</dd>
+        <dt>Q · Shift</dt>
+        <dd>Select tool · add/remove from selection</dd>
         <dt>G · B · N</dt>
         <dd>Grab · Ball · Block</dd>
         <dt>S · D · T · U</dt>
@@ -121,10 +183,13 @@
         <dd>Delete selection · cancel interaction</dd>
       </dl>
       <p>
-        Belt: click two balls. Pulley: click endpoint, wheel ball, endpoint.
-        Cable ends can move at any angle and connect to springs. Pulley axles
-        start pinned; unlock position to move them. Select a belt for crossed /
-        driven modes. Select a spring to lock its current angle.
+        Select: drag a box, then drag a selected body to move the connected
+        assembly. Ctrl snaps group movement to 0.5 m. Pins and world anchors
+        move with the layout. Belt: click two balls. Pulley: click endpoint,
+        wheel ball, endpoint. Cable ends can move at any angle and connect to
+        springs. Pulley axles start pinned; unlock position to move them. Select
+        a belt for crossed / driven modes. Select a spring to lock its current
+        angle.
       </p>
     </section>
     <script src="vendor/matter.js"></script>

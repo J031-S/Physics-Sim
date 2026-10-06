@@ -335,7 +335,7 @@ export class Mechanisms {
       const speed = -s.state(l.a).omega * a.radius,
         relative = state.vx * t.x + state.vy * t.y + state.omega * lever;
       const normal = Math.max(
-        o.mass * 9.81 * STEP,
+        o.mass * Math.abs(s.settings.gravity) * STEP,
         contacts.reduce((sum, c) => sum + Math.abs(c.normalImpulse), 0) /
           (SCALE * STEP),
       );

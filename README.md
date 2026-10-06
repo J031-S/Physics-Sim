@@ -19,6 +19,7 @@ Click **Keys ?** (or press **?**) for the built-in shortcut guide. Shortcuts do 
 | Key / gesture | Action |
 |---|---|
 | Space | Play / pause (holding the key does not repeatedly toggle) |
+| Q / Shift | Select tool / add or remove objects from selection |
 | G / B / N | Grab / Ball / Block |
 | S / D / T / U | Spring / Rod / Belt / Pulley |
 | V | Toggle velocity vectors |
@@ -35,6 +36,21 @@ Click **Keys ?** (or press **?**) for the built-in shortcut guide. Shortcuts do 
 - **Resize:** hold R before starting a drag, or click the selection bar's **Resize (R)** button. Drag outward/inward to resize a ball's diameter; drag a block near a corner to change width and height along its local axes. Dimensions appear beside the selection. The body stays centred and still during the gesture, even while physics runs. Mass stays constant; inertia is recalculated. Limits are 0.1–10 m. Edits that penetrate the floor or overlap pulley wheels are rejected. Return from the button-operated resize tool with G.
 - **Spring / Rod:** click two bodies, or a world anchor and a body. Connections attach at body centres. Select a connection by clicking its line. Alt-drag changes rod length while paused or running.
 - **Pause / Clear scene:** pause deliberately stops physics but editing still works. Clear removes everything except the static floor. Dragging does not pause the world.
+
+### Box selection and layout moves
+
+Choose **Select (Q)** and drag a rectangle over objects. Shift-drag adds to the selection; Shift-click toggles an individual object. Drag a selected body to move the group. Ctrl snaps the translation to 0.5 m increments, preserving the spacing between objects. Delete removes the selected objects and their attached connections.
+
+Moving a selection includes every body connected to it, so springs, rods, cables and belts stay assembled. The expanded selection is highlighted and announced. World anchors and pinned positions translate with the group; lock states, dimensions, angles and connection lengths remain unchanged. This is a layout edit and does not throw the group: selected bodies stay still during placement and release with zero velocity. The rest of the simulation keeps running. Use Grab for individual, constraint-respecting physical manipulation instead.
+
+### Simulation settings
+
+Click **Settings** in the header to open the side panel. Both settings offer numeric entry and a live slider:
+
+- **Gravity:** −50 to +50 m/s²; positive is downward, zero disables gravity, negative is upward. Default 9.81.
+- **Air resistance:** 0–10 s⁻¹; an isotropic linear velocity and spin damping rate, added to each body's existing damping. Default 0. This is a simple linear drag model rather than a fluid simulation.
+
+Changes preserve the current scene, velocities and simulation time. **Restore defaults** resets just these settings. Clear scene retains them; reloading the page restores defaults. Global electric and magnetic fields can be added when their force models are implemented.
 
 ### Spring angle lock / horizontal SHO
 
@@ -63,7 +79,7 @@ To reproduce a spring–Atwood arrangement:
 
 The model is a taut, massless, no-slip cable with finite wheel inertia. It allows swinging/angled endpoints and translating axles; it does not simulate slack rope, rope collisions with unrelated objects, or automatic rerouting around extra wheels. Each cable wraps one selected wheel. The normal contact engine handles the objects and floor. Very stiff/conflicting assemblies retain the ordinary numerical limitations of an iterative rigid-body simulation.
 
-The floor is not selectable or editable. Gravity is 9.81 m/s². Grid lines mark 0.5 m and 1 m intervals.
+The floor is not selectable or editable. Gravity defaults to 9.81 m/s² and is configurable in Settings. Grid lines mark 0.5 m and 1 m intervals.
 
 ## Right-click menu
 
@@ -79,7 +95,7 @@ For a ball or block, only these constants are editable:
 
 Surface friction is not internal material hysteresis. The two damping coefficients model motion loss; this rigid-body simulation does not model deformation, heat generation or microscopic material properties.
 
-Springs expose stiffness, axial damping and rest length; rods expose length. Property changes apply on Enter or leaving the field, without pausing, resetting time, or rebuilding the world. Invalid values are rejected. Close with Escape, the cross, or clicking outside. Shift+F10 opens the menu for a selected object while the canvas is focused.
+Springs expose stiffness, axial damping and rest length; rods expose length. Every numeric property also has a slider. Sliders apply continuously while dragged and stay synchronized with manual input; manual changes apply on Enter or leaving the field, without pausing, resetting time, or rebuilding the world. Invalid values are rejected. Close with Escape, the cross, or clicking outside. Shift+F10 opens the menu for a selected object while the canvas is focused.
 
 Material menus contain no position/velocity inputs or geometry controls. Geometry, locks and belt drive controls are separate from material constants. There are no charge/temperature placeholders, equation editor, graph panel, presets, additional body shapes, inspector, autosave or scene import/export. Old localStorage saves are not loaded or deleted. This is a fresh, transient sandbox on every page load.
 
@@ -105,4 +121,4 @@ Numerical regression coverage also checks SHO period, guide motion, snapped rota
 
 The original regression coverage includes free fall, static floor, grab/throw velocity, pinned-object rotation, independent locks, lock/unlock after mass changes, pinned contacts, snapping, rod safety, springs and live constants. DOM checks exercise the actual creation/drag/menu/lock/snap controls. Visual browser verification was not available in the authoring environment; these checks do not claim exhaustive browser/device coverage.
 
-`src/physics.js` owns bodies, locks, dragging, resizing and spring guides. `src/mechanisms.js` owns belts and conveyor contact; `src/pulley.js` owns tangent cable geometry and its coupled translational/rotational constraints. `src/app.js` owns keyboard/pointer input, drawing and menus.
+`src/physics.js` owns bodies, global settings, locks, dragging, resizing and spring guides. `src/group-move.js` owns connected-assembly layout translation. `src/mechanisms.js` owns belts and conveyor contact; `src/pulley.js` owns tangent cable geometry and its coupled translational/rotational constraints. `src/app.js` owns keyboard/pointer input, drawing and menus.

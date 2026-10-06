@@ -68,7 +68,7 @@ const menu = (x, y) => {
 frames(1);
 assert.deepEqual(
   [...document.querySelectorAll("[data-tool]")].map((b) => b.dataset.tool),
-  ["grab", "ball", "block", "spring", "rod", "belt", "pulley"],
+  ["grab", "select", "ball", "block", "spring", "rod", "belt", "pulley"],
 );
 assert.equal(document.querySelector("#graph"), null);
 assert.equal(document.querySelector("#properties"), null);
@@ -80,7 +80,9 @@ assert.equal($("selected-name").textContent, "Ball");
 assert.equal(menu(500, 250).defaultPrevented, true);
 assert.equal($("material-menu").hidden, false);
 assert.deepEqual(
-  [...$("constants").querySelectorAll("input")].map((i) => i.dataset.constant),
+  [...$("constants").querySelectorAll("input[type=number]")].map(
+    (i) => i.dataset.constant,
+  ),
   ["mass", "friction", "restitution", "linearDamping", "angularDamping"],
 );
 assert.equal($("constants").querySelector('[aria-label="Position x"]'), null);
@@ -294,7 +296,67 @@ assert.equal($("lock-position").checked, false);
 key(" ");
 frames(10);
 key(" ");
+// Marquee selects only enclosed/intersecting bodies; group movement and deletion.
+$("clear").click();
+canvas.focus();
+key("b");
+click(300, 300);
+key("n");
+click(500, 300);
+key("b");
+click(750, 300);
+key("q");
+pointer("pointerdown", 250, 250);
+pointer("pointermove", 550, 350);
+pointer("pointerup", 550, 350);
+assert.equal($("selected-name").textContent, "2 objects selected");
+pointer("pointerdown", 300, 300);
+pointer("pointermove", 350, 350);
+pointer("pointerup", 350, 350);
+assert.equal($("selected-name").textContent, "2 objects selected");
+menu(350, 350);
+assert.ok($("constants").querySelector('[aria-label="Mass"]'));
+const massRange = $("constants").querySelector('[aria-label="Mass slider"]');
+massRange.value = "3";
+massRange.dispatchEvent(new window.Event("input"));
+assert.equal($("constants").querySelector('[aria-label="Mass"]').value, "3");
+const massNumber = $("constants").querySelector('[aria-label="Mass"]');
+massNumber.value = "4.5";
+massNumber.dispatchEvent(new window.Event("change"));
+assert.equal(massRange.value, "4.5");
+$("close-menu").click();
+menu(550, 350);
+assert.ok($("constants").querySelector('[aria-label="Mass"]'));
+$("close-menu").click();
+key("q");
+pointer("pointerdown", 250, 250);
+pointer("pointermove", 600, 420);
+pointer("pointerup", 600, 420);
+key("Delete");
+assert.equal($("selection").hidden, true);
+menu(750, 300);
+assert.ok($("constants").querySelector('[aria-label="Mass"]'));
+$("close-menu").click();
+$("settings-toggle").click();
+assert.equal($("settings-panel").hidden, false);
+$("range-gravity").value = "0";
+$("range-gravity").dispatchEvent(new window.Event("input"));
+assert.equal($("setting-gravity").value, "0");
+$("setting-airResistance").value = "2";
+$("setting-airResistance").dispatchEvent(new window.Event("change"));
+assert.equal($("range-airResistance").value, "2");
+$("setting-gravity").value = "-500";
+$("setting-gravity").dispatchEvent(new window.Event("change"));
+assert.equal($("setting-gravity").value, "0");
+$("clear").click();
+$("settings-toggle").click();
+$("settings-toggle").click();
+assert.equal($("setting-airResistance").value, "2");
+$("reset-settings").click();
+assert.equal($("setting-gravity").value, "9.81");
+assert.equal($("setting-airResistance").value, "0");
+$("close-settings").click();
 console.log(
-  "PASS: creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, deletion and clear.",
+  "PASS: creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );
 await window.happyDOM.close();

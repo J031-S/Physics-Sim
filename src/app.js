@@ -6,6 +6,8 @@ let sim = new Sandbox(),
   running = true,
   tool = "grab",
   selected = null,
+  selectionSet = new Set(),
+  marquee = null,
   pending = null,
   pointer = null,
   ctrl = false,
@@ -35,6 +37,8 @@ function locate(e) {
 }
 function chooseTool(next) {
   sim.endResize();
+  sim.endGroup();
+  marquee = null;
   tool = next;
   pending = null;
   for (const b of document.querySelectorAll("[data-tool]")) {
@@ -42,6 +46,8 @@ function chooseTool(next) {
     b.setAttribute("aria-pressed", b.dataset.tool === tool);
   }
   $("hint").textContent = {
+    select:
+      "Drag a box to select · Shift adds/removes · drag a selected body to move its assembly · Ctrl snaps movement",
     grab: "Drag to move · R-drag resizes · Alt-drag refits rods / cables · Ctrl snaps · ? shortcuts",
     resize:
       "Drag a ball or block to resize around its centre. Ctrl snaps dimensions to 0.5 m. G returns to Grab.",
@@ -57,6 +63,7 @@ function chooseTool(next) {
   canvas.style.cursor = tool === "grab" ? "grab" : "crosshair";
 }
 function select(id) {
+  selectionSet = new Set(id ? [id] : []);
   selected = id;
   const o = sim.objects.get(id),
     l = sim.links.get(id);
@@ -88,6 +95,43 @@ function select(id) {
     $(id).parentElement.hidden = !o;
     $(id).checked = !!o?.[key];
   }
+}
+function selectMany(ids) {
+  const list = [...new Set(ids)].filter(
+    (id) => sim.objects.has(id) || sim.links.has(id),
+  );
+  select(list.length === 1 ? list[0] : null);
+  selectionSet = new Set(list);
+  if (list.length > 1) {
+    $("selection").hidden = false;
+    $("selected-name").textContent = `${list.length} objects selected`;
+  }
+}
+function finishMarquee(p) {
+  const box = marquee;
+  if (!box) return;
+  const minX = Math.min(box.start.x, p.x),
+    maxX = Math.max(box.start.x, p.x),
+    minY = Math.min(box.start.y, p.y),
+    maxY = Math.max(box.start.y, p.y);
+  const ids = [...sim.objects.values()]
+    .filter(
+      (o) =>
+        o.body.bounds.max.x / 100 >= minX &&
+        o.body.bounds.min.x / 100 <= maxX &&
+        -o.body.bounds.min.y / 100 >= minY &&
+        -o.body.bounds.max.y / 100 <= maxY,
+    )
+    .map((o) => o.id);
+  selectMany([...box.base, ...ids]);
+  marquee = null;
+}
+function highlighted(id) {
+  if (selectionSet.has(id)) return true;
+  const l = sim.links.get(id);
+  return (
+    l && [l.a, l.b, l.wheel].filter(Boolean).every((id) => selectionSet.has(id))
+  );
 }
 function showDimensions() {
   const o = sim.objects.get(selected);
@@ -250,6 +294,14 @@ function openMenu(id, x, y) {
     input.value = (o || l)[key];
     input.setAttribute("aria-label", name);
     input.dataset.constant = key;
+    const range = document.createElement("input");
+    range.type = "range";
+    range.min = min;
+    range.max = max;
+    range.step = "any";
+    range.value = input.value;
+    range.dataset.slider = key;
+    range.setAttribute("aria-label", name + " slider");
     input.onchange = () => {
       const current = sim.objects.get(id) || sim.links.get(id);
       if (!current) {
@@ -267,8 +319,13 @@ function openMenu(id, x, y) {
         toast(error.message);
         input.value = current[key];
       }
+      range.value = current[key];
     };
-    label.append(input);
+    range.oninput = () => {
+      input.value = String(Number(Number(range.value).toFixed(3)));
+      input.onchange();
+    };
+    label.append(input, range);
     const info = document.createElement("small");
     info.textContent = help;
     label.append(info);
@@ -320,6 +377,30 @@ canvas.addEventListener("pointerdown", (e) => {
   syncCtrl(e.ctrlKey);
   alt = e.altKey;
   canvas.setPointerCapture(e.pointerId);
+  if (tool === "select") {
+    const id = sim.hit(pointer);
+    if (id) {
+      if (e.shiftKey) {
+        const ids = new Set(selectionSet);
+        ids.has(id) ? ids.delete(id) : ids.add(id);
+        selectMany([...ids]);
+        return;
+      }
+      if (!selectionSet.has(id)) selectMany([id]);
+      const before = selectionSet.size;
+      selectMany(sim.beginGroup([...selectionSet], pointer));
+      if (selectionSet.size > before)
+        toast("Connected objects included to preserve the assembly.");
+    } else {
+      marquee = {
+        start: { ...pointer },
+        end: { ...pointer },
+        base: e.shiftKey ? [...selectionSet] : [],
+      };
+      if (!e.shiftKey) selectMany([]);
+    }
+    return;
+  }
   if (tool === "grab" || tool === "resize") {
     const id = sim.hit(pointer);
     select(id || linkAt(pointer) || null);
@@ -398,6 +479,8 @@ canvas.addEventListener("pointermove", (e) => {
   pointer = locate(e);
   syncCtrl(e.ctrlKey);
   alt = e.altKey;
+  if (marquee) marquee.end = { ...pointer };
+  if (sim.group) sim.moveGroup(pointer, ctrl);
   if (sim.grab) sim.moveGrab(pointer, ctrl, alt);
   if (sim.sizing) {
     try {
@@ -410,6 +493,11 @@ canvas.addEventListener("pointermove", (e) => {
 });
 canvas.addEventListener("pointerup", (e) => {
   if (e.button !== 0) return;
+  if (marquee) finishMarquee(locate(e));
+  if (sim.group) {
+    sim.moveGroup(locate(e), e.ctrlKey);
+    sim.endGroup();
+  }
   if (sim.grab) {
     pointer = locate(e);
     sim.moveGrab(pointer, e.ctrlKey, e.altKey);
@@ -430,6 +518,8 @@ canvas.addEventListener("pointerup", (e) => {
 canvas.addEventListener("pointercancel", cancelDrag);
 canvas.addEventListener("lostpointercapture", cancelDrag);
 function cancelDrag() {
+  marquee = null;
+  sim.endGroup();
   sim.endGrab(false);
   sim.endResize();
 }
@@ -509,9 +599,59 @@ $("close-keys").onclick = () => {
   $("keys-panel").hidden = true;
   canvas.focus();
 };
+function syncSettings() {
+  for (const key of ["gravity", "airResistance"]) {
+    $("setting-" + key).value = sim.settings[key];
+    $("range-" + key).value = sim.settings[key];
+  }
+}
+function closeSettings() {
+  $("settings-panel").hidden = true;
+  $("settings-toggle").setAttribute("aria-expanded", "false");
+}
+$("settings-toggle").onclick = () => {
+  const hidden = !$("settings-panel").hidden;
+  $("settings-panel").hidden = hidden;
+  $("settings-toggle").setAttribute("aria-expanded", String(!hidden));
+  syncSettings();
+};
+$("close-settings").onclick = () => {
+  closeSettings();
+  canvas.focus();
+};
+$("settings-panel").addEventListener("keydown", (e) => {
+  e.stopPropagation();
+  if (e.key === "Escape") {
+    closeSettings();
+    canvas.focus();
+  }
+});
+for (const key of ["gravity", "airResistance"]) {
+  const input = $("setting-" + key),
+    range = $("range-" + key);
+  input.onchange = () => {
+    try {
+      if (input.value === "" || !input.checkValidity())
+        throw new Error("Enter a value within the displayed limits.");
+      sim.updateSettings({ [key]: Number(input.value) });
+    } catch (error) {
+      toast(error.message);
+    }
+    syncSettings();
+  };
+  range.oninput = () => {
+    sim.updateSettings({ [key]: Number(range.value) });
+    input.value = sim.settings[key];
+  };
+}
+$("reset-settings").onclick = () => {
+  sim.updateSettings({ gravity: 9.81, airResistance: 0 });
+  syncSettings();
+};
 function removeSelected() {
-  if (selected) {
-    sim.remove(selected);
+  if (selectionSet.size) {
+    cancelDrag();
+    for (const id of [...selectionSet]) sim.remove(id);
     select(null);
     closeMenu();
   }
@@ -524,8 +664,10 @@ $("pause").onclick = () => {
   canvas.focus();
 };
 $("clear").onclick = () => {
+  const settings = { ...sim.settings };
   sim.dispose();
   sim = new Sandbox();
+  sim.updateSettings(settings);
   selected = null;
   pending = null;
   select(null);
@@ -574,6 +716,7 @@ document.addEventListener("keydown", (e) => {
     chooseTool("grab");
     closeMenu();
     $("keys-panel").hidden = true;
+    closeSettings();
   }
   if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.code === "Space" || e.key === " ") {
@@ -582,6 +725,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   const keys = {
+    q: "select",
     g: "grab",
     b: "ball",
     n: "block",
@@ -689,7 +833,7 @@ function draw() {
       const path = linkPath(l).map(screen);
       ctx.beginPath();
       path.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.strokeStyle = l.id === selected ? "#566b91" : "#617569";
+      ctx.strokeStyle = highlighted(l.id) ? "#566b91" : "#617569";
       ctx.lineWidth = l.type === "belt" ? 5 : 2.5;
       ctx.stroke();
       if (l.type === "belt") {
@@ -719,7 +863,7 @@ function draw() {
         );
       }
     ctx.lineTo(b.x, b.y);
-    ctx.strokeStyle = l.id === selected ? "#566b91" : "#879579";
+    ctx.strokeStyle = highlighted(l.id) ? "#566b91" : "#879579";
     ctx.lineWidth = l.type === "rod" ? 3 : 1.8;
     ctx.stroke();
     if (l.type === "spring" && l.lockAngle) {
@@ -750,13 +894,12 @@ function draw() {
     ctx.closePath();
     ctx.fillStyle = o.shape === "ball" ? "#dba66be0" : "#8ca6bce0";
     ctx.fill();
-    ctx.strokeStyle =
-      o.id === selected
-        ? "#334e3c"
-        : o.shape === "ball"
-          ? "#a77943"
-          : "#658199";
-    ctx.lineWidth = o.id === selected ? 2.5 : 1.5;
+    ctx.strokeStyle = highlighted(o.id)
+      ? "#334e3c"
+      : o.shape === "ball"
+        ? "#a77943"
+        : "#658199";
+    ctx.lineWidth = highlighted(o.id) ? 2.5 : 1.5;
     ctx.stroke();
     // A radial stripe makes ball rotation visible, including with a pinned centre.
     if (o.shape === "ball")
@@ -805,7 +948,7 @@ function draw() {
           "#497caa",
           2,
         );
-        if (o.id === selected) {
+        if (highlighted(o.id)) {
           ctx.fillStyle = "#497caa";
           ctx.font = "10px monospace";
           ctx.fillText(speed.toFixed(1) + " m/s", end.x + 7, end.y - 6);
@@ -821,6 +964,27 @@ function draw() {
       ctx.lineWidth = 2;
       ctx.strokeRect(p.x - 6, p.y - 6, 12, 12);
     }
+  }
+  if (marquee) {
+    const a = screen(marquee.start),
+      b = screen(marquee.end);
+    ctx.fillStyle = "#63876a22";
+    ctx.strokeStyle = "#507954";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 3]);
+    ctx.fillRect(
+      Math.min(a.x, b.x),
+      Math.min(a.y, b.y),
+      Math.abs(b.x - a.x),
+      Math.abs(b.y - a.y),
+    );
+    ctx.strokeRect(
+      Math.min(a.x, b.x),
+      Math.min(a.y, b.y),
+      Math.abs(b.x - a.x),
+      Math.abs(b.y - a.y),
+    );
+    ctx.setLineDash([]);
   }
   if (pending && pointer) {
     ctx.setLineDash([4, 4]);
@@ -844,6 +1008,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 for (const [key, t] of Object.entries({
+  Q: "select",
   G: "grab",
   B: "ball",
   N: "block",

@@ -1,3 +1,4 @@
+import { GroupMove } from "./group-move.js";
 import { Mechanisms } from "./mechanisms.js";
 // The sandbox exposes SI units; Matter uses px, ms and 60 Hz-normalised velocity.
 const { Engine, Bodies, Body, Composite, Constraint, Query } =
@@ -18,6 +19,8 @@ export class Sandbox {
     this.engine.gravity.scale = 0; // Gravity and damping are explicit SI forces.
     this.objects = new Map();
     this.links = new Map();
+    this.settings = { gravity: 9.81, airResistance: 0 };
+    this.group = null;
     this.time = 0;
     this.serial = 0;
     this.grab = null;
@@ -46,6 +49,30 @@ export class Sandbox {
     globalThis.Matter.Events.on(this.engine, "collisionStart", (event) =>
       filter(event.pairs),
     );
+  }
+  updateSettings(patch) {
+    const ranges = { gravity: [-50, 50], airResistance: [0, 10] };
+    for (const [key, v] of Object.entries(patch))
+      if (
+        !ranges[key] ||
+        !Number.isFinite(v) ||
+        v < ranges[key][0] ||
+        v > ranges[key][1]
+      )
+        throw new Error("Invalid simulation setting: " + key);
+    Object.assign(this.settings, patch);
+  }
+  beginGroup(ids, p) {
+    this.endGrab(false);
+    this.endResize();
+    this.group = new GroupMove(this, ids, p);
+    return [...this.group.ids];
+  }
+  moveGroup(p, snapping = false) {
+    this.group?.move(p, snapping);
+  }
+  endGroup() {
+    this.group = null;
   }
   add(shape, point) {
     if (!["ball", "block"].includes(shape))
@@ -728,16 +755,21 @@ export class Sandbox {
       const s = this.state(o.id),
         b = o.body;
       if (!o.lockPosition) {
-        this.applyForce(o.id, s, { x: 0, y: -9.81 * o.mass });
+        this.applyForce(o.id, s, { x: 0, y: -this.settings.gravity * o.mass });
         Body.setVelocity(b, {
-          x: b.velocity.x * Math.exp(-o.linearDamping * DT),
-          y: b.velocity.y * Math.exp(-o.linearDamping * DT),
+          x:
+            b.velocity.x *
+            Math.exp(-(o.linearDamping + this.settings.airResistance) * DT),
+          y:
+            b.velocity.y *
+            Math.exp(-(o.linearDamping + this.settings.airResistance) * DT),
         });
       }
       if (!o.lockRotation)
         Body.setAngularVelocity(
           b,
-          Body.getAngularVelocity(b) * Math.exp(-o.angularDamping * DT),
+          Body.getAngularVelocity(b) *
+            Math.exp(-(o.angularDamping + this.settings.airResistance) * DT),
         );
     }
     for (const l of this.links.values())
@@ -761,6 +793,7 @@ export class Sandbox {
     this.placeGrab();
     this.enforceLocks();
     this.holdResize();
+    this.group?.hold();
     this.mechanisms.beforeStep();
     Engine.update(this.engine, DT * 1000);
     this.enforceLocks();
@@ -768,9 +801,11 @@ export class Sandbox {
     this.holdResize();
     for (let i = 0; i < 6; i++) this.solveGuides();
     this.mechanisms.afterStep();
+    this.group?.hold();
     this.time += DT;
   }
   remove(id) {
+    if (this.group?.ids.has(id)) this.endGroup();
     if (this.grab?.id === id) this.endGrab(false);
     if (this.sizing?.id === id) this.endResize();
     this.mechanisms.remove(id);
