@@ -19,36 +19,42 @@ Click **Keys ?** (or press **?**) for the built-in shortcut guide. Shortcuts do 
 | Key / gesture | Action |
 |---|---|
 | Space | Play / pause (holding the key does not repeatedly toggle) |
-| Q / Shift | Select tool / add or remove objects from selection |
+| Q / Shift-box | Select tool / add objects to a selection box |
 | G / B / N | Grab / Ball / Block |
 | S / D / T / U | Spring / Rod / Belt / Pulley |
 | V | Toggle velocity vectors |
 | R + left-drag | Resize a ball or block about its current centre |
-| Ctrl + R-drag | Snap diameter, or width and height, to 0.5 m |
-| Ctrl + drag | Snap the desired centre to the grid; a position-locked body instead rotates in 15° steps |
+| Z | Toggle snapping for every geometry operation; also available in Settings |
+| Shift + drag | Prioritise movement; moving a position-locked body requires Pause |
+| Ctrl + drag | Prioritise rotation about the centre; changing a rotation-locked body requires Pause |
+| Shift + Alt + drag | Move while refitting rod/cable lengths |
+| Ctrl + R | Native browser reload |
 | Alt + drag | Refit attached rod / pulley cable lengths |
 | Delete / Escape | Delete selection / cancel interaction |
 | Right-click / Shift+F10 | Material constants / constants for selection |
 
 - **Ball / Block:** select a tool and click above the floor. The tool returns to Grab after one placement.
-- **Grab:** drag directly without a mouse tether. Release while moving to throw; hold still before release to stop. A rod constrains normal dragging to its arc. Ctrl release suppresses throwing; locks and connections take priority over grid placement.
-- **Independent locks:** use the selection bar to lock position, rotation, or both. For a pinned ball, grab away from its centre to rotate it. Ctrl snaps its absolute orientation to multiples of 15°. A ball's stripe shows its orientation.
+- **Grab:** drag directly without a mouse tether. Release while moving to throw; hold still before release to stop. A rod constrains normal dragging to its arc. Snapping suppresses throwing on release; locks and connections take priority over grid placement.
+- **Independent locks:** use the selection bar to lock position, rotation, or both. For a pinned ball, grab away from its centre to rotate it. With snapping enabled, rotation follows absolute 15° steps. Shift explicitly chooses translation, Ctrl explicitly chooses rotation. When paused, manual edits update the stored locked position/angle without disabling either lock; physics continues to respect those locks on resume. Running interactions cannot edit a locked degree of freedom. A ball's stripe shows its orientation.
 - **Resize:** hold R before starting a drag, or click the selection bar's **Resize (R)** button. Drag outward/inward to resize a ball's diameter; drag a block near a corner to change width and height along its local axes. Dimensions appear beside the selection. The body stays centred and still during the gesture, even while physics runs. Mass stays constant; inertia is recalculated. Limits are 0.1–10 m. Edits that penetrate the floor or overlap pulley wheels are rejected. Return from the button-operated resize tool with G.
 - **Spring / Rod:** click two bodies, or a world anchor and a body. Connections attach at body centres. Select a connection by clicking its line. Alt-drag changes rod length while paused or running.
 - **Pause / Clear scene:** pause deliberately stops physics but editing still works. Clear removes everything except the static floor. Dragging does not pause the world.
 
 ### Box selection and layout moves
 
-Choose **Select (Q)** and drag a rectangle over objects. Shift-drag adds to the selection; Shift-click toggles an individual object. Drag a selected body to move the group. Ctrl snaps the translation to 0.5 m increments, preserving the spacing between objects. Delete removes the selected objects and their attached connections.
+Choose **Select (Q)** and drag a rectangle over objects. Shift-box selection adds objects to the current selection. Drag a selected body to move the group. With snapping enabled, translation follows 0.5 m increments, preserving the spacing between objects. Delete removes the selected objects and their attached connections.
 
-Moving a selection includes every body connected to it, so springs, rods, cables and belts stay assembled. The expanded selection is highlighted and announced. World anchors and pinned positions translate with the group; lock states, dimensions, angles and connection lengths remain unchanged. This is a layout edit and does not throw the group: selected bodies stay still during placement and release with zero velocity. The rest of the simulation keeps running. Use Grab for individual, constraint-respecting physical manipulation instead.
+Moving a selection includes every body connected to it, so springs, rods, cables and belts stay assembled. The expanded selection is highlighted and announced. World anchors and pinned positions translate with the group; lock states, dimensions, angles and connection lengths remain unchanged. This is a layout edit and does not throw the group: selected bodies stay still during placement and release with zero velocity. Assemblies containing position-locked objects can only be moved while paused. The rest of the simulation keeps running for unlocked group moves. Ctrl in Select mode rotates the clicked body individually. Use Grab for individual, constraint-respecting physical manipulation instead.
 
 ### Simulation settings
 
-Click **Settings** in the header to open the side panel. Both settings offer numeric entry and a live slider:
+Click **Settings** in the header to open the side panel. Gravity and air resistance offer numeric entry and a live slider:
 
-- **Gravity:** −50 to +50 m/s²; positive is downward, zero disables gravity, negative is upward. Default 9.81.
+- **Gravity:** −50 to +50 m/s²; positive is downward, zero disables gravity, negative is upward. Default 9.81. The slider snaps to exactly zero within ±0.5 m/s²; manual input still permits smaller nonzero values.
 - **Air resistance:** 0–10 s⁻¹; an isotropic linear velocity and spin damping rate, added to each body's existing damping. Default 0. This is a simple linear drag model rather than a fluid simulation.
+
+- **Snapping (Z):** one persistent toggle for position and group translations (0.5 m), rotation (15°), dimensions (0.5 m), and Alt-refitted connection lengths (0.5 m). The active operation determines what is snapped; physical constraints and walls take priority when exact grid placement is impossible. Shift/Ctrl/Alt can be changed during a drag; Shift wins if Shift and Ctrl are held together. R chooses resizing and works with the snapping toggle, but Ctrl+R and Cmd+R retain browser reload.
+- **Screen-edge walls:** enables four nonselectable static colliders at the canvas edges, tracking browser viewport changes. The existing ground remains in place. Disabled by default.
 
 Changes preserve the current scene, velocities and simulation time. **Restore defaults** resets just these settings. Clear scene retains them; reloading the page restores defaults. Global electric and magnetic fields can be added when their force models are implemented.
 
@@ -62,7 +68,7 @@ Press **T**, then click two separate balls. A closed belt wraps tangentially aro
 
 Select the belt to enable **Crossed belt** (opposite rotation), or **Drive belt** and a signed speed in m/s (−10 to 10). Positive speed goes from the first wheel to the second along the first span. With Drive off, spin a wheel by dragging its rim and releasing; momentum is shared according to the wheels' radii and inertias. A rotation-locked wheel brakes the pair.
 
-For a conveyor, place the two wheels horizontally, enable Drive belt, then place a block just above the upper span. The spans support contact and use the object's surface friction to transport it. Zero surface friction means no conveyor traction. Passive belt contact reacts back on the wheels; a driven belt is an ideal external motor supplying whatever torque is required. Animated dashes show belt travel. Delete the belt before unlocking an axle's position.
+For a conveyor, place the two wheels horizontally, enable Drive belt, then place a block just above the upper span. The spans support contact and use the object's surface friction to transport it. Zero surface friction means no conveyor traction. Passive belt contact reacts back on the wheels; a driven belt is an ideal external motor supplying whatever torque is required. Animated dashes show belt travel. Delete the belt before unlocking an axle's position for physics motion. While paused, Shift-drag can reposition the pinned axle directly.
 
 ### Flexible pulley cable / spring–Atwood machine
 
@@ -105,7 +111,7 @@ The app uses SI units at the boundary and a fixed 1/120-second physics step. Poi
 
 Translation and rotation are independent degrees of freedom. A position lock sets inverse translational mass to zero and restores the pinned centre during solver phases, but keeps finite rotational inertia. A rotation lock sets rotational inertia to infinity while retaining translational inverse mass. Unlocking restores the finite values, including after changing mass. A completely immovable collision pair cannot be resolved, so its collision response is skipped; collisions with unpinned bodies still resolve. Rod constraints between two pinned centres are suspended until an endpoint is unlocked.
 
-This is an educational rigid-body approximation. Discrete collisions can tunnel at extreme speeds, iterative rods have numerical tolerance, and spring stability depends on stiffness/mass. Locks can conflict with arbitrarily placed constraints; they take priority. Grid snapping is projected onto rod constraints before placement, including while paused. Pinning both ends of a rod at a new separation holds those centres until unlocked. Direct dragging can pass through other movable objects between pointer events; it is an editing interaction, not a swept collision solver. Objects can be thrown out of view; Clear scene starts fresh.
+This is an educational rigid-body approximation. Discrete collisions can tunnel at extreme speeds, iterative rods have numerical tolerance, and spring stability depends on stiffness/mass. Locks can conflict with arbitrarily placed constraints; they take priority. Position snapping is projected onto rod constraints before placement, including while paused. Pinning both ends of a rod at a new separation holds those centres until unlocked. Direct dragging can pass through other movable objects between pointer events; it is an editing interaction, not a swept collision solver. With screen walls disabled, objects can be thrown out of view; Clear scene starts fresh.
 
 ## Tests
 
@@ -117,7 +123,9 @@ npm ci
 npm run test:ui
 ```
 
-Numerical regression coverage also checks SHO period, guide motion, snapped rotation, local-axis resizing and inertia, open/crossed transmission ratios, passive conveyor reaction, driven conveyor transport, and Atwood acceleration with finite wheel inertia, tangent geometry, spring–Atwood oscillation, angled dragging, movable axles, explicit cable refitting, and infeasible pinned poses.
+Belts and pulley cables share iterative position and velocity solving, so one connection no longer overwrites a wheel angle already solved by the other. Guided springs use signed extension to remain continuous when an endpoint crosses its anchor.
+
+Numerical regression coverage also checks SHO period, guide motion, snapped rotation, local-axis resizing and inertia, open/crossed transmission ratios, passive conveyor reaction, driven conveyor transport, and Atwood acceleration with finite wheel inertia, tangent geometry, spring–Atwood oscillation, angled dragging, movable axles, explicit cable refitting, and infeasible pinned poses, coupled belt/multiple-pulley/spring assemblies, paused lock editing, modifier combinations, walls and viewport resizing.
 
 The original regression coverage includes free fall, static floor, grab/throw velocity, pinned-object rotation, independent locks, lock/unlock after mass changes, pinned contacts, snapping, rod safety, springs and live constants. DOM checks exercise the actual creation/drag/menu/lock/snap controls. Visual browser verification was not available in the authoring environment; these checks do not claim exhaustive browser/device coverage.
 

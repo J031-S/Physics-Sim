@@ -19,7 +19,14 @@ export class Sandbox {
     this.engine.gravity.scale = 0; // Gravity and damping are explicit SI forces.
     this.objects = new Map();
     this.links = new Map();
-    this.settings = { gravity: 9.81, airResistance: 0 };
+    this.settings = {
+      gravity: 9.81,
+      airResistance: 0,
+      snapping: false,
+      walls: false,
+    };
+    this.viewport = null;
+    this.walls = [];
     this.group = null;
     this.time = 0;
     this.serial = 0;
@@ -54,18 +61,67 @@ export class Sandbox {
     const ranges = { gravity: [-50, 50], airResistance: [0, 10] };
     for (const [key, v] of Object.entries(patch))
       if (
-        !ranges[key] ||
-        !Number.isFinite(v) ||
-        v < ranges[key][0] ||
-        v > ranges[key][1]
+        ["walls", "snapping"].includes(key)
+          ? typeof v !== "boolean"
+          : !ranges[key] ||
+            !Number.isFinite(v) ||
+            v < ranges[key][0] ||
+            v > ranges[key][1]
       )
         throw new Error("Invalid simulation setting: " + key);
     Object.assign(this.settings, patch);
+    if (patch.walls !== undefined) this.syncWalls();
   }
-  beginGroup(ids, p) {
+  setViewport(bounds) {
+    if (
+      this.viewport &&
+      Object.keys(bounds).every(
+        (k) => Math.abs(bounds[k] - this.viewport[k]) < 1e-6,
+      )
+    )
+      return;
+    this.viewport = { ...bounds };
+    this.syncWalls();
+  }
+  syncWalls() {
+    for (const b of this.walls) Composite.remove(this.engine.world, b);
+    this.walls = [];
+    if (!this.settings.walls || !this.viewport) return;
+    const { minX, maxX, minY, maxY } = this.viewport,
+      t = 0.5,
+      options = { isStatic: true, friction: 0.5, restitution: 0 };
+    for (const [x, y, w, h] of [
+      [minX - t / 2, (minY + maxY) / 2, t, maxY - minY + 2 * t],
+      [maxX + t / 2, (minY + maxY) / 2, t, maxY - minY + 2 * t],
+      [(minX + maxX) / 2, maxY + t / 2, maxX - minX, t],
+      [(minX + maxX) / 2, minY - t / 2, maxX - minX, t],
+    ])
+      this.walls.push(
+        Bodies.rectangle(x * SCALE, -y * SCALE, w * SCALE, h * SCALE, options),
+      );
+    Composite.add(this.engine.world, this.walls);
+  }
+  boundPosition(id, p) {
+    const b = this.objects.get(id).body,
+      xs = b.vertices.map((v) => v.x),
+      ys = b.vertices.map((v) => v.y),
+      left = (b.position.x - Math.min(...xs)) / SCALE,
+      right = (Math.max(...xs) - b.position.x) / SCALE,
+      down = (Math.max(...ys) - b.position.y) / SCALE,
+      up = (b.position.y - Math.min(...ys)) / SCALE;
+    let x = p.x,
+      y = Math.max(down, p.y);
+    if (this.settings.walls && this.viewport) {
+      const v = this.viewport;
+      x = Math.max(v.minX + left, Math.min(v.maxX - right, x));
+      y = Math.max(Math.max(0, v.minY) + down, Math.min(v.maxY - up, y));
+    }
+    return { x, y };
+  }
+  beginGroup(ids, p, options = { paused: true }) {
     this.endGrab(false);
     this.endResize();
-    this.group = new GroupMove(this, ids, p);
+    this.group = new GroupMove(this, ids, p, options);
     return [...this.group.ids];
   }
   moveGroup(p, snapping = false) {
@@ -364,6 +420,16 @@ export class Sandbox {
       throw new Error(
         "There is not enough room above the floor. Move the object up first.",
       );
+    if (this.settings.walls && this.viewport) {
+      const v = this.viewport,
+        halfX = o.shape === "ball" ? width / 2 : (width * c + height * sn) / 2;
+      if (
+        p.x - halfX < v.minX ||
+        p.x + halfX > v.maxX ||
+        p.y + clearance > v.maxY
+      )
+        throw new Error("There is not enough room inside the screen walls.");
+    }
     this.mechanisms.validateResize(id, width, height);
     const b = o.body,
       angle = b.angle;
@@ -442,7 +508,7 @@ export class Sandbox {
   endResize() {
     this.sizing = null;
   }
-  beginGrab(id, p, now = performance.now()) {
+  beginGrab(id, p, now = performance.now(), options = {}) {
     const o = this.objects.get(id);
     if (!o) return;
     const b = o.body,
@@ -453,6 +519,11 @@ export class Sandbox {
       s = Math.sin(-b.angle);
     this.grab = {
       id,
+      mode: options.mode || "auto",
+      paused: !!options.paused,
+      centre: toWorld(b.position),
+      startPoint: { ...p },
+      startAngle: b.angle,
       local: { x: dx * c - dy * s, y: dx * s + dy * c },
       target: { ...p },
       snap: false,
@@ -473,11 +544,37 @@ export class Sandbox {
       y: b.position.y + g.local.x * s + g.local.y * c,
     };
   }
-  moveGrab(p, snapping = false, resize = false, now = performance.now()) {
+  moveGrab(
+    p,
+    snapping = false,
+    resize = false,
+    now = performance.now(),
+    options = null,
+  ) {
     if (!this.grab) return;
     const g = this.grab;
+    if (options) {
+      if ((options.mode || "auto") !== g.mode) {
+        const b = this.objects.get(g.id).body,
+          q = toEngine(g.target),
+          dx = q.x - b.position.x,
+          dy = q.y - b.position.y,
+          c = Math.cos(-b.angle),
+          sn = Math.sin(-b.angle);
+        g.local = { x: dx * c - dy * sn, y: dx * sn + dy * c };
+        g.centre = toWorld(b.position);
+        g.angle = b.angle;
+        g.startPoint = { ...g.target };
+        g.startAngle = b.angle;
+      }
+      g.mode = options.mode || "auto";
+      g.paused = !!options.paused;
+    }
     const cable = this.mechanisms.cables,
-      saved = cable.involves(g.id) ? cable.capture() : null;
+      saved =
+        cable.involves(g.id) || this.mechanisms.isWheel(g.id)
+          ? cable.capture()
+          : null;
     const previous = { ...g.target },
       previousAngle = g.angle;
     g.target = { ...p };
@@ -486,7 +583,7 @@ export class Sandbox {
     this.placeGrab(true);
     // If a lock or the floor makes the requested cable pose impossible, stop
     // at the last feasible point instead of stretching or moving a pinned body.
-    if (saved && cable.error() > 0.002) {
+    if (saved && cable.error(g.id) > 0.000002) {
       let lo = 0,
         hi = 1,
         best = saved,
@@ -501,7 +598,7 @@ export class Sandbox {
           y: previous.y + (p.y - previous.y) * t,
         };
         this.placeGrab(true);
-        if (cable.error() <= 0.002) {
+        if (cable.error(g.id) <= 0.000002) {
           lo = t;
           best = cable.capture();
           bestTarget = { ...g.target };
@@ -529,12 +626,36 @@ export class Sandbox {
     const o = this.objects.get(g.id),
       b = o.body;
     const old = this.state(g.id);
-    if (o.lockPosition) {
-      // A pinned centre leaves only rotation; a centre grab has no lever arm.
-      if (!o.lockRotation && Math.hypot(g.local.x, g.local.y) > 1e-4) {
+    g.blocked =
+      !g.paused &&
+      ((g.mode === "move" && o.lockPosition) ||
+        (g.mode === "rotate" && o.lockRotation));
+    if (g.blocked) return;
+    const rotating =
+      g.mode === "rotate" || (g.mode === "auto" && o.lockPosition);
+    if (rotating) {
+      if (
+        g.mode === "rotate" &&
+        (!o.lockRotation || g.paused) &&
+        Math.hypot(g.local.x, g.local.y) <= 1e-4
+      ) {
+        let desired = g.startAngle + (g.target.x - g.startPoint.x) * Math.PI;
+        if (g.snap)
+          desired = Math.round(desired / (Math.PI / 12)) * (Math.PI / 12);
+        Body.setAngle(b, desired);
+        const bounded = this.boundPosition(g.id, g.centre);
+        if (Math.hypot(bounded.x - g.centre.x, bounded.y - g.centre.y) <= 0.001)
+          g.angle = desired;
+        else Body.setAngle(b, g.angle);
+      }
+      if (
+        (!o.lockRotation || g.paused) &&
+        Math.hypot(g.local.x, g.local.y) > 1e-4
+      ) {
         const q = toEngine(g.target),
-          dx = q.x - o.positionAnchor.x,
-          dy = q.y - o.positionAnchor.y;
+          centre = toEngine(g.centre),
+          dx = q.x - centre.x,
+          dy = q.y - centre.y;
         if (Math.hypot(dx, dy) > 1e-4) {
           let desired = Math.atan2(dy, dx) - Math.atan2(g.local.y, g.local.x);
           if (g.snap)
@@ -545,10 +666,19 @@ export class Sandbox {
               Math.sin(desired - b.angle),
               Math.cos(desired - b.angle),
             );
+          Body.setAngle(b, g.angle);
+          const bounded = this.boundPosition(g.id, g.centre);
+          if (
+            Math.hypot(bounded.x - g.centre.x, bounded.y - g.centre.y) > 0.001
+          ) {
+            g.angle = -old.angle;
+            Body.setAngle(b, g.angle);
+          }
         }
       }
-      Body.setPosition(b, o.positionAnchor);
-    } else {
+      Body.setPosition(b, toEngine(g.centre));
+      if (o.lockRotation && g.paused) o.angleAnchor = g.angle;
+    } else if (!o.lockPosition || g.paused) {
       const c = Math.cos(g.angle),
         sn = Math.sin(g.angle);
       let desired = {
@@ -558,12 +688,12 @@ export class Sandbox {
       Body.setAngle(b, o.lockRotation ? o.angleAnchor : g.angle);
       const floor =
         (Math.max(...b.vertices.map((v) => v.y)) - b.position.y) / SCALE;
-      if (g.snap)
+      if (g.snap && !g.resize)
         desired = {
           x: snap(desired.x),
           y: Math.max(Math.ceil(floor / GRID) * GRID, snap(desired.y)),
         };
-      desired.y = Math.max(floor, desired.y);
+      desired = this.boundPosition(g.id, desired);
       const guides = [...this.links.values()]
         .filter(
           (l) =>
@@ -586,15 +716,34 @@ export class Sandbox {
         ...this.endpoint(l, l.a === g.id ? "b" : "a"),
         r: l.length,
       }));
+      const oldLengths = circles.map((c) => c.r);
       if (g.resize && editLength) {
         // Reject impossible/extreme edits atomically, without stretching locks.
-        const lengths = circles.map((c) =>
-          Math.hypot(desired.x - c.x, desired.y - c.y),
-        );
+        if (g.snap && circles.length === 1) {
+          const c = circles[0],
+            dx = desired.x - c.x,
+            dy = desired.y - c.y,
+            d = Math.hypot(dx, dy);
+          if (d > 1e-8) {
+            const length = Math.max(GRID, snap(d));
+            desired = {
+              x: c.x + (dx * length) / d,
+              y: c.y + (dy * length) / d,
+            };
+          }
+        }
+        const lengths = circles.map((c) => {
+          const d = Math.hypot(desired.x - c.x, desired.y - c.y);
+          return g.snap ? Math.max(GRID, snap(d)) : d;
+        });
         if (lengths.every((l) => l >= 0.05 && l <= 50)) {
-          rods.forEach((l, i) => this.updateLink(l.id, { length: lengths[i] }));
+          rods.forEach((l, i) => {
+            this.updateLink(l.id, { length: lengths[i] });
+            circles[i].r = lengths[i];
+          });
         } else desired = old;
-      } else if (circles.length) {
+      }
+      if (circles.length && !(g.resize && editLength && !g.snap)) {
         const candidates = [old];
         // Closest point on each circle, plus circle/circle and circle/floor
         // intersections. This handles multiple rods without iterative drift.
@@ -661,10 +810,34 @@ export class Sandbox {
             Math.hypot(a.x - desired.x, a.y - desired.y) -
             Math.hypot(b.x - desired.x, b.y - desired.y),
         );
+        if (!valid.length && g.resize && editLength)
+          rods.forEach((l, i) =>
+            this.updateLink(l.id, { length: oldLengths[i] }),
+          );
         desired = valid[0] || old; // Inconsistent constraints must not teleport a body.
       }
       if (desired.y < floor - 1e-7) desired = old;
+      if (
+        [...this.links.values()].some(
+          (l) =>
+            l.type === "belt" &&
+            (l.a === g.id || l.b === g.id) &&
+            (() => {
+              const other = this.objects.get(l.a === g.id ? l.b : l.a),
+                p = this.state(other.id);
+              return (
+                Math.hypot(desired.x - p.x, desired.y - p.y) <=
+                o.radius + other.radius + 0.1
+              );
+            })(),
+        )
+      )
+        desired = old;
+      const bounded = this.boundPosition(g.id, desired);
+      if (Math.hypot(bounded.x - desired.x, bounded.y - desired.y) > 0.001)
+        desired = old;
       Body.setPosition(b, toEngine(desired));
+      if (o.lockPosition && g.paused) o.positionAnchor = { ...b.position };
     }
     Body.setAngle(b, o.lockRotation ? o.angleAnchor : g.angle);
     Body.setVelocity(b, { x: 0, y: 0 });
@@ -676,9 +849,18 @@ export class Sandbox {
         0;
     if (g.resize && editLength)
       for (const l of this.mechanisms.cables.links())
-        if ([l.a, l.b, l.wheel].includes(g.id)) this.mechanisms.cables.bind(l);
+        if ([l.a, l.b, l.wheel].includes(g.id)) {
+          this.mechanisms.cables.bind(l);
+          if (g.snap) {
+            const target = Math.max(GRID, snap(l.length)),
+              delta = target - l.length;
+            if (l.b === g.id) l.feedA += delta;
+            else l.feedB += delta;
+            l.length = target;
+          }
+        }
     this.mechanisms.solvePulley(g.id);
-    this.mechanisms.driveDraggedWheel(g.id);
+
     g.snapCentre = g.snap && !o.lockPosition ? toWorld(b.position) : null;
   }
   endGrab(throwObject = true, now = performance.now()) {
@@ -689,7 +871,14 @@ export class Sandbox {
     const last = samples.at(-1),
       first = samples.find((s) => s.t >= last.t - 100) || samples[0];
     const dt = (last.t - first.t) / 1000;
-    if (throwObject && !g.snap && dt > 0.001 && now - last.t < 100) {
+    if (
+      throwObject &&
+      !g.blocked &&
+      !g.paused &&
+      !g.snap &&
+      dt > 0.001 &&
+      now - last.t < 100
+    ) {
       let vx = (last.x - first.x) / dt,
         vy = (last.y - first.y) / dt;
       const rods = this.grabRods();
@@ -712,7 +901,7 @@ export class Sandbox {
           x: (vx * scale * SCALE) / 60,
           y: (-vy * scale * SCALE) / 60,
         });
-      if (!o.lockRotation && o.lockPosition)
+      if (!o.lockRotation && (o.lockPosition || g.mode === "rotate"))
         Body.setAngularVelocity(
           o.body,
           -Math.max(-30, Math.min(30, (last.angle - first.angle) / dt)) / 60,
@@ -779,13 +968,13 @@ export class Sandbox {
           dx = b.x - a.x,
           dy = b.y - a.y,
           d = Math.hypot(dx, dy);
-        if (d < 1e-8) continue;
+        if (!l.lockAngle && d > 1e-8) l.axis = { x: dx / d, y: dy / d };
         const va = l.a ? this.state(l.a) : { vx: 0, vy: 0 },
           vb = l.b ? this.state(l.b) : { vx: 0, vy: 0 },
-          nx = dx / d,
-          ny = dy / d;
+          nx = l.lockAngle || d < 1e-8 ? l.axis.x : dx / d,
+          ny = l.lockAngle || d < 1e-8 ? l.axis.y : dy / d;
         const f =
-          l.k * (d - l.length) +
+          l.k * ((l.lockAngle ? dx * nx + dy * ny : d) - l.length) +
           l.damping * ((vb.vx - va.vx) * nx + (vb.vy - va.vy) * ny);
         if (l.a) this.applyForce(l.a, a, { x: f * nx, y: f * ny });
         if (l.b) this.applyForce(l.b, b, { x: -f * nx, y: -f * ny });

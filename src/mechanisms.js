@@ -184,9 +184,9 @@ export class Mechanisms {
       [l.a, l.b].some((id) => this.sim.objects.get(id)?.body === other)
     );
   }
-  solveBelts() {
+  solveBelts(driver = null, passes = 8) {
     const s = this.sim;
-    for (let i = 0; i < 8; i++)
+    for (let i = 0; i < passes; i++)
       for (const l of s.links.values())
         if (l.type === "belt") {
           const [a, b] = this.wheels(l),
@@ -195,9 +195,10 @@ export class Mechanisms {
             sign = l.crossed ? -1 : 1;
           const ra = a.radius,
             rb = b.radius,
-            ia = a.body.inverseInertia * SCALE * SCALE,
-            ib = b.body.inverseInertia * SCALE * SCALE;
+            ia = l.a === driver ? 0 : a.body.inverseInertia * SCALE * SCALE,
+            ib = l.b === driver ? 0 : b.body.inverseInertia * SCALE * SCALE;
           if (
+            !driver &&
             l.motor &&
             !a.lockRotation &&
             !b.lockRotation &&
@@ -220,22 +221,7 @@ export class Mechanisms {
         }
   }
   driveDraggedWheel(id) {
-    const s = this.sim;
-    for (const l of s.links.values())
-      if (l.type === "belt" && (l.a === id || l.b === id)) {
-        const [a, b] = this.wheels(l),
-          sign = l.crossed ? -1 : 1,
-          sa = s.state(l.a),
-          sb = s.state(l.b);
-        if (id === l.a && !b.lockRotation)
-          angle(b.body, (a.radius * sa.angle - l.phase) / (sign * b.radius));
-        else if (id === l.b && !a.lockRotation)
-          angle(a.body, (l.phase + sign * b.radius * sb.angle) / a.radius);
-        else if (id === l.a)
-          angle(a.body, (l.phase + sign * b.radius * sb.angle) / a.radius);
-        else angle(b.body, (a.radius * sa.angle - l.phase) / (sign * b.radius));
-        this.updateSurfaces(l);
-      }
+    this.solvePulley(id);
   }
   createPulley(a, wheel, b) {
     return this.cables.create(a, wheel, b);

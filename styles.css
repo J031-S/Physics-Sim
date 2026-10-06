@@ -439,3 +439,14 @@ input[type="checkbox"] {
   background: transparent;
   border: 0;
 }
+
+#settings-panel .setting-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+#settings-panel .setting-toggle input {
+  width: 14px;
+  margin: 0;
+}

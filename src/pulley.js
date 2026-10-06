@@ -219,13 +219,13 @@ export class PulleyCables {
         p = s.state(id);
       if (isVelocity) velocity(o.body, { x: p.vx + d.x, y: p.vy + d.y });
       else {
-        const floor =
-          (Math.max(...o.body.vertices.map((v) => v.y)) - o.body.position.y) /
-          S;
-        position(o.body, {
-          x: p.x + d.x,
-          y: o.lockPosition ? p.y : Math.max(floor, p.y + d.y),
-        });
+        const next = { x: p.x + d.x, y: p.y + d.y };
+        position(
+          o.body,
+          o.lockPosition || id === this.sim.grab?.id
+            ? p
+            : this.sim.boundPosition(id, next),
+        );
       }
     }
     const w = s.objects.get(l.wheel),
@@ -273,9 +273,12 @@ export class PulleyCables {
   }
   solve(driver = null) {
     const links = this.links();
-    if (!links.length) return;
+    if (!links.length) {
+      this.sim.mechanisms.solveBelts(driver);
+      return;
+    }
     const s = this.sim;
-    for (let iteration = 0; iteration < 16; iteration++) {
+    for (let iteration = 0; iteration < 48; iteration++) {
       for (const l of links) {
         const g = this.geometry(l, true),
           m = this.system(l, g, driver);
@@ -297,10 +300,11 @@ export class PulleyCables {
           lambdas = lambdas.map((v) => (v * 0.25) / movement);
         this.apply(l, g, m, lambdas, false);
       }
+      s.mechanisms.solveBelts(driver, 1);
       this.projectRods(driver);
       s.solveGuides();
     }
-    for (let iteration = 0; iteration < 8; iteration++) {
+    for (let iteration = 0; iteration < 32; iteration++) {
       for (const l of links) {
         const g = this.geometry(l, true),
           m = this.system(l, g, driver),
@@ -321,12 +325,29 @@ export class PulleyCables {
           true,
         );
       }
+      s.mechanisms.solveBelts(driver, 1);
       this.projectRods(driver, true);
     }
   }
-  error() {
+  error(id = null) {
+    const component = new Set(id ? [id] : this.sim.objects.keys());
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const l of this.sim.links.values()) {
+        const ends = [l.a, l.b, l.wheel].filter(Boolean);
+        if (ends.some((e) => component.has(e)))
+          for (const e of ends)
+            if (!component.has(e)) {
+              component.add(e);
+              changed = true;
+            }
+      }
+    }
+
     let max = 0;
     for (const l of this.links()) {
+      if (!component.has(l.a)) continue;
       const g = this.geometry(l);
       max = Math.max(
         max,
@@ -348,13 +369,33 @@ export class PulleyCables {
           Math.abs(Math.hypot(b.x - a.x, b.y - a.y) - l.length),
         );
       }
+    for (const l of this.sim.links.values())
+      if (l.type === "belt" && component.has(l.a)) {
+        const a = this.sim.objects.get(l.a),
+          b = this.sim.objects.get(l.b),
+          pa = this.sim.state(l.a),
+          pb = this.sim.state(l.b);
+        max = Math.max(
+          max,
+          Math.abs(
+            a.radius * pa.angle -
+              (l.crossed ? -1 : 1) * b.radius * pb.angle -
+              l.phase,
+          ),
+          a.radius + b.radius + 0.1 - Math.hypot(pa.x - pb.x, pa.y - pb.y),
+        );
+      }
     return max;
   }
   capture() {
     return {
       bodies: [...this.sim.objects.keys()].map((id) => [
         id,
-        this.sim.state(id),
+        {
+          ...this.sim.state(id),
+          anchor: { ...this.sim.objects.get(id).positionAnchor },
+          angleAnchor: this.sim.objects.get(id).angleAnchor,
+        },
       ]),
       links: [...this.sim.links.values()].map((l) => [
         l.id,
@@ -364,6 +405,7 @@ export class PulleyCables {
           feedA: l.feedA,
           feedB: l.feedB,
           length: l.length,
+          phase: l.phase,
         },
       ]),
     };
@@ -371,7 +413,10 @@ export class PulleyCables {
   restore(saved) {
     const s = this.sim;
     for (const [id, p] of saved.bodies) {
-      const b = s.objects.get(id).body;
+      const o = s.objects.get(id),
+        b = o.body;
+      o.positionAnchor = { ...p.anchor };
+      o.angleAnchor = p.angleAnchor;
       position(b, p);
       Body.setAngle(b, -p.angle);
       velocity(b, { x: p.vx, y: p.vy });

@@ -11,6 +11,7 @@ let sim = new Sandbox(),
   pending = null,
   pointer = null,
   ctrl = false,
+  shift = false,
   alt = false,
   resizeHeld = false,
   accumulator = 0,
@@ -47,15 +48,15 @@ function chooseTool(next) {
   }
   $("hint").textContent = {
     select:
-      "Drag a box to select · Shift adds/removes · drag a selected body to move its assembly · Ctrl snaps movement",
-    grab: "Drag to move · R-drag resizes · Alt-drag refits rods / cables · Ctrl snaps · ? shortcuts",
+      "Drag a box to select · Shift-box adds · drag a selected body to move its assembly · Z toggles snapping",
+    grab: "Drag to move · Shift moves · Ctrl rotates · R resizes · Alt refits · Z snaps · ? shortcuts",
     resize:
-      "Drag a ball or block to resize around its centre. Ctrl snaps dimensions to 0.5 m. G returns to Grab.",
+      "Drag a ball or block to resize around its centre. Z toggles dimension snapping. G returns to Grab.",
     belt: "Click two balls to wrap a belt around them. Their centres will be pinned. Escape cancels.",
     pulley:
       "Click endpoint → wheel ball → endpoint. Any angle; springs can share endpoints. Alt-drag refits cable length.",
-    ball: "Click to add a ball. Hold Ctrl to place its centre on the grid.",
-    block: "Click to add a block. Hold Ctrl to place its centre on the grid.",
+    ball: "Click to add a ball. Z toggles grid snapping.",
+    block: "Click to add a block. Z toggles grid snapping.",
     spring:
       "Click two objects, or an empty anchor point and an object. Escape cancels.",
     rod: "Click two objects, or an empty anchor point and an object. Escape cancels.",
@@ -363,32 +364,73 @@ document.addEventListener("focusin", (e) => {
   if (!$("material-menu").hidden && !$("material-menu").contains(e.target))
     closeMenu();
 });
-function syncCtrl(value) {
-  ctrl = value;
-  $("snap-status").textContent = ctrl
-    ? "SNAP · 0.5 m dimensions / grid · 15° rotation"
-    : "Grid: 0.5 m · hold Ctrl to snap";
-  $("snap-status").classList.toggle("snapping", ctrl);
+function syncModifiers(e) {
+  ctrl = !!e.ctrlKey;
+  shift = !!e.shiftKey;
+  alt = !!e.altKey;
+}
+function grabOptions() {
+  return { mode: shift ? "move" : ctrl ? "rotate" : "auto", paused: !running };
+}
+function snapStatus() {
+  const on = sim.settings.snapping;
+  $("snap-status").textContent = on
+    ? "SNAP ON · 0.5 m / 15° · Z toggles"
+    : "Snap off · Z toggles 0.5 m / 15°";
+  $("snap-status").classList.toggle("snapping", on);
+  $("setting-snapping").checked = on;
+}
+function updateInteraction() {
+  if (!pointer) return;
+  if (sim.grab)
+    sim.moveGrab(
+      pointer,
+      sim.settings.snapping,
+      alt,
+      performance.now(),
+      grabOptions(),
+    );
+  if (sim.group && ctrl && !shift) {
+    const id = sim.group.handle;
+    sim.endGroup();
+    if (id) {
+      select(id);
+      sim.beginGrab(id, pointer, performance.now(), grabOptions());
+    }
+  }
+  if (sim.group) sim.moveGroup(pointer, sim.settings.snapping);
+  if (sim.sizing) {
+    try {
+      sim.moveResize(pointer, sim.settings.snapping);
+      showDimensions();
+    } catch (error) {
+      toast(error.message);
+    }
+  }
 }
 canvas.addEventListener("pointerdown", (e) => {
   if (e.button !== 0) return;
   canvas.focus();
   pointer = locate(e);
-  syncCtrl(e.ctrlKey);
-  alt = e.altKey;
+  syncModifiers(e);
   canvas.setPointerCapture(e.pointerId);
   if (tool === "select") {
     const id = sim.hit(pointer);
     if (id) {
-      if (e.shiftKey) {
-        const ids = new Set(selectionSet);
-        ids.has(id) ? ids.delete(id) : ids.add(id);
-        selectMany([...ids]);
+      if (ctrl || resizeHeld) {
+        select(id);
+        if (resizeHeld) sim.beginResize(id, pointer);
+        else sim.beginGrab(id, pointer, performance.now(), grabOptions());
         return;
       }
       if (!selectionSet.has(id)) selectMany([id]);
       const before = selectionSet.size;
-      selectMany(sim.beginGroup([...selectionSet], pointer));
+      selectMany(
+        sim.beginGroup([...selectionSet], pointer, { paused: !running }),
+      );
+      sim.group.handle = id;
+      if (sim.group.blocked)
+        toast("Pause to reposition an assembly containing locked objects.");
       if (selectionSet.size > before)
         toast("Connected objects included to preserve the assembly.");
     } else {
@@ -406,12 +448,12 @@ canvas.addEventListener("pointerdown", (e) => {
     select(id || linkAt(pointer) || null);
     if (id) {
       if (resizeHeld || tool === "resize") sim.beginResize(id, pointer);
-      else sim.beginGrab(id, pointer);
+      else sim.beginGrab(id, pointer, performance.now(), grabOptions());
     }
     return;
   }
   if (["ball", "block"].includes(tool)) {
-    const p = ctrl
+    const p = sim.settings.snapping
       ? { x: snap(pointer.x), y: Math.max(GRID, snap(pointer.y)) }
       : pointer;
     select(sim.add(tool, p));
@@ -460,7 +502,7 @@ canvas.addEventListener("pointerdown", (e) => {
   const id = sim.hit(pointer),
     p = id
       ? sim.state(id)
-      : ctrl
+      : sim.settings.snapping
         ? { x: snap(pointer.x), y: snap(pointer.y) }
         : { ...pointer };
   if (!pending) {
@@ -477,35 +519,33 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 canvas.addEventListener("pointermove", (e) => {
   pointer = locate(e);
-  syncCtrl(e.ctrlKey);
-  alt = e.altKey;
+  syncModifiers(e);
   if (marquee) marquee.end = { ...pointer };
-  if (sim.group) sim.moveGroup(pointer, ctrl);
-  if (sim.grab) sim.moveGrab(pointer, ctrl, alt);
-  if (sim.sizing) {
-    try {
-      sim.moveResize(pointer, ctrl);
-      showDimensions();
-    } catch (error) {
-      toast(error.message);
-    }
-  }
+  updateInteraction();
 });
 canvas.addEventListener("pointerup", (e) => {
   if (e.button !== 0) return;
+  syncModifiers(e);
+  pointer = locate(e);
   if (marquee) finishMarquee(locate(e));
   if (sim.group) {
-    sim.moveGroup(locate(e), e.ctrlKey);
+    sim.moveGroup(locate(e), sim.settings.snapping);
     sim.endGroup();
   }
   if (sim.grab) {
     pointer = locate(e);
-    sim.moveGrab(pointer, e.ctrlKey, e.altKey);
+    sim.moveGrab(
+      pointer,
+      sim.settings.snapping,
+      e.altKey,
+      performance.now(),
+      grabOptions(),
+    );
     sim.endGrab();
   }
   if (sim.sizing) {
     try {
-      sim.moveResize(locate(e), e.ctrlKey);
+      sim.moveResize(locate(e), sim.settings.snapping);
     } catch (error) {
       toast(error.message);
     }
@@ -600,6 +640,8 @@ $("close-keys").onclick = () => {
   canvas.focus();
 };
 function syncSettings() {
+  $("setting-walls").checked = sim.settings.walls;
+  snapStatus();
   for (const key of ["gravity", "airResistance"]) {
     $("setting-" + key).value = sim.settings[key];
     $("range-" + key).value = sim.settings[key];
@@ -640,12 +682,28 @@ for (const key of ["gravity", "airResistance"]) {
     syncSettings();
   };
   range.oninput = () => {
-    sim.updateSettings({ [key]: Number(range.value) });
+    const value =
+      key === "gravity" && Math.abs(Number(range.value)) <= 0.5
+        ? 0
+        : Number(range.value);
+    sim.updateSettings({ [key]: value });
+    range.value = value;
     input.value = sim.settings[key];
   };
 }
+for (const key of ["snapping", "walls"])
+  $("setting-" + key).onchange = (e) => {
+    sim.updateSettings({ [key]: e.target.checked });
+    snapStatus();
+    updateInteraction();
+  };
 $("reset-settings").onclick = () => {
-  sim.updateSettings({ gravity: 9.81, airResistance: 0 });
+  sim.updateSettings({
+    gravity: 9.81,
+    airResistance: 0,
+    snapping: false,
+    walls: false,
+  });
   syncSettings();
 };
 function removeSelected() {
@@ -658,6 +716,7 @@ function removeSelected() {
 }
 $("delete").onclick = removeSelected;
 $("pause").onclick = () => {
+  cancelDrag();
   running = !running;
   accumulator = 0;
   $("pause").textContent = running ? "Ⅱ Pause" : "▶ Run";
@@ -690,24 +749,32 @@ function typing(e) {
 }
 document.addEventListener("keydown", (e) => {
   if (typing(e) || !$("material-menu").hidden) return;
-  if (e.key === "Control") syncCtrl(true);
+  const key = e.key.toLowerCase();
+  // Browser reload remains native, even if Ctrl is already controlling a drag.
+  if (key === "r" && (e.ctrlKey || e.metaKey)) return;
+  if (key === "z" && !e.metaKey) {
+    e.preventDefault();
+    if (!e.repeat) {
+      sim.updateSettings({ snapping: !sim.settings.snapping });
+      snapStatus();
+      updateInteraction();
+    }
+    return;
+  }
+  if (e.key === "Control") ctrl = true;
+  if (e.key === "Shift") shift = true;
   if (e.key === "Alt") {
     alt = true;
     e.preventDefault();
   }
-  if (e.key.toLowerCase() === "r" && !e.metaKey && !e.altKey) {
+  if (["Control", "Shift", "Alt"].includes(e.key)) {
+    updateInteraction();
+    return;
+  }
+  if (key === "r" && !e.metaKey) {
     resizeHeld = true;
     e.preventDefault();
-  }
-  if (sim.grab && pointer && ["Alt", "Control"].includes(e.key))
-    sim.moveGrab(pointer, ctrl, alt);
-  if (sim.sizing && pointer && e.key === "Control") {
-    try {
-      sim.moveResize(pointer, true);
-      showDimensions();
-    } catch (error) {
-      toast(error.message);
-    }
+    return;
   }
   if (e.key === "Escape") {
     pending = null;
@@ -734,12 +801,12 @@ document.addEventListener("keydown", (e) => {
     t: "belt",
     u: "pulley",
   };
-  if (keys[e.key.toLowerCase()]) {
+  if (keys[key]) {
     e.preventDefault();
     cancelDrag();
-    chooseTool(keys[e.key.toLowerCase()]);
+    chooseTool(keys[key]);
   }
-  if (e.key.toLowerCase() === "v") {
+  if (key === "v") {
     $("vectors").checked = !$("vectors").checked;
     e.preventDefault();
   }
@@ -753,21 +820,19 @@ document.addEventListener("keydown", (e) => {
   }
 });
 document.addEventListener("keyup", (e) => {
-  if (e.key === "Control") syncCtrl(false);
+  if (e.key === "Control") ctrl = false;
+  if (e.key === "Shift") shift = false;
   if (e.key === "Alt") alt = false;
   if (e.key.toLowerCase() === "r") resizeHeld = false;
-  if (sim.grab && pointer && ["Alt", "Control"].includes(e.key))
-    sim.moveGrab(pointer, ctrl, alt);
+  if (["Control", "Shift", "Alt"].includes(e.key)) updateInteraction();
 });
 window.addEventListener("blur", () => {
   cancelDrag();
-  resizeHeld = false;
-  alt = false;
-  syncCtrl(false);
+  resizeHeld = ctrl = shift = alt = false;
 });
 document.addEventListener("visibilitychange", () => {
   cancelDrag();
-  resizeHeld = false;
+  resizeHeld = ctrl = shift = alt = false;
   last = 0;
   accumulator = 0;
 });
@@ -799,6 +864,12 @@ function draw() {
     canvas.width = Math.round(r.width * dpr);
     canvas.height = Math.round(r.height * dpr);
   }
+  sim.setViewport({
+    minX: -view.x / view.scale,
+    maxX: (r.width - view.x) / view.scale,
+    minY: (view.y - r.height) / view.scale,
+    maxY: view.y / view.scale,
+  });
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, r.width, r.height);
   const min = world({ x: 0, y: r.height }),
@@ -824,6 +895,11 @@ function draw() {
   ctx.fillStyle = "#e0e3d8";
   ctx.fillRect(0, view.y, r.width, r.height - view.y);
   line({ x: 0, y: view.y }, { x: r.width, y: view.y }, "#7f9076", 2);
+  if (sim.settings.walls) {
+    ctx.strokeStyle = "#7f9076";
+    ctx.lineWidth = 4;
+    ctx.strokeRect(1, 1, r.width - 2, r.height - 2);
+  }
   ctx.font = "9px ui-monospace,monospace";
   ctx.fillStyle = "#819078";
   for (let x = Math.ceil(min.x); x <= max.x; x++)
@@ -1020,5 +1096,6 @@ for (const [key, t] of Object.entries({
   document.querySelector(`[data-tool="${t}"]`).title =
     `${t[0].toUpperCase() + t.slice(1)} (${key})`;
 chooseTool("grab");
+snapStatus();
 draw();
 requestAnimationFrame(frame);

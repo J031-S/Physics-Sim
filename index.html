@@ -26,7 +26,7 @@
       <canvas
         id="canvas"
         tabindex="0"
-        aria-label="Physics sandbox. Choose Ball or Block, then click to create. Drag to throw. Hold Control to snap."
+        aria-label="Physics sandbox. Choose Ball or Block, then click to create. Drag to throw. Press Z to toggle snapping."
       ></canvas>
       <div class="tools" role="toolbar" aria-label="Creation tools">
         <button data-tool="grab" class="active" aria-pressed="true">
@@ -69,7 +69,7 @@
           m/s</label
         ><button
           id="resize-object"
-          title="Resize tool: drag the object; Ctrl snaps dimensions"
+          title="Resize tool: drag the object; Z toggles dimension snapping"
         >
           Resize (R)</button
         ><span id="dimensions"></span
@@ -82,7 +82,7 @@
         constants.
       </div>
       <div class="status">
-        <span id="snap-status">Grid: 0.5 m · hold Ctrl to snap</span
+        <span id="snap-status">Snap off · Z toggles 0.5 m / 15°</span
         ><span id="time">0.00 s</span>
       </div>
       <div id="toast" role="status" aria-live="polite"></div>
@@ -110,6 +110,13 @@
         </button>
       </div>
       <p>Changes apply immediately, including while running.</p>
+      <label class="setting-toggle"
+        ><input id="setting-snapping" type="checkbox" /> Snapping (Z) — 0.5 m /
+        15°</label
+      >
+      <label class="setting-toggle"
+        ><input id="setting-walls" type="checkbox" /> Screen-edge walls</label
+      >
       <label for="setting-gravity">Gravity ↓ <span>m/s²</span></label>
       <input
         id="setting-gravity"
@@ -127,6 +134,7 @@
         step="0.01"
         value="9.81"
         aria-label="Gravity slider"
+        list="gravity-stops"
       />
       <small
         >Positive pulls down; zero disables gravity; negative pulls up.</small
@@ -164,7 +172,7 @@
         <dt>Space</dt>
         <dd>Play / pause</dd>
         <dt>Q · Shift</dt>
-        <dd>Select tool · add/remove from selection</dd>
+        <dd>Select tool · add to a selection box</dd>
         <dt>G · B · N</dt>
         <dd>Grab · Ball · Block</dd>
         <dt>S · D · T · U</dt>
@@ -173,23 +181,32 @@
         <dd>Toggle velocity vectors</dd>
         <dt>R + drag</dt>
         <dd>Resize in place (ball diameter; block width / height)</dd>
-        <dt>Ctrl + R-drag</dt>
-        <dd>Snap dimensions to 0.5 m</dd>
+        <dt>Z</dt>
+        <dd>Toggle snapping for all geometry edits (also in Settings)</dd>
+        <dt>Shift + drag</dt>
+        <dd>
+          Move; paused simulation also permits moving position-locked objects
+        </dd>
         <dt>Ctrl + drag</dt>
-        <dd>Snap centre to grid; pinned objects rotate in 15° steps</dd>
+        <dd>Rotate around the centre; pause to edit rotation-locked objects</dd>
         <dt>Alt + drag</dt>
-        <dd>Refit connected rod / cable lengths</dd>
+        <dd>
+          Refit rod / cable lengths; combine with Shift to move and change
+          length
+        </dd>
+        <dt>Ctrl + R</dt>
+        <dd>Browser reload</dd>
         <dt>Delete · Escape</dt>
         <dd>Delete selection · cancel interaction</dd>
       </dl>
       <p>
         Select: drag a box, then drag a selected body to move the connected
-        assembly. Ctrl snaps group movement to 0.5 m. Pins and world anchors
-        move with the layout. Belt: click two balls. Pulley: click endpoint,
-        wheel ball, endpoint. Cable ends can move at any angle and connect to
-        springs. Pulley axles start pinned; unlock position to move them. Select
-        a belt for crossed / driven modes. Select a spring to lock its current
-        angle.
+        assembly. Z toggles snapping. Pause to move an assembly containing
+        locked positions. Pins and world anchors move with the layout. Belt:
+        click two balls. Pulley: click endpoint, wheel ball, endpoint. Cable
+        ends can move at any angle and connect to springs. Pulley axles start
+        pinned; unlock position to move them. Select a belt for crossed / driven
+        modes. Select a spring to lock its current angle.
       </p>
     </section>
     <script src="vendor/matter.js"></script>

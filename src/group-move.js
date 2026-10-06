@@ -2,7 +2,7 @@
 const { Body } = globalThis.Matter;
 const S = 100;
 export class GroupMove {
-  constructor(sim, ids, start) {
+  constructor(sim, ids, start, options = { paused: true }) {
     this.sim = sim;
     this.ids = new Set(ids.filter((id) => sim.objects.has(id)));
     this.start = { ...start };
@@ -20,6 +20,9 @@ export class GroupMove {
             }
       }
     }
+    this.blocked =
+      !options.paused &&
+      [...this.ids].some((id) => sim.objects.get(id).lockPosition);
     this.bodies = [...this.ids].map((id) => {
       const o = sim.objects.get(id);
       return {
@@ -51,6 +54,7 @@ export class GroupMove {
       : 0;
   }
   move(p, snapping = false) {
+    if (this.blocked) return;
     const snap = (v) => Math.round(v / 0.5) * 0.5;
     let x = p.x - this.start.x,
       y = p.y - this.start.y;
@@ -62,10 +66,40 @@ export class GroupMove {
       snapping ? Math.ceil(this.floorLimit / 0.5) * 0.5 : this.floorLimit,
       y,
     );
+    if (this.sim.settings.walls && this.sim.viewport) {
+      const v = this.sim.viewport;
+      let loX = -Infinity,
+        hiX = Infinity,
+        loY = -Infinity,
+        hiY = Infinity;
+      for (const saved of this.bodies) {
+        const b = this.sim.objects.get(saved.id).body;
+        loX = Math.max(
+          loX,
+          v.minX - (saved.position.x - (b.position.x - b.bounds.min.x)) / S,
+        );
+        hiX = Math.min(
+          hiX,
+          v.maxX - (saved.position.x + (b.bounds.max.x - b.position.x)) / S,
+        );
+        loY = Math.max(
+          loY,
+          v.minY - (-saved.position.y - (b.bounds.max.y - b.position.y)) / S,
+        );
+        hiY = Math.min(
+          hiY,
+          v.maxY - (-saved.position.y + (b.position.y - b.bounds.min.y)) / S,
+        );
+      }
+      if (loX > hiX || loY > hiY) return;
+      x = Math.max(loX, Math.min(hiX, x));
+      y = Math.max(loY, Math.min(hiY, y));
+    }
     this.offset = { x, y };
     this.hold();
   }
   hold() {
+    if (this.blocked) return;
     const { x, y } = this.offset;
     for (const saved of this.bodies) {
       const o = this.sim.objects.get(saved.id);

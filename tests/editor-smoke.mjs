@@ -38,7 +38,14 @@ const frames = (n) => {
   }
 };
 const tool = (name) => document.querySelector(`[data-tool=${name}]`).click();
-const pointer = (type, x, y, ctrlKey = false, altKey = false) =>
+const pointer = (
+  type,
+  x,
+  y,
+  ctrlKey = false,
+  altKey = false,
+  shiftKey = false,
+) =>
   canvas.dispatchEvent(
     new window.PointerEvent(type, {
       clientX: x,
@@ -47,6 +54,7 @@ const pointer = (type, x, y, ctrlKey = false, altKey = false) =>
       pointerId: 1,
       ctrlKey,
       altKey,
+      shiftKey,
       bubbles: true,
     }),
   );
@@ -117,11 +125,17 @@ $("lock-position").dispatchEvent(new window.Event("change"));
 $("lock-rotation").checked = true;
 $("lock-rotation").dispatchEvent(new window.Event("change"));
 assert.equal($("lock-position").checked, false);
+canvas.dispatchEvent(
+  new window.KeyboardEvent("keydown", { key: "z", bubbles: true }),
+);
 pointer("pointerdown", 300, 250);
-pointer("pointermove", 350, 300, true);
+pointer("pointermove", 350, 300);
 frames(5);
 assert.match($("snap-status").textContent, /SNAP/);
-pointer("pointerup", 350, 300, true);
+pointer("pointerup", 350, 300);
+canvas.dispatchEvent(
+  new window.KeyboardEvent("keydown", { key: "z", bubbles: true }),
+);
 assert.equal($("pause").textContent, "Ⅱ Pause");
 // Connect the known snapped block to a fixed point, edit spring constants.
 tool("spring");
@@ -181,12 +195,14 @@ key(" ");
 assert.equal($("pause").textContent, "▶ Run");
 key("b");
 click(500, 350);
+key("z");
 key("r");
 pointer("pointerdown", 520, 350);
-pointer("pointermove", 550, 350, true);
-pointer("pointerup", 550, 350, true);
+pointer("pointermove", 550, 350);
+pointer("pointerup", 550, 350);
 key("r", "keyup");
 assert.match($("dimensions").textContent, /1.50/);
+key("z");
 key("v");
 assert.equal($("vectors").checked, true);
 key("s");
@@ -356,6 +372,68 @@ $("reset-settings").click();
 assert.equal($("setting-gravity").value, "9.81");
 assert.equal($("setting-airResistance").value, "0");
 $("close-settings").click();
+// Z is a persistent toggle, composes with modifiers, and does not steal reload.
+canvas.focus();
+key("z");
+assert.equal($("setting-snapping").checked, true);
+key("z", "keydown", { repeat: true });
+assert.equal($("setting-snapping").checked, true);
+key("z", "keydown", { ctrlKey: true });
+assert.equal($("setting-snapping").checked, false);
+const reload = new window.KeyboardEvent("keydown", {
+  key: "r",
+  ctrlKey: true,
+  bubbles: true,
+  cancelable: true,
+});
+canvas.dispatchEvent(reload);
+assert.equal(reload.defaultPrevented, false);
+$("settings-toggle").click();
+$("range-gravity").value = ".23";
+$("range-gravity").dispatchEvent(new window.Event("input"));
+assert.equal($("setting-gravity").value, "0");
+assert.equal($("range-gravity").value, "0");
+$("setting-gravity").value = ".23";
+$("setting-gravity").dispatchEvent(new window.Event("change"));
+assert.equal($("setting-gravity").value, "0.23");
+$("setting-walls").checked = true;
+$("setting-walls").dispatchEvent(new window.Event("change"));
+frames(1);
+assert.equal($("setting-walls").checked, true);
+$("setting-snapping").checked = true;
+$("setting-snapping").dispatchEvent(new window.Event("change"));
+assert.match($("snap-status").textContent, /SNAP ON/);
+$("reset-settings").click();
+$("close-settings").click();
+// Shift manually repositions a paused pin; Ctrl rotates without translating.
+$("clear").click();
+canvas.focus();
+key("b");
+click(400, 350);
+$("lock-position").checked = true;
+$("lock-position").dispatchEvent(new window.Event("change"));
+pointer("pointerdown", 400, 350, false, false, true);
+pointer("pointermove", 500, 350, false, false, true);
+pointer("pointerup", 500, 350, false, false, true);
+menu(500, 350);
+assert.ok($("constants").querySelector('[aria-label="Mass"]'));
+$("close-menu").click();
+$("lock-rotation").checked = true;
+$("lock-rotation").dispatchEvent(new window.Event("change"));
+pointer("pointerdown", 520, 350, true);
+pointer("pointermove", 500, 330, true);
+pointer("pointerup", 500, 330, true);
+assert.equal($("lock-position").checked, true);
+assert.equal($("lock-rotation").checked, true);
+key(" ");
+pointer("pointerdown", 500, 350, false, false, true);
+pointer("pointermove", 600, 350, false, false, true);
+pointer("pointerup", 600, 350, false, false, true);
+frames(3);
+key(" ");
+menu(500, 350);
+assert.ok($("constants").querySelector('[aria-label="Mass"]'));
+$("close-menu").click();
 console.log(
   "PASS: creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );
