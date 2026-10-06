@@ -3,314 +3,71 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="theme-color" content="#172333" />
-    <title>Physics Sim — Experiment freely</title>
+    <title>Physics Sim · Sandbox</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body class="studio">
+  <body>
     <header>
-      <a class="brand" href="./"
-        ><span class="brandmark">φ</span>
-        <div>PHYSICS <b>SIM</b><small>KINEMATICS WORKSPACE</small></div></a
-      >
-      <div class="project">
-        <input
-          id="title"
-          aria-label="Experiment name"
-          value="Projectile"
-        /><span id="save-state">Saved on this device</span>
+      <a class="brand" href="./"><span>φ</span> Physics Sim</a
+      ><span class="subtitle">A simple mechanics sandbox</span>
+      <div class="playback">
+        <button id="pause">Ⅱ Pause</button
+        ><button id="clear">Clear scene</button>
       </div>
-      <nav>
-        <button id="toggle-tools" aria-pressed="true">Tools</button
-        ><button id="toggle-inspector" aria-pressed="true">Inspector</button
-        ><button id="toggle-graph" aria-pressed="false">Graphs</button
-        ><button id="fullscreen" title="Toggle full screen">⛶</button
-        ><button id="import">Open scene</button
-        ><button id="export">Save file ↗</button
-        ><button id="help" title="Keyboard shortcuts and help">?</button>
-      </nav>
     </header>
     <main>
-      <aside class="library">
-        <div class="eyebrow">YOUR WORKBENCH</div>
-        <h1>Build your experiment.</h1>
-        <p class="muted intro">
-          Build a scene. Change a variable.<br />See the physics happen.
-        </p>
-        <section>
-          <h2>01 <span>Add to your scene</span></h2>
-          <div class="tool-grid">
-            <button data-tool="select" class="active">
-              <span>↖</span>Select <kbd>V</kbd></button
-            ><button data-tool="pan"><span>✥</span>Pan <kbd>H</kbd></button>
-            <button data-tool="circle"><span>○</span>Ball <kbd>C</kbd></button
-            ><button data-tool="box"><span>□</span>Block <kbd>B</kbd></button>
-            <button data-tool="wall"><span>▰</span>Wall <kbd>W</kbd></button
-            ><button data-tool="triangle"><span>◿</span>Triangle</button
-            ><button data-tool="ring"><span>◎</span>Ring</button
-            ><button data-tool="arc"><span>⌒</span>Arc</button
-            ><button data-tool="trough"><span>⊔</span>Trough</button
-            ><button data-tool="half-trough"><span>∟</span>Half trough</button
-            ><button data-tool="stroke"><span>✎</span>Draw path</button
-            ><button data-tool="polygon"><span>⬠</span>Draw solid</button
-            ><button data-tool="rotate">
-              <span>↻</span>Rotate <kbd>R</kbd></button
-            ><button data-tool="resize"><span>⤢</span>Resize</button
-            ><button data-tool="velocity"><span>↗</span>Velocity</button
-            ><button data-tool="measure"><span>↔</span>Ruler</button
-            ><button data-tool="spring"><span>∿</span>Spring</button>
-            <button data-tool="rod"><span>⊶</span>Rod / pivot</button
-            ><button data-tool="rope"><span>⌒</span>Rope</button>
-          </div>
-          <p class="tool-hint" id="tool-hint">
-            Drag objects to reposition. A running scene pauses when grabbed.
-          </p>
-        </section>
-        <section>
-          <h2>02 <span>Start with an experiment</span></h2>
-          <div class="presets">
-            <button data-preset="Uniform motion">Uniform motion →</button
-            ><button data-preset="Constant acceleration">
-              Constant acceleration →</button
-            ><button data-preset="Circular motion">Circular motion →</button
-            ><button data-preset="Track">Curved track →</button>
-            <button data-preset="Projectile">
-              <span class="preset-icon orange">↗</span
-              ><span
-                >Projectile motion<small
-                  >Explore launch angle & range</small
-                ></span
-              ><b>↗</b>
-            </button>
-            <button data-preset="Pendulum">
-              <span class="preset-icon blue">◴</span
-              ><span>Pendulum<small>Trade height for speed</small></span
-              ><b>↗</b>
-            </button>
-            <button data-preset="Spring oscillator">
-              <span class="preset-icon purple">∿</span
-              ><span
-                >Spring oscillator<small>Watch Hooke’s law at work</small></span
-              ><b>↗</b>
-            </button>
-            <button data-preset="Collisions">
-              <span class="preset-icon green">⇄</span
-              ><span>Collisions<small>Follow the momentum</small></span
-              ><b>↗</b>
-            </button>
-            <button data-preset="Ramp">
-              <span class="preset-icon blue">◿</span
-              ><span>Inclined plane<small>Experiment with friction</small></span
-              ><b>↗</b>
-            </button>
-          </div>
-          <button id="blank" class="wide">＋ Blank experiment</button>
-        </section>
-        <div class="library-footer">
-          <span class="status-dot"></span> Local & private by design<small
-            >Your scenes stay in this browser.</small
-          >
-        </div>
-      </aside>
-      <section class="workspace">
-        <div class="canvas-header">
-          <div>
-            <span class="eyebrow">EXPERIMENT SPACE</span
-            ><span class="pill" id="mode">EDITING</span>
-          </div>
-          <div class="history">
-            <button id="undo" title="Undo (Ctrl/Cmd+Z)">↶</button
-            ><button id="redo" title="Redo (Ctrl/Cmd+Shift+Z)">↷</button
-            ><span></span><button id="zoom-out" title="Zoom out">−</button
-            ><span id="zoom">100%</span
-            ><button id="zoom-in" title="Zoom in">＋</button
-            ><button id="fit" title="Fit scene to view">Fit</button
-            ><button
-              id="capture"
-              title="Make current positions and velocities the starting setup"
-            >
-              Use current as start
-            </button>
-          </div>
-        </div>
-        <div class="stage" id="stage">
-          <canvas
-            id="canvas"
-            aria-label="Physics scene. Use Add tools and the object list to edit objects."
-            tabindex="0"
-          ></canvas>
-          <div class="stage-label">
-            <strong>KINEMATICS</strong> · <span class="status-dot"></span
-            ><span id="stage-info">EARTH GRAVITY · 9.81 m/s²</span>
-          </div>
-          <div class="stage-bottom">
-            <span id="coordinates">x → &nbsp; y ↑ &nbsp; · &nbsp; metres</span
-            ><span>Scroll to zoom · middle-drag to pan</span>
-          </div>
-          <div id="toast" role="status" aria-live="polite"></div>
-        </div>
-        <div class="transport">
-          <div class="transport-controls">
-            <button id="play" class="primary">▶ Run</button
-            ><button id="step" title="Advance 1/120 second">▹ Step</button
-            ><button
-              id="reset"
-              title="Restore the experiment’s initial conditions"
-            >
-              ↺ Reset
-            </button>
-          </div>
-          <div class="clock">
-            <span>SIMULATION TIME</span
-            ><strong id="time">0.00 <small>s</small></strong>
-          </div>
-          <label class="speed"
-            >Speed<select id="speed">
-              <option value=".25">0.25×</option>
-              <option value=".5">0.5×</option>
-              <option value="1" selected>1×</option>
-              <option value="2">2×</option>
-            </select></label
-          >
-        </div>
-        <section class="analysis">
-          <div class="analysis-head">
-            <div>
-              <span class="eyebrow">MEASURE & UNDERSTAND</span>
-              <h2>
-                Motion over time <span id="tracking">Select an object</span>
-              </h2>
-            </div>
-            <div>
-              <select id="metric" aria-label="Graph measurement">
-                <option value="speed">Speed · m/s</option>
-                <option value="y">Height · m</option>
-                <option value="x">Position x · m</option>
-                <option value="energy">Kinetic energy · J</option>
-                <option value="vx">Velocity x · m/s</option>
-                <option value="vy">Velocity y · m/s</option>
-                <option value="ax">Acceleration x · m/s²</option>
-                <option value="ay">Acceleration y · m/s²</option>
-                <option value="displacement">Displacement · m</option></select
-              ><button id="csv">Export CSV</button>
-            </div>
-          </div>
-          <div class="graph-wrap">
-            <canvas id="graph" aria-label="Measured motion graph"></canvas>
-            <div id="graph-empty">Run your experiment to start recording.</div>
-          </div>
-          <div class="graph-caption">
-            Last 20 simulated seconds · sampled at 20 Hz<span id="samples"
-              >0 samples</span
-            >
-          </div>
-        </section>
-      </section>
-      <aside class="inspector">
-        <section class="world-settings">
-          <div class="eyebrow">ENVIRONMENT</div>
-          <label class="field"
-            >Gravity <span>m/s² ↓</span
-            ><input
-              id="gravity"
-              type="number"
-              min="-100"
-              max="100"
-              step=".01"
-              value="9.81"
-          /></label>
-          <div class="toggles">
-            <label
-              ><input id="vectors" type="checkbox" checked /> Velocity
-              vectors</label
-            ><label
-              ><input id="accelerations" type="checkbox" /> Acceleration
-              vectors</label
-            ><label
-              ><input id="forces" type="checkbox" /> Applied forces +
-              gravity</label
-            ><label
-              ><input id="trails" type="checkbox" checked /> Motion
-              trails</label
-            ><label
-              ><input id="grid" type="checkbox" checked /> Metre grid</label
-            >
-          </div>
-        </section>
-        <section class="object-section">
-          <div class="section-heading">
-            <span class="eyebrow">OBJECT INSPECTOR</span
-            ><span id="object-count">2 objects</span>
-          </div>
-          <select
-            id="selection"
-            aria-label="Select object or connection"
-          ></select>
-          <div id="properties"></div>
-          <div id="readouts" class="readouts"></div>
-        </section>
-        <section class="notes">
-          <h3>Make a prediction.</h3>
-          <p>
-            What will happen if you double the mass? Change one thing, reset,
-            and try again.
-          </p>
-          <small
-            >2D rigid-body approximation. Force arrows exclude contact and joint
-            reactions.</small
-          >
-        </section>
-      </aside>
+      <canvas
+        id="canvas"
+        tabindex="0"
+        aria-label="Physics sandbox. Choose Ball or Block, then click to create. Drag to throw. Hold Control to snap."
+      ></canvas>
+      <div class="tools" role="toolbar" aria-label="Creation tools">
+        <button data-tool="grab" class="active" aria-pressed="true">
+          <b>↖</b> Grab</button
+        ><button data-tool="ball" aria-pressed="false"><b>○</b> Ball</button
+        ><button data-tool="block" aria-pressed="false"><b>□</b> Block</button
+        ><span class="divider"></span
+        ><button data-tool="spring" aria-pressed="false"><b>∿</b> Spring</button
+        ><button data-tool="rod" aria-pressed="false"><b>⊶</b> Rod</button
+        ><label class="vectors"
+          ><input type="checkbox" id="vectors" /> Velocity vectors</label
+        >
+      </div>
+      <div id="selection" class="selection" hidden>
+        <strong id="selected-name"></strong
+        ><label
+          ><input type="checkbox" id="lock-position" /> Lock position</label
+        ><label
+          ><input type="checkbox" id="lock-rotation" /> Lock rotation</label
+        ><button id="delete" title="Delete selected object or connection">
+          Delete
+        </button>
+      </div>
+      <div class="hint" id="hint">
+        Add a ball or block, then grab and throw it. Right-click for material
+        constants.
+      </div>
+      <div class="status">
+        <span id="snap-status">Grid: 0.5 m · hold Ctrl to snap</span
+        ><span id="time">0.00 s</span>
+      </div>
+      <div id="toast" role="status" aria-live="polite"></div>
     </main>
-    <input id="file" type="file" accept=".json,application/json" hidden />
-    <dialog id="help-dialog">
-      <button class="close" aria-label="Close help">×</button
-      ><span class="eyebrow">QUICK START</span>
-      <h2>Your personal physics lab.</h2>
-      <p>
-        Pick an experiment and press <b>Run</b>, or choose a shape and click the
-        canvas to place it. Select objects to edit their properties.
-      </p>
-      <p>
-        For springs, rods and ropes, click two objects, or an empty point and an
-        object. Connections attach to object centres; an empty point becomes a
-        fixed world anchor.
-      </p>
-      <p>
-        Use Rotate, Resize or Velocity and drag an object. Draw path makes a
-        fixed surface; Draw solid makes a convex body. The ruler measures
-        between two points. Select a body and enable Motion equations to define
-        aₓ and aᵧ; apply the equations after editing. Position is in metres and
-        acceleration in m/s².
-      </p>
-      <p>
-        <b>Reset</b> restores your starting conditions. Dragging a running scene
-        pauses it. Dragging after a run uses the current scene as a new starting
-        setup; Undo restores the previous setup. Property edits apply live without resetting playback.
-        Right-click an object to edit its properties at the cursor. Changes are saved locally; Save file exports a
-        portable JSON scene.
-      </p>
-      <dl>
-        <dt>Space</dt>
-        <dd>Run / pause</dd>
-        <dt>V / H</dt>
-        <dd>Select / pan</dd>
-        <dt>C / B / W</dt>
-        <dd>Ball / block / wall</dd>
-        <dt>Delete</dt>
-        <dd>Delete selection</dd>
-        <dt>Ctrl/⌘ Z</dt>
-        <dd>Undo (Shift to redo)</dd>
-        <dt>Escape</dt>
-        <dd>Cancel tool or connection</dd>
-      </dl>
-      <p class="muted">
-        SI units: metres, kilograms, seconds, newtons. Positive y is upward.
-        Springs use Hooke’s law; ropes and rods are approximate numerical
-        constraints. Very fast or very small objects may tunnel through
-        surfaces.
-      </p>
-    </dialog>
+    <section
+      id="material-menu"
+      role="dialog"
+      aria-labelledby="menu-title"
+      hidden
+    >
+      <div class="menu-header">
+        <strong id="menu-title">Material constants</strong
+        ><button id="close-menu" aria-label="Close material constants">
+          ×
+        </button>
+      </div>
+      <p id="menu-note">Changes apply while the simulation runs.</p>
+      <form id="constants"></form>
+    </section>
     <script src="vendor/matter.js"></script>
     <script type="module" src="src/app.js"></script>
   </body>
