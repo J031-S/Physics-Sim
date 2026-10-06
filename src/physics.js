@@ -134,10 +134,6 @@ export class Sandbox {
       throw new Error(
         "Connect two different objects, or an object and a fixed point.",
       );
-    if ([a, b].some((id) => this.mechanisms.isLoad(id)))
-      throw new Error(
-        "A pulley load already has a cable guide. Remove its pulley before adding another connection.",
-      );
     const pa = a ? this.state(a) : aPoint,
       pb = b ? this.state(b) : bPoint,
       length = Math.hypot(pb.x - pa.x, pb.y - pa.y);
@@ -194,9 +190,14 @@ export class Sandbox {
     const o = this.objects.get(id);
     if (!o) return;
     if (axis === "position") {
-      if (!locked && this.mechanisms.isWheel(id))
+      if (
+        !locked &&
+        [...this.links.values()].some(
+          (l) => l.type === "belt" && (l.a === id || l.b === id),
+        )
+      )
         throw new Error(
-          "Remove the belt or pulley before moving its fixed axle.",
+          "Remove the belt before moving its fixed axle. Pulley axles can be unlocked.",
         );
       o.lockPosition = locked;
       o.positionAnchor = { ...o.body.position };
@@ -448,10 +449,42 @@ export class Sandbox {
   moveGrab(p, snapping = false, resize = false, now = performance.now()) {
     if (!this.grab) return;
     const g = this.grab;
+    const cable = this.mechanisms.cables,
+      saved = cable.involves(g.id) ? cable.capture() : null;
+    const previous = { ...g.target },
+      previousAngle = g.angle;
     g.target = { ...p };
     g.snap = snapping;
     g.resize = resize;
     this.placeGrab(true);
+    // If a lock or the floor makes the requested cable pose impossible, stop
+    // at the last feasible point instead of stretching or moving a pinned body.
+    if (saved && cable.error() > 0.002) {
+      let lo = 0,
+        hi = 1,
+        best = saved,
+        bestTarget = previous,
+        bestAngle = previousAngle;
+      for (let i = 0; i < 12; i++) {
+        cable.restore(saved);
+        g.angle = previousAngle;
+        const t = (lo + hi) / 2;
+        g.target = {
+          x: previous.x + (p.x - previous.x) * t,
+          y: previous.y + (p.y - previous.y) * t,
+        };
+        this.placeGrab(true);
+        if (cable.error() <= 0.002) {
+          lo = t;
+          best = cable.capture();
+          bestTarget = { ...g.target };
+          bestAngle = g.angle;
+        } else hi = t;
+      }
+      cable.restore(best);
+      g.target = bestTarget;
+      g.angle = bestAngle;
+    }
     const state = this.state(g.id);
     g.samples.push({ ...state, t: now });
     while (g.samples.length > 2 && g.samples[1].t < now - 100)
@@ -614,6 +647,9 @@ export class Sandbox {
       b.constraintImpulse.y =
       b.constraintImpulse.angle =
         0;
+    if (g.resize && editLength)
+      for (const l of this.mechanisms.cables.links())
+        if ([l.a, l.b, l.wheel].includes(g.id)) this.mechanisms.cables.bind(l);
     this.mechanisms.solvePulley(g.id);
     this.mechanisms.driveDraggedWheel(g.id);
     g.snapCentre = g.snap && !o.lockPosition ? toWorld(b.position) : null;

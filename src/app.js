@@ -42,12 +42,12 @@ function chooseTool(next) {
     b.setAttribute("aria-pressed", b.dataset.tool === tool);
   }
   $("hint").textContent = {
-    grab: "Drag to move · R-drag resizes · Alt-drag adjusts rods · Ctrl snaps · ? shortcuts",
+    grab: "Drag to move · R-drag resizes · Alt-drag refits rods / cables · Ctrl snaps · ? shortcuts",
     resize:
       "Drag a ball or block to resize around its centre. Ctrl snaps dimensions to 0.5 m. G returns to Grab.",
     belt: "Click two balls to wrap a belt around them. Their centres will be pinned. Escape cancels.",
     pulley:
-      "Click a left load, then the wheel ball, then a right load. Use a wheel large enough to separate the loads.",
+      "Click endpoint → wheel ball → endpoint. Any angle; springs can share endpoints. Alt-drag refits cable length.",
     ball: "Click to add a ball. Hold Ctrl to place its centre on the grid.",
     block: "Click to add a block. Hold Ctrl to place its centre on the grid.",
     spring:
@@ -70,6 +70,8 @@ function select(id) {
       : "";
   $("lock-angle").parentElement.hidden = l?.type !== "spring";
   $("lock-angle").checked = !!l?.lockAngle;
+  $("reverse-wrap").parentElement.hidden = l?.type !== "pulley";
+  $("reverse-wrap").checked = !!l?.reverse;
   for (const id of ["crossed-belt", "belt-motor"])
     $(id).parentElement.hidden = l?.type !== "belt";
   $("crossed-belt").checked = !!l?.crossed;
@@ -154,7 +156,7 @@ function openMenu(id, x, y) {
     l?.type === "belt"
       ? "Ideal no-slip belt. Crossed / drive controls are in the selection bar. Wheel mass and damping are edited on each ball."
       : l?.type === "pulley"
-        ? "Massless, guided cable over a fixed axle. Wheel mass and radius determine rotational inertia; edit the ball for its constants."
+        ? "Taut cable with freely angled ends. Wheel mass and radius determine inertia. Alt-drag refits length; select the wheel to unlock its axle."
         : "Changes apply while the simulation runs.";
   const fields = o
     ? [
@@ -358,7 +360,7 @@ canvas.addEventListener("pointerdown", (e) => {
         select(result);
         chooseTool("grab");
         toast(
-          "Wheel centres pinned; rotation stays free. Select the connection for its controls.",
+          "Axle pinned initially; rotation stays free. Pulley axles can be unlocked. Select the cable to reverse its wrap.",
         );
       } catch (error) {
         toast(error.message);
@@ -370,7 +372,7 @@ canvas.addEventListener("pointerdown", (e) => {
           ? "Choose the second wheel."
           : pending.ids.length === 1
             ? "Choose the pulley wheel ball."
-            : "Choose the right load.",
+            : "Choose the other endpoint.",
       );
     return;
   }
@@ -470,6 +472,8 @@ $("lock-position").onchange = (e) => {
 $("lock-rotation").onchange = (e) => {
   sim.setLock(selected, "rotation", e.target.checked);
 };
+$("reverse-wrap").onchange = (e) =>
+  sim.mechanisms.cables.reverse(selected, e.target.checked);
 $("lock-angle").onchange = (e) => {
   try {
     sim.setSpringAngle(selected, e.target.checked);

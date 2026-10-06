@@ -25,7 +25,7 @@ Click **Keys ?** (or press **?**) for the built-in shortcut guide. Shortcuts do 
 | R + left-drag | Resize a ball or block about its current centre |
 | Ctrl + R-drag | Snap diameter, or width and height, to 0.5 m |
 | Ctrl + drag | Snap the desired centre to the grid; a position-locked body instead rotates in 15° steps |
-| Alt + drag | Change attached rod lengths |
+| Alt + drag | Refit attached rod / pulley cable lengths |
 | Delete / Escape | Delete selection / cancel interaction |
 | Right-click / Shift+F10 | Material constants / constants for selection |
 
@@ -48,11 +48,20 @@ Select the belt to enable **Crossed belt** (opposite rotation), or **Drive belt*
 
 For a conveyor, place the two wheels horizontally, enable Drive belt, then place a block just above the upper span. The spans support contact and use the object's surface friction to transport it. Zero surface friction means no conveyor traction. Passive belt contact reacts back on the wheels; a driven belt is an ideal external motor supplying whatever torque is required. Animated dashes show belt travel. Delete the belt before unlocking an axle's position.
 
-### Single-wheel pulley
+### Flexible pulley cable / spring–Atwood machine
 
-Press **U**, then click **left load → wheel ball → right load**. This makes a massless, taut cable passing over the ball's upper semicircle. Its axle is pinned, the loads are guided vertically at the left and right tangency points, and wheel inertia affects acceleration. Moving one load raises or lowers the other. Unequal masses accelerate the arrangement; rotation damping dissipates energy.
+Press **U**, then click **first endpoint → wheel ball → second endpoint**. Endpoints may be at any angle, and creation keeps them where you placed them. Cable spans meet the wheel tangentially and wrap around its rim. Endpoints may already have springs or rods, and further connections may be added afterward.
 
-Place both loads below the wheel and make the wheel large enough for their widths to fit side by side (for default blocks, a 2–3 m diameter wheel works). Choose loads without existing connections or position locks. Travel stops before a load reaches the floor or wheel. Locking a load's position or the wheel's rotation stops the mechanism. Remove the cable before changing its axle position or giving a load another connection. This is a fixed-axle guided pulley, not arbitrary slack rope, moving pulleys or multi-wheel cable routing.
+The axle starts pinned for convenient setup. Select the wheel and uncheck **Lock position** to move it or let it move dynamically. Normal dragging preserves the cable's length and adjusts other free endpoints; pinned positions and spring guides still constrain the result. If a requested drag cannot satisfy those constraints, it stops at a feasible position. **Alt-drag** an endpoint or an unlocked wheel to refit cable length for a new layout. Resizing the wheel also refits the cable around its new rim. Select the cable and use **Reverse cable wrap** to route around the other side, without repositioning the bodies.
+
+To reproduce a spring–Atwood arrangement:
+
+1. Place a block to the left of a wheel, roughly level with its top, and a second block below the wheel's right side.
+2. Connect a horizontal spring from an empty anchor on the left to the first block. Enable **Lock spring angle** to represent the tabletop's frictionless horizontal guide.
+3. Choose Pulley and click the spring-connected block, the wheel, then the hanging block.
+4. Drag either block to displace the system and release. The spring and cable act on the same body; the hanging mass drives the horizontal motion. Set spring/body damping to zero for sustained ideal oscillation.
+
+The model is a taut, massless, no-slip cable with finite wheel inertia. It allows swinging/angled endpoints and translating axles; it does not simulate slack rope, rope collisions with unrelated objects, or automatic rerouting around extra wheels. Each cable wraps one selected wheel. The normal contact engine handles the objects and floor. Very stiff/conflicting assemblies retain the ordinary numerical limitations of an iterative rigid-body simulation.
 
 The floor is not selectable or editable. Gravity is 9.81 m/s². Grid lines mark 0.5 m and 1 m intervals.
 
@@ -92,8 +101,8 @@ npm ci
 npm run test:ui
 ```
 
-Numerical regression coverage also checks SHO period, guide motion, snapped rotation, local-axis resizing and inertia, open/crossed transmission ratios, passive conveyor reaction, driven conveyor transport, and Atwood acceleration with finite wheel inertia.
+Numerical regression coverage also checks SHO period, guide motion, snapped rotation, local-axis resizing and inertia, open/crossed transmission ratios, passive conveyor reaction, driven conveyor transport, and Atwood acceleration with finite wheel inertia, tangent geometry, spring–Atwood oscillation, angled dragging, movable axles, explicit cable refitting, and infeasible pinned poses.
 
 The original regression coverage includes free fall, static floor, grab/throw velocity, pinned-object rotation, independent locks, lock/unlock after mass changes, pinned contacts, snapping, rod safety, springs and live constants. DOM checks exercise the actual creation/drag/menu/lock/snap controls. Visual browser verification was not available in the authoring environment; these checks do not claim exhaustive browser/device coverage.
 
-`src/physics.js` owns bodies, locks, dragging, resizing and spring guides. `src/mechanisms.js` owns belt geometry, angular coupling, conveyor contact and the guided pulley. `src/app.js` owns keyboard/pointer input, drawing and menus.
+`src/physics.js` owns bodies, locks, dragging, resizing and spring guides. `src/mechanisms.js` owns belts and conveyor contact; `src/pulley.js` owns tangent cable geometry and its coupled translational/rotational constraints. `src/app.js` owns keyboard/pointer input, drawing and menus.

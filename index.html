@@ -44,6 +44,8 @@
           ><input type="checkbox" id="lock-rotation" /> Lock rotation</label
         ><label
           ><input type="checkbox" id="lock-angle" /> Lock spring angle</label
+        ><label
+          ><input type="checkbox" id="reverse-wrap" /> Reverse cable wrap</label
         ><label><input type="checkbox" id="crossed-belt" /> Crossed belt</label
         ><label><input type="checkbox" id="belt-motor" /> Drive belt</label
         ><label id="belt-speed-label"
@@ -114,13 +116,14 @@
         <dt>Ctrl + drag</dt>
         <dd>Snap centre to grid; pinned objects rotate in 15° steps</dd>
         <dt>Alt + drag</dt>
-        <dd>Change connected rod lengths</dd>
+        <dd>Refit connected rod / cable lengths</dd>
         <dt>Delete · Escape</dt>
         <dd>Delete selection · cancel interaction</dd>
       </dl>
       <p>
-        Belt: click two balls. Pulley: click left load, wheel ball, right load.
-        Wheels are fixed in position but can spin. Select a belt for crossed /
+        Belt: click two balls. Pulley: click endpoint, wheel ball, endpoint.
+        Cable ends can move at any angle and connect to springs. Pulley axles
+        start pinned; unlock position to move them. Select a belt for crossed /
         driven modes. Select a spring to lock its current angle.
       </p>
     </section>

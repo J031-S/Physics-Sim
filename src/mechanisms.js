@@ -1,4 +1,5 @@
-// Ideal fixed-axle belts and a guided, no-slip cable over a single pulley.
+import { PulleyCables } from "./pulley.js";
+// Belts and conveyors; flexible pulley cables live in pulley.js.
 // Geometry uses metres/radians; conversions to Matter units stay at the boundary.
 const { Body, Bodies, Composite } = globalThis.Matter;
 const SCALE = 100,
@@ -12,6 +13,7 @@ const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 export class Mechanisms {
   constructor(sim) {
     this.sim = sim;
+    this.cables = new PulleyCables(sim);
   }
   isLoad(id) {
     return (
@@ -235,136 +237,14 @@ export class Mechanisms {
         this.updateSurfaces(l);
       }
   }
-  createPulley(left, wheel, right) {
-    const s = this.sim,
-      a = s.objects.get(left),
-      w = s.objects.get(wheel),
-      b = s.objects.get(right);
-    if (
-      new Set([left, wheel, right]).size !== 3 ||
-      !a ||
-      !b ||
-      w?.shape !== "ball"
-    )
-      throw new Error(
-        "Choose a left load, a ball for the wheel, and a different right load.",
-      );
-    if (
-      [...s.links.values()].some(
-        (l) => l.type === "pulley" && l.wheel === wheel,
-      )
-    )
-      throw new Error("This wheel already has a pulley cable.");
-    if (
-      this.isWheel(left) ||
-      this.isWheel(right) ||
-      this.isLoad(wheel) ||
-      [...s.links.values()].some((l) =>
-        [l.a, l.b].some((id) => id === left || id === right),
-      )
-    )
-      throw new Error("Choose loads that do not already have connections.");
-    if (a.lockPosition || b.lockPosition)
-      throw new Error("Unlock the positions of the two loads first.");
-    const pa = s.state(left),
-      pb = s.state(right),
-      pw = s.state(wheel),
-      extent = (o) =>
-        o.shape === "ball" ? o.radius : Math.hypot(o.width, o.height) / 2;
-    if (Math.max(pa.y + extent(a), pb.y + extent(b)) >= pw.y - 0.05)
-      throw new Error("Place both loads below the pulley wheel.");
-    if (extent(a) + extent(b) >= 2 * w.radius - 0.05)
-      throw new Error(
-        "Enlarge the pulley wheel or reduce the loads so they fit side by side.",
-      );
-    const l = {
-      id: "link-" + ++s.serial,
-      type: "pulley",
-      a: left,
-      b: right,
-      wheel,
-      yA: pa.y,
-      yB: pb.y,
-      theta: pw.angle,
-      q: 0,
-    };
-    s.setLock(wheel, "position", true);
-    s.links.set(l.id, l);
-    this.solvePulley();
-    return l.id;
+  createPulley(a, wheel, b) {
+    return this.cables.create(a, wheel, b);
   }
   solvePulley(driver = null) {
-    const s = this.sim;
-    for (const l of s.links.values())
-      if (l.type === "pulley") {
-        const a = s.objects.get(l.a),
-          b = s.objects.get(l.b),
-          w = s.objects.get(l.wheel),
-          sa = s.state(l.a),
-          sb = s.state(l.b),
-          sw = s.state(l.wheel),
-          r = w.radius;
-        const inertia = w.freeInertia / (SCALE * SCALE),
-          denom = (a.mass + b.mass) * r * r + inertia;
-        let q =
-          (a.mass * -r * (sa.y - l.yA) +
-            b.mass * r * (sb.y - l.yB) +
-            inertia * (sw.angle - l.theta)) /
-          denom;
-        let omega =
-          (-a.mass * r * sa.vy + b.mass * r * sb.vy + inertia * sw.omega) /
-          denom;
-        if (driver === l.a) q = (l.yA - sa.y) / r;
-        if (driver === l.b) q = (sb.y - l.yB) / r;
-        if (driver === l.wheel) q = sw.angle - l.theta;
-        if ([l.a, l.b, l.wheel].includes(driver)) omega = 0;
-        if (a.lockPosition) {
-          q = (l.yA - sa.y) / r;
-          omega = 0;
-        }
-        if (b.lockPosition) {
-          q = (sb.y - l.yB) / r;
-          omega = 0;
-        }
-        if (w.lockRotation) {
-          q = -w.angleAnchor - l.theta;
-          omega = 0;
-        }
-        const clearance = (o) =>
-          (Math.max(...o.body.vertices.map((v) => v.y)) - o.body.position.y) /
-          SCALE;
-        const ca = clearance(a),
-          cb = clearance(b),
-          topA = sw.y - ca - 0.05,
-          topB = sw.y - cb - 0.05;
-        const lo = Math.max((l.yA - topA) / r, (cb - l.yB) / r),
-          hi = Math.min((l.yA - ca) / r, (topB - l.yB) / r);
-        const bounded = clamp(q, lo, hi);
-        if (bounded !== q) omega = 0;
-        q = bounded;
-        l.q = q;
-        if (!a.lockPosition) pos(a.body, { x: sw.x - r, y: l.yA - r * q });
-        if (!b.lockPosition) pos(b.body, { x: sw.x + r, y: l.yB + r * q });
-        velocity(a.body, 0, a.lockPosition ? 0 : -r * omega);
-        velocity(b.body, 0, b.lockPosition ? 0 : r * omega);
-        if (!w.lockRotation) angle(w.body, l.theta + q);
-        spin(w.body, w.lockRotation ? 0 : omega);
-      }
+    this.cables.solve(driver);
   }
   pulleyPath(l) {
-    const s = this.sim,
-      w = s.objects.get(l.wheel),
-      p = s.state(l.wheel),
-      path = [s.state(l.a), { x: p.x - w.radius, y: p.y }];
-    for (let i = 0; i <= 32; i++) {
-      const a = Math.PI - (i * Math.PI) / 32;
-      path.push({
-        x: p.x + w.radius * Math.cos(a),
-        y: p.y + w.radius * Math.sin(a),
-      });
-    }
-    path.push(s.state(l.b));
-    return path;
+    return this.cables.path(l);
   }
   validateResize(id, width, height) {
     const radius = width / 2;
@@ -377,30 +257,21 @@ export class Mechanisms {
         if (Math.hypot(a.x - b.x, a.y - b.y) <= radius + other.radius + 0.1)
           throw new Error("The belt wheels need a gap between them.");
       }
-      if (l.type === "pulley" && (l.a === id || l.b === id || l.wheel === id)) {
-        const w = s.objects.get(l.wheel),
-          a = s.objects.get(l.a),
-          b = s.objects.get(l.b);
-        const extent = (o) =>
-          o.id === id
-            ? o.shape === "ball"
-              ? radius
-              : Math.hypot(width, height) / 2
-            : o.shape === "ball"
-              ? o.radius
-              : Math.hypot(o.width, o.height) / 2;
-        const r = l.wheel === id ? radius : w.radius;
-        if (extent(a) + extent(b) >= 2 * r - 0.05)
-          throw new Error("Leave room for both pulley loads.");
-        if (l.wheel === id && (a.lockPosition || b.lockPosition))
-          throw new Error(
-            "Unlock the pulley loads before changing wheel size.",
-          );
+      if (l.type === "pulley" && l.wheel === id) {
+        const centre = s.state(id);
         if (
-          Math.max(s.state(l.a).y + extent(a), s.state(l.b).y + extent(b)) >=
-          s.state(l.wheel).y - 0.05
+          [l.a, l.b].some(
+            (end) =>
+              Math.hypot(
+                s.state(end).x - centre.x,
+                s.state(end).y - centre.y,
+              ) <=
+              radius + 0.02,
+          )
         )
-          throw new Error("Leave clearance below the pulley wheel.");
+          throw new Error(
+            "Move the endpoints outside the enlarged wheel first.",
+          );
       }
     }
   }
@@ -415,11 +286,7 @@ export class Mechanisms {
         this.updateSurfaces(l);
       }
       if (l.type === "pulley" && (l.wheel === id || l.a === id || l.b === id)) {
-        l.yA = s.state(l.a).y;
-        l.yB = s.state(l.b).y;
-        l.theta = s.state(l.wheel).angle;
-        l.q = 0;
-        this.solvePulley();
+        this.cables.bind(l);
       }
     }
   }
@@ -498,7 +365,7 @@ export class Mechanisms {
   afterStep() {
     this.solveBelts();
     this.conveyorContacts();
-    this.solvePulley(this.sim.sizing?.id || null);
+    this.solvePulley(this.sim.sizing?.id || this.sim.grab?.id || null);
     for (const l of this.sim.links.values())
       if (l.type === "belt")
         l.travel +=

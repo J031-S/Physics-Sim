@@ -177,8 +177,13 @@ test("pulley drag moves the other load, preserves rope, and stops at travel limi
   const { s, a, b, wheel, l } = pulley();
   s.beginGrab(a, s.state(a));
   s.moveGrab({ x: -3, y: 4 });
-  near(s.state(a).x, -1.5);
-  near(s.state(b).y, 6);
+  near(s.state(a).x, -3);
+  assert.ok(s.state(b).y > 6);
+  near(
+    s.mechanisms.cables.geometry(s.links.get(l)).length,
+    s.links.get(l).length,
+    0.002,
+  );
   s.endGrab(false);
   s.beginGrab(a, s.state(a));
   s.moveGrab({ x: -3, y: -10 });
@@ -186,7 +191,7 @@ test("pulley drag moves the other load, preserves rope, and stops at travel limi
   run(s, 2);
   finite(s);
   assert.ok(s.state(a).y > 0.4);
-  assert.ok(s.state(b).y < 8);
+  assert.ok(s.mechanisms.cables.error() < 0.005);
   s.remove(wheel);
   assert.equal(s.links.has(l), false);
   s.dispose();

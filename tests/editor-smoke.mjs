@@ -252,7 +252,49 @@ click(500, 180);
 click(600, 400);
 assert.equal($("selected-name").textContent, "Pulley");
 frames(1);
+// Build the reference layout: spring-guided horizontal block, angled cable,
+// wheel, hanging block. Existing spring connections must remain acceptable.
+$("clear").click();
+canvas.focus();
+key("n");
+click(300, 260);
+key("s");
+click(160, 260);
+click(300, 260);
+$("lock-angle").checked = true;
+$("lock-angle").dispatchEvent(new window.Event("change"));
+key("b");
+click(500, 290);
+key("n");
+click(530, 440);
+key("u");
+click(300, 260);
+click(500, 290);
+click(530, 440);
+assert.equal($("selected-name").textContent, "Pulley");
+assert.equal($("reverse-wrap").parentElement.hidden, false);
+$("reverse-wrap").checked = true;
+$("reverse-wrap").dispatchEvent(new window.Event("change"));
+$("reverse-wrap").checked = false;
+$("reverse-wrap").dispatchEvent(new window.Event("change"));
+menu(300, 260);
+assert.ok($("constants").querySelector('[aria-label="Mass"]'));
+$("close-menu").click();
+pointer("pointerdown", 530, 440);
+pointer("pointermove", 600, 420);
+pointer("pointerup", 600, 420);
+menu(600, 420);
+assert.ok($("constants").querySelector('[aria-label="Mass"]'));
+$("close-menu").click();
+click(500, 290);
+assert.equal($("lock-position").checked, true);
+$("lock-position").checked = false;
+$("lock-position").dispatchEvent(new window.Event("change"));
+assert.equal($("lock-position").checked, false);
+key(" ");
+frames(10);
+key(" ");
 console.log(
-  "PASS: creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, deletion and clear.",
+  "PASS: creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, deletion and clear.",
 );
 await window.happyDOM.close();
