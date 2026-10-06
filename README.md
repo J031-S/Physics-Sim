@@ -14,19 +14,47 @@ Open http://localhost:3000. Running the app needs no package installation or bui
 
 ## Controls
 
-- **Ball / Block:** choose the tool, then click above the floor. The tool returns to Grab after placing one object.
-- **Grab:** hold the left mouse button on an object and move it. The simulation keeps running. Release while moving to throw it. Movement is direct, with no elastic mouse tether. A position-locked object can be rotated by grabbing away from its centre.
-- **Ctrl-drag:** place precisely on the 0.5 m grid. The desired centre snaps to the grid; rod constraints and locks take priority where an exact grid point is unreachable. Release with Ctrl to stop linear velocity. Placement stays above the floor.
-- **Alt-drag:** resize rods attached to the dragged object, while paused or running. Ordinary dragging preserves rod length and follows the allowed arc. Position locks still take priority.
-- **Spring / Rod:** click two objects, or one empty world anchor and an object. Connections attach to body centres. Escape cancels an unfinished connection. Click a connection to select it; right-click for its constants.
-- **Velocity vectors:** toggle blue velocity arrows. The selected object's speed is labelled in m/s; arrow lengths are capped for visibility.
-- **Lock position:** pins the selected centre at its current coordinates and stops translation, while allowing rotation.
-- **Lock rotation:** holds the current angle and stops spin, while allowing translation. Both locks may be enabled independently. A ball's radial stripe shows its orientation.
-- **Delete:** removes the selected object or connection. Deleting an object also removes its connections.
-- **Pause:** deliberately suspends physics. Direct placement, rotation and rod resizing still work while paused. Grabbing never pauses playback automatically.
-- **Clear scene:** removes everything except the static floor.
+Click **Keys ?** (or press **?**) for the built-in shortcut guide. Shortcuts do not intercept typing in property fields or other form controls.
 
-The floor is not selectable or editable. Gravity is fixed at 9.81 m/s². The grid has darker 1 m lines and lighter 0.5 m lines.
+| Key / gesture | Action |
+|---|---|
+| Space | Play / pause (holding the key does not repeatedly toggle) |
+| G / B / N | Grab / Ball / Block |
+| S / D / T / U | Spring / Rod / Belt / Pulley |
+| V | Toggle velocity vectors |
+| R + left-drag | Resize a ball or block about its current centre |
+| Ctrl + R-drag | Snap diameter, or width and height, to 0.5 m |
+| Ctrl + drag | Snap the desired centre to the grid; a position-locked body instead rotates in 15° steps |
+| Alt + drag | Change attached rod lengths |
+| Delete / Escape | Delete selection / cancel interaction |
+| Right-click / Shift+F10 | Material constants / constants for selection |
+
+- **Ball / Block:** select a tool and click above the floor. The tool returns to Grab after one placement.
+- **Grab:** drag directly without a mouse tether. Release while moving to throw; hold still before release to stop. A rod constrains normal dragging to its arc. Ctrl release suppresses throwing; locks and connections take priority over grid placement.
+- **Independent locks:** use the selection bar to lock position, rotation, or both. For a pinned ball, grab away from its centre to rotate it. Ctrl snaps its absolute orientation to multiples of 15°. A ball's stripe shows its orientation.
+- **Resize:** hold R before starting a drag, or click the selection bar's **Resize (R)** button. Drag outward/inward to resize a ball's diameter; drag a block near a corner to change width and height along its local axes. Dimensions appear beside the selection. The body stays centred and still during the gesture, even while physics runs. Mass stays constant; inertia is recalculated. Limits are 0.1–10 m. Edits that penetrate the floor or overlap pulley wheels are rejected. Return from the button-operated resize tool with G.
+- **Spring / Rod:** click two bodies, or a world anchor and a body. Connections attach at body centres. Select a connection by clicking its line. Alt-drag changes rod length while paused or running.
+- **Pause / Clear scene:** pause deliberately stops physics but editing still works. Clear removes everything except the static floor. Dragging does not pause the world.
+
+### Spring angle lock / horizontal SHO
+
+Create a spring between an empty anchor point and a ball/block at the same height. Select the spring and enable **Lock spring angle**. Its current axis becomes a frictionless guide: the free endpoint can move along it but cannot sag or be dragged sideways. Stretch the spring along that axis and release. For undamped SHO, set the spring's damping and the body's linear damping to zero. A spring between two free bodies fixes their relative angle; both centres can still fall together. Pin one endpoint or use a world anchor when a fixed laboratory frame is wanted.
+
+### Belts and conveyors
+
+Press **T**, then click two separate balls. A closed belt wraps tangentially around their circumferences, and the two centres become fixed axles. Resize the balls before or after creating the belt to change the transmission ratio; the wheels must remain separate.
+
+Select the belt to enable **Crossed belt** (opposite rotation), or **Drive belt** and a signed speed in m/s (−10 to 10). Positive speed goes from the first wheel to the second along the first span. With Drive off, spin a wheel by dragging its rim and releasing; momentum is shared according to the wheels' radii and inertias. A rotation-locked wheel brakes the pair.
+
+For a conveyor, place the two wheels horizontally, enable Drive belt, then place a block just above the upper span. The spans support contact and use the object's surface friction to transport it. Zero surface friction means no conveyor traction. Passive belt contact reacts back on the wheels; a driven belt is an ideal external motor supplying whatever torque is required. Animated dashes show belt travel. Delete the belt before unlocking an axle's position.
+
+### Single-wheel pulley
+
+Press **U**, then click **left load → wheel ball → right load**. This makes a massless, taut cable passing over the ball's upper semicircle. Its axle is pinned, the loads are guided vertically at the left and right tangency points, and wheel inertia affects acceleration. Moving one load raises or lowers the other. Unequal masses accelerate the arrangement; rotation damping dissipates energy.
+
+Place both loads below the wheel and make the wheel large enough for their widths to fit side by side (for default blocks, a 2–3 m diameter wheel works). Choose loads without existing connections or position locks. Travel stops before a load reaches the floor or wheel. Locking a load's position or the wheel's rotation stops the mechanism. Remove the cable before changing its axle position or giving a load another connection. This is a fixed-axle guided pulley, not arbitrary slack rope, moving pulleys or multi-wheel cable routing.
+
+The floor is not selectable or editable. Gravity is 9.81 m/s². Grid lines mark 0.5 m and 1 m intervals.
 
 ## Right-click menu
 
@@ -44,7 +72,7 @@ Surface friction is not internal material hysteresis. The two damping coefficien
 
 Springs expose stiffness, axial damping and rest length; rods expose length. Property changes apply on Enter or leaving the field, without pausing, resetting time, or rebuilding the world. Invalid values are rejected. Close with Escape, the cross, or clicking outside. Shift+F10 opens the menu for a selected object while the canvas is focused.
 
-There are no position/velocity inputs, geometry settings, charge/temperature placeholders, equation editor, graph panel, presets, additional shapes, rope, inspector, autosave, scene import/export, or hidden advanced modes. Old localStorage saves are not loaded or deleted. This is a fresh, transient sandbox on every page load.
+Material menus contain no position/velocity inputs or geometry controls. Geometry, locks and belt drive controls are separate from material constants. There are no charge/temperature placeholders, equation editor, graph panel, presets, additional body shapes, inspector, autosave or scene import/export. Old localStorage saves are not loaded or deleted. This is a fresh, transient sandbox on every page load.
 
 ## Physics implementation
 
@@ -64,6 +92,8 @@ npm ci
 npm run test:ui
 ```
 
-Numerical regression coverage includes free fall, static floor, grab/throw velocity, pinned-object rotation, independent locks, lock/unlock after mass changes, pinned contacts, snapping, rod safety, springs and live constants. DOM checks exercise the actual creation/drag/menu/lock/snap controls. Visual browser verification was not available in the authoring environment; these checks do not claim exhaustive browser/device coverage.
+Numerical regression coverage also checks SHO period, guide motion, snapped rotation, local-axis resizing and inertia, open/crossed transmission ratios, passive conveyor reaction, driven conveyor transport, and Atwood acceleration with finite wheel inertia.
 
-Source is deliberately small: `src/physics.js` owns the physics and locks; `src/app.js` owns canvas input, drawing and the constants menu.
+The original regression coverage includes free fall, static floor, grab/throw velocity, pinned-object rotation, independent locks, lock/unlock after mass changes, pinned contacts, snapping, rod safety, springs and live constants. DOM checks exercise the actual creation/drag/menu/lock/snap controls. Visual browser verification was not available in the authoring environment; these checks do not claim exhaustive browser/device coverage.
+
+`src/physics.js` owns bodies, locks, dragging, resizing and spring guides. `src/mechanisms.js` owns belt geometry, angular coupling, conveyor contact and the guided pulley. `src/app.js` owns keyboard/pointer input, drawing and menus.

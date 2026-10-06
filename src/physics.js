@@ -1,3 +1,4 @@
+import { Mechanisms } from "./mechanisms.js";
 // The sandbox exposes SI units; Matter uses px, ms and 60 Hz-normalised velocity.
 const { Engine, Bodies, Body, Composite, Constraint, Query } =
   globalThis.Matter;
@@ -20,6 +21,8 @@ export class Sandbox {
     this.time = 0;
     this.serial = 0;
     this.grab = null;
+    this.sizing = null;
+    this.mechanisms = new Mechanisms(this);
     this.floor = Bodies.rectangle(
       0,
       -(-0.25) * SCALE,
@@ -31,7 +34,9 @@ export class Sandbox {
     const filter = (pairs) => {
       for (const pair of pairs) {
         const { parentA: a, parentB: b } = pair.collision;
-        pair.isSensor = a.inverseMass + b.inverseMass === 0;
+        pair.isSensor =
+          a.inverseMass + b.inverseMass === 0 ||
+          this.mechanisms.ignoreContact(a, b);
       }
     };
     globalThis.Matter.Events.on(this.engine, "beforeSolve", () => {
@@ -129,6 +134,10 @@ export class Sandbox {
       throw new Error(
         "Connect two different objects, or an object and a fixed point.",
       );
+    if ([a, b].some((id) => this.mechanisms.isLoad(id)))
+      throw new Error(
+        "A pulley load already has a cable guide. Remove its pulley before adding another connection.",
+      );
     const pa = a ? this.state(a) : aPoint,
       pb = b ? this.state(b) : bPoint,
       length = Math.hypot(pb.x - pa.x, pb.y - pa.y);
@@ -144,6 +153,8 @@ export class Sandbox {
         length,
         k: 20,
         damping: 0.3,
+        lockAngle: false,
+        axis: { x: (pb.x - pa.x) / length, y: (pb.y - pa.y) / length },
         constraint: null,
         attached: false,
       };
@@ -183,6 +194,10 @@ export class Sandbox {
     const o = this.objects.get(id);
     if (!o) return;
     if (axis === "position") {
+      if (!locked && this.mechanisms.isWheel(id))
+        throw new Error(
+          "Remove the belt or pulley before moving its fixed axle.",
+        );
       o.lockPosition = locked;
       o.positionAnchor = { ...o.body.position };
       o.body.inverseMass = locked ? 0 : 1 / o.mass;
@@ -242,6 +257,162 @@ export class Sandbox {
         throw new Error("Invalid " + key + ".");
     Object.assign(l, patch);
     if (l.constraint) l.constraint.length = l.length * SCALE;
+  }
+  setSpringAngle(id, locked) {
+    const l = this.links.get(id);
+    if (l?.type !== "spring") return;
+    if (locked) {
+      const a = this.endpoint(l, "a"),
+        b = this.endpoint(l, "b"),
+        d = Math.hypot(b.x - a.x, b.y - a.y);
+      if (d < 1e-6)
+        throw new Error(
+          "Separate the spring endpoints before locking its angle.",
+        );
+      l.axis = { x: (b.x - a.x) / d, y: (b.y - a.y) / d };
+    }
+    l.lockAngle = locked;
+    this.solveGuides();
+  }
+  solveGuides() {
+    for (const l of this.links.values())
+      if (l.type === "spring" && l.lockAngle) {
+        const a = this.endpoint(l, "a"),
+          b = this.endpoint(l, "b"),
+          n = { x: -l.axis.y, y: l.axis.x };
+        const oa = this.objects.get(l.a),
+          ob = this.objects.get(l.b);
+        const wa =
+          oa &&
+          !oa.lockPosition &&
+          this.grab?.id !== l.a &&
+          this.sizing?.id !== l.a
+            ? 1 / oa.mass
+            : 0;
+        const wb =
+          ob &&
+          !ob.lockPosition &&
+          this.grab?.id !== l.b &&
+          this.sizing?.id !== l.b
+            ? 1 / ob.mass
+            : 0;
+        if (!wa && !wb) continue;
+        const error = (b.x - a.x) * n.x + (b.y - a.y) * n.y;
+        const va = oa ? this.state(l.a) : { vx: 0, vy: 0 },
+          vb = ob ? this.state(l.b) : { vx: 0, vy: 0 };
+        const speed = (vb.vx - va.vx) * n.x + (vb.vy - va.vy) * n.y;
+        for (const [o, w, sign] of [
+          [oa, wa, 1],
+          [ob, wb, -1],
+        ])
+          if (w) {
+            const p = this.state(o.id),
+              f = (sign * w) / (wa + wb);
+            Body.setPosition(
+              o.body,
+              toEngine({ x: p.x + f * error * n.x, y: p.y + f * error * n.y }),
+            );
+            Body.setVelocity(o.body, {
+              x: ((p.vx + f * speed * n.x) * SCALE) / 60,
+              y: (-(p.vy + f * speed * n.y) * SCALE) / 60,
+            });
+          }
+      }
+  }
+  resizeBody(id, width, height = width) {
+    const o = this.objects.get(id);
+    if (
+      !o ||
+      ![width, height].every((v) => Number.isFinite(v) && v >= 0.1 && v <= 10)
+    )
+      throw new Error("Dimensions must be between 0.1 and 10 m.");
+    if (o.shape === "ball") height = width;
+    const p = this.state(id),
+      c = Math.abs(Math.cos(p.angle)),
+      sn = Math.abs(Math.sin(p.angle));
+    const clearance =
+      o.shape === "ball" ? width / 2 : (width * sn + height * c) / 2;
+    if (p.y < clearance - 1e-5)
+      throw new Error(
+        "There is not enough room above the floor. Move the object up first.",
+      );
+    this.mechanisms.validateResize(id, width, height);
+    const b = o.body,
+      angle = b.angle;
+    Body.setInertia(b, o.freeInertia);
+    Body.setAngle(b, 0);
+    Body.scale(
+      b,
+      width / (o.shape === "ball" ? o.radius * 2 : o.width),
+      height / (o.shape === "ball" ? o.radius * 2 : o.height),
+    );
+    Body.setMass(b, o.mass);
+    o.freeInertia = b.inertia;
+    o.width = width;
+    o.height = height;
+    if (o.shape === "ball") o.radius = width / 2;
+    Body.setAngle(b, angle);
+    b.inverseMass = o.lockPosition ? 0 : 1 / o.mass;
+    Body.setInertia(b, o.lockRotation ? Infinity : o.freeInertia);
+    this.mechanisms.rebase(id);
+  }
+  beginResize(id, p) {
+    const o = this.objects.get(id);
+    if (!o) return;
+    this.endGrab(false);
+    this.sizing = {
+      id,
+      start: { ...p },
+      centre: this.state(id),
+      width: o.shape === "ball" ? o.radius * 2 : o.width,
+      height: o.shape === "ball" ? o.radius * 2 : o.height,
+    };
+  }
+  moveResize(p, snapping = false) {
+    const g = this.sizing;
+    if (!g) return;
+    const o = this.objects.get(g.id),
+      a = g.centre.angle,
+      dx = p.x - g.start.x,
+      dy = p.y - g.start.y;
+    let w, h;
+    if (o.shape === "ball") {
+      w =
+        g.width +
+        2 *
+          (Math.hypot(p.x - g.centre.x, p.y - g.centre.y) -
+            Math.hypot(g.start.x - g.centre.x, g.start.y - g.centre.y));
+      h = w;
+    } else {
+      const sx =
+        (g.start.x - g.centre.x) * Math.cos(a) +
+        (g.start.y - g.centre.y) * Math.sin(a);
+      const sy =
+        -(g.start.x - g.centre.x) * Math.sin(a) +
+        (g.start.y - g.centre.y) * Math.cos(a);
+      w =
+        g.width +
+        2 * (dx * Math.cos(a) + dy * Math.sin(a)) * (Math.sign(sx) || 1);
+      h =
+        g.height +
+        2 * (-dx * Math.sin(a) + dy * Math.cos(a)) * (Math.sign(sy) || 1);
+    }
+    const dimension = (v) =>
+      Math.max(snapping ? GRID : 0.1, Math.min(10, snapping ? snap(v) : v));
+    this.resizeBody(g.id, dimension(w), dimension(h));
+    this.holdResize();
+  }
+  holdResize() {
+    const g = this.sizing;
+    if (!g) return;
+    const b = this.objects.get(g.id).body;
+    Body.setPosition(b, toEngine(g.centre));
+    Body.setAngle(b, -g.centre.angle);
+    Body.setVelocity(b, { x: 0, y: 0 });
+    Body.setAngularVelocity(b, 0);
+  }
+  endResize() {
+    this.sizing = null;
   }
   beginGrab(id, p, now = performance.now()) {
     const o = this.objects.get(id);
@@ -305,7 +476,9 @@ export class Sandbox {
           dx = q.x - o.positionAnchor.x,
           dy = q.y - o.positionAnchor.y;
         if (Math.hypot(dx, dy) > 1e-4) {
-          const desired = Math.atan2(dy, dx) - Math.atan2(g.local.y, g.local.x);
+          let desired = Math.atan2(dy, dx) - Math.atan2(g.local.y, g.local.x);
+          if (g.snap)
+            desired = Math.round(desired / (Math.PI / 12)) * (Math.PI / 12);
           g.angle =
             b.angle +
             Math.atan2(
@@ -331,6 +504,23 @@ export class Sandbox {
           y: Math.max(Math.ceil(floor / GRID) * GRID, snap(desired.y)),
         };
       desired.y = Math.max(floor, desired.y);
+      const guides = [...this.links.values()]
+        .filter(
+          (l) =>
+            l.type === "spring" &&
+            l.lockAngle &&
+            (l.a === g.id || l.b === g.id),
+        )
+        .map((l) => ({
+          ...this.endpoint(l, l.a === g.id ? "b" : "a"),
+          axis: l.axis,
+        }));
+      for (const line of guides) {
+        const t =
+          (desired.x - line.x) * line.axis.x +
+          (desired.y - line.y) * line.axis.y;
+        desired = { x: line.x + t * line.axis.x, y: line.y + t * line.axis.y };
+      }
       const rods = this.grabRods();
       const circles = rods.map((l) => ({
         ...this.endpoint(l, l.a === g.id ? "b" : "a"),
@@ -381,9 +571,27 @@ export class Sandbox {
               });
           }
         }
+        for (const line of guides)
+          for (const circle of circles) {
+            const dx = line.x - circle.x,
+              dy = line.y - circle.y,
+              t = -(dx * line.axis.x + dy * line.axis.y);
+            const h2 = circle.r ** 2 - (dx * dx + dy * dy - t * t);
+            if (h2 >= 0)
+              for (const sign of [-1, 1])
+                candidates.push({
+                  x: line.x + (t + sign * Math.sqrt(h2)) * line.axis.x,
+                  y: line.y + (t + sign * Math.sqrt(h2)) * line.axis.y,
+                });
+          }
         const valid = candidates.filter(
           (p) =>
             p.y >= floor - 1e-7 &&
+            guides.every(
+              (l) =>
+                Math.abs((p.x - l.x) * l.axis.y - (p.y - l.y) * l.axis.x) <
+                1e-6,
+            ) &&
             circles.every(
               (c) => Math.abs(Math.hypot(p.x - c.x, p.y - c.y) - c.r) < 1e-6,
             ),
@@ -395,6 +603,7 @@ export class Sandbox {
         );
         desired = valid[0] || old; // Inconsistent constraints must not teleport a body.
       }
+      if (desired.y < floor - 1e-7) desired = old;
       Body.setPosition(b, toEngine(desired));
     }
     Body.setAngle(b, o.lockRotation ? o.angleAnchor : g.angle);
@@ -405,6 +614,8 @@ export class Sandbox {
       b.constraintImpulse.y =
       b.constraintImpulse.angle =
         0;
+    this.mechanisms.solvePulley(g.id);
+    this.mechanisms.driveDraggedWheel(g.id);
     g.snapCentre = g.snap && !o.lockPosition ? toWorld(b.position) : null;
   }
   endGrab(throwObject = true, now = performance.now()) {
@@ -445,6 +656,8 @@ export class Sandbox {
         );
     }
     this.grab = null;
+    this.solveGuides();
+    this.mechanisms.solvePulley();
   }
   applyForce(id, point, force) {
     const o = this.objects.get(id);
@@ -511,13 +724,20 @@ export class Sandbox {
       }
     this.placeGrab();
     this.enforceLocks();
+    this.holdResize();
+    this.mechanisms.beforeStep();
     Engine.update(this.engine, DT * 1000);
     this.enforceLocks();
     this.placeGrab();
+    this.holdResize();
+    for (let i = 0; i < 6; i++) this.solveGuides();
+    this.mechanisms.afterStep();
     this.time += DT;
   }
   remove(id) {
     if (this.grab?.id === id) this.endGrab(false);
+    if (this.sizing?.id === id) this.endResize();
+    this.mechanisms.remove(id);
     for (const [key, l] of this.links)
       if (key === id || l.a === id || l.b === id) {
         if (l.constraint) Composite.remove(this.engine.world, l.constraint);

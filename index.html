@@ -11,7 +11,8 @@
       <a class="brand" href="./"><span>φ</span> Physics Sim</a
       ><span class="subtitle">A simple mechanics sandbox</span>
       <div class="playback">
-        <button id="pause">Ⅱ Pause</button
+        <button id="shortcuts" title="Keyboard shortcuts (?)">Keys ?</button
+        ><button id="pause" title="Play / pause (Space)">Ⅱ Pause</button
         ><button id="clear">Clear scene</button>
       </div>
     </header>
@@ -29,6 +30,8 @@
         ><span class="divider"></span
         ><button data-tool="spring" aria-pressed="false"><b>∿</b> Spring</button
         ><button data-tool="rod" aria-pressed="false"><b>⊶</b> Rod</button
+        ><button data-tool="belt" aria-pressed="false"><b>▱</b> Belt</button
+        ><button data-tool="pulley" aria-pressed="false"><b>∩</b> Pulley</button
         ><label class="vectors"
           ><input type="checkbox" id="vectors" /> Velocity vectors</label
         >
@@ -39,6 +42,28 @@
           ><input type="checkbox" id="lock-position" /> Lock position</label
         ><label
           ><input type="checkbox" id="lock-rotation" /> Lock rotation</label
+        ><label
+          ><input type="checkbox" id="lock-angle" /> Lock spring angle</label
+        ><label><input type="checkbox" id="crossed-belt" /> Crossed belt</label
+        ><label><input type="checkbox" id="belt-motor" /> Drive belt</label
+        ><label id="belt-speed-label"
+          >Speed
+          <input
+            id="belt-speed"
+            type="number"
+            min="-10"
+            max="10"
+            step="0.1"
+            value="1"
+            aria-label="Belt speed"
+          />
+          m/s</label
+        ><button
+          id="resize-object"
+          title="Resize tool: drag the object; Ctrl snaps dimensions"
+        >
+          Resize (R)</button
+        ><span id="dimensions"></span
         ><button id="delete" title="Delete selected object or connection">
           Delete
         </button>
@@ -67,6 +92,37 @@
       </div>
       <p id="menu-note">Changes apply while the simulation runs.</p>
       <form id="constants"></form>
+    </section>
+    <section id="keys-panel" hidden aria-label="Keyboard shortcuts">
+      <div class="menu-header">
+        <strong>Keyboard &amp; mouse</strong
+        ><button id="close-keys" aria-label="Close shortcuts">×</button>
+      </div>
+      <dl>
+        <dt>Space</dt>
+        <dd>Play / pause</dd>
+        <dt>G · B · N</dt>
+        <dd>Grab · Ball · Block</dd>
+        <dt>S · D · T · U</dt>
+        <dd>Spring · Rod · Belt · Pulley</dd>
+        <dt>V</dt>
+        <dd>Toggle velocity vectors</dd>
+        <dt>R + drag</dt>
+        <dd>Resize in place (ball diameter; block width / height)</dd>
+        <dt>Ctrl + R-drag</dt>
+        <dd>Snap dimensions to 0.5 m</dd>
+        <dt>Ctrl + drag</dt>
+        <dd>Snap centre to grid; pinned objects rotate in 15° steps</dd>
+        <dt>Alt + drag</dt>
+        <dd>Change connected rod lengths</dd>
+        <dt>Delete · Escape</dt>
+        <dd>Delete selection · cancel interaction</dd>
+      </dl>
+      <p>
+        Belt: click two balls. Pulley: click left load, wheel ball, right load.
+        Wheels are fixed in position but can spin. Select a belt for crossed /
+        driven modes. Select a spring to lock its current angle.
+      </p>
     </section>
     <script src="vendor/matter.js"></script>
     <script type="module" src="src/app.js"></script>

@@ -10,6 +10,7 @@ let sim = new Sandbox(),
   pointer = null,
   ctrl = false,
   alt = false,
+  resizeHeld = false,
   accumulator = 0,
   last = 0,
   menuId = null,
@@ -33,6 +34,7 @@ function locate(e) {
   return world({ x: e.clientX - r.left, y: e.clientY - r.top });
 }
 function chooseTool(next) {
+  sim.endResize();
   tool = next;
   pending = null;
   for (const b of document.querySelectorAll("[data-tool]")) {
@@ -40,7 +42,12 @@ function chooseTool(next) {
     b.setAttribute("aria-pressed", b.dataset.tool === tool);
   }
   $("hint").textContent = {
-    grab: "Drag to move · Alt-drag to resize rods · Ctrl for grid · right-click for constants",
+    grab: "Drag to move · R-drag resizes · Alt-drag adjusts rods · Ctrl snaps · ? shortcuts",
+    resize:
+      "Drag a ball or block to resize around its centre. Ctrl snaps dimensions to 0.5 m. G returns to Grab.",
+    belt: "Click two balls to wrap a belt around them. Their centres will be pinned. Escape cancels.",
+    pulley:
+      "Click a left load, then the wheel ball, then a right load. Use a wheel large enough to separate the loads.",
     ball: "Click to add a ball. Hold Ctrl to place its centre on the grid.",
     block: "Click to add a block. Hold Ctrl to place its centre on the grid.",
     spring:
@@ -59,10 +66,19 @@ function select(id) {
       ? "Ball"
       : "Block"
     : l
-      ? l.type === "spring"
-        ? "Spring"
-        : "Rod"
+      ? l.type[0].toUpperCase() + l.type.slice(1)
       : "";
+  $("lock-angle").parentElement.hidden = l?.type !== "spring";
+  $("lock-angle").checked = !!l?.lockAngle;
+  for (const id of ["crossed-belt", "belt-motor"])
+    $(id).parentElement.hidden = l?.type !== "belt";
+  $("crossed-belt").checked = !!l?.crossed;
+  $("belt-motor").checked = !!l?.motor;
+  $("belt-speed-label").hidden = l?.type !== "belt";
+  $("belt-speed").value = l?.speed ?? 1;
+  $("resize-object").hidden = !o;
+  $("dimensions").hidden = !o;
+  showDimensions();
   for (const [id, key] of [
     ["lock-position", "lockPosition"],
     ["lock-rotation", "lockRotation"],
@@ -71,20 +87,37 @@ function select(id) {
     $(id).checked = !!o?.[key];
   }
 }
+function showDimensions() {
+  const o = sim.objects.get(selected);
+  if (o)
+    $("dimensions").textContent =
+      o.shape === "ball"
+        ? `Ø ${(o.radius * 2).toFixed(2)} m`
+        : `${o.width.toFixed(2)} × ${o.height.toFixed(2)} m`;
+}
+function linkPath(l) {
+  if (l.type === "belt") return sim.mechanisms.beltGeometry(l).path;
+  if (l.type === "pulley") return sim.mechanisms.pulleyPath(l);
+  return [sim.endpoint(l, "a"), sim.endpoint(l, "b")];
+}
 function linkAt(p) {
   return [...sim.links.values()].reverse().find((l) => {
-    const a = sim.endpoint(l, "a"),
-      b = sim.endpoint(l, "b"),
-      dx = b.x - a.x,
-      dy = b.y - a.y,
-      t = Math.max(
+    const path = linkPath(l);
+    return path.slice(1).some((b, i) => {
+      const a = path[i],
+        dx = b.x - a.x,
+        dy = b.y - a.y;
+      const t = Math.max(
         0,
         Math.min(
           1,
           ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1),
         ),
       );
-    return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy) * view.scale < 8;
+      return (
+        Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy) * view.scale < 8
+      );
+    });
   })?.id;
 }
 function closeMenu(focus = false) {
@@ -112,7 +145,17 @@ function openMenu(id, x, y) {
     ? (o.shape === "ball" ? "Ball" : "Block") + " · material constants"
     : l.type === "spring"
       ? "Spring constants"
-      : "Rod constant";
+      : l.type === "rod"
+        ? "Rod constant"
+        : l.type === "belt"
+          ? "Belt"
+          : "Pulley cable";
+  $("menu-note").textContent =
+    l?.type === "belt"
+      ? "Ideal no-slip belt. Crossed / drive controls are in the selection bar. Wheel mass and damping are edited on each ball."
+      : l?.type === "pulley"
+        ? "Massless, guided cable over a fixed axle. Wheel mass and radius determine rotational inertia; edit the ball for its constants."
+        : "Changes apply while the simulation runs.";
   const fields = o
     ? [
         ["mass", "Mass", "kg", 0.05, 100, 0.1, "Inertial mass."],
@@ -175,17 +218,19 @@ function openMenu(id, x, y) {
           ],
           ["length", "Rest length", "m", 0.05, 50, 0.1, "Unstretched length."],
         ]
-      : [
-          [
-            "length",
-            "Length",
-            "m",
-            0.05,
-            50,
-            0.1,
-            "The distance held by the rod.",
-          ],
-        ];
+      : ["belt", "pulley"].includes(l.type)
+        ? []
+        : [
+            [
+              "length",
+              "Length",
+              "m",
+              0.05,
+              50,
+              0.1,
+              "The distance held by the rod.",
+            ],
+          ];
   const form = $("constants");
   form.replaceChildren();
   form.onsubmit = (e) => e.preventDefault();
@@ -262,7 +307,7 @@ document.addEventListener("focusin", (e) => {
 function syncCtrl(value) {
   ctrl = value;
   $("snap-status").textContent = ctrl
-    ? "SNAP · 0.5 m grid"
+    ? "SNAP · 0.5 m dimensions / grid · 15° rotation"
     : "Grid: 0.5 m · hold Ctrl to snap";
   $("snap-status").classList.toggle("snapping", ctrl);
 }
@@ -273,10 +318,13 @@ canvas.addEventListener("pointerdown", (e) => {
   syncCtrl(e.ctrlKey);
   alt = e.altKey;
   canvas.setPointerCapture(e.pointerId);
-  if (tool === "grab") {
+  if (tool === "grab" || tool === "resize") {
     const id = sim.hit(pointer);
     select(id || linkAt(pointer) || null);
-    if (id) sim.beginGrab(id, pointer);
+    if (id) {
+      if (resizeHeld || tool === "resize") sim.beginResize(id, pointer);
+      else sim.beginGrab(id, pointer);
+    }
     return;
   }
   if (["ball", "block"].includes(tool)) {
@@ -285,6 +333,45 @@ canvas.addEventListener("pointerdown", (e) => {
       : pointer;
     select(sim.add(tool, p));
     chooseTool("grab");
+    return;
+  }
+  if (tool === "belt" || tool === "pulley") {
+    const id = sim.hit(pointer);
+    if (!id) {
+      toast("Click an object.");
+      return;
+    }
+    if (!pending) pending = { ids: [], point: { ...pointer } };
+    if (pending.ids.includes(id)) {
+      toast("Choose a different object.");
+      return;
+    }
+    pending.ids.push(id);
+    pending.point = { ...pointer };
+    const count = tool === "belt" ? 2 : 3;
+    if (pending.ids.length === count) {
+      try {
+        const result =
+          tool === "belt"
+            ? sim.mechanisms.createBelt(...pending.ids)
+            : sim.mechanisms.createPulley(...pending.ids);
+        select(result);
+        chooseTool("grab");
+        toast(
+          "Wheel centres pinned; rotation stays free. Select the connection for its controls.",
+        );
+      } catch (error) {
+        toast(error.message);
+        pending = null;
+      }
+    } else
+      toast(
+        tool === "belt"
+          ? "Choose the second wheel."
+          : pending.ids.length === 1
+            ? "Choose the pulley wheel ball."
+            : "Choose the right load.",
+      );
     return;
   }
   const id = sim.hit(pointer),
@@ -310,6 +397,14 @@ canvas.addEventListener("pointermove", (e) => {
   syncCtrl(e.ctrlKey);
   alt = e.altKey;
   if (sim.grab) sim.moveGrab(pointer, ctrl, alt);
+  if (sim.sizing) {
+    try {
+      sim.moveResize(pointer, ctrl);
+      showDimensions();
+    } catch (error) {
+      toast(error.message);
+    }
+  }
 });
 canvas.addEventListener("pointerup", (e) => {
   if (e.button !== 0) return;
@@ -318,11 +413,24 @@ canvas.addEventListener("pointerup", (e) => {
     sim.moveGrab(pointer, e.ctrlKey, e.altKey);
     sim.endGrab();
   }
+  if (sim.sizing) {
+    try {
+      sim.moveResize(locate(e), e.ctrlKey);
+    } catch (error) {
+      toast(error.message);
+    }
+    sim.endResize();
+    showDimensions();
+  }
   if (canvas.hasPointerCapture?.(e.pointerId))
     canvas.releasePointerCapture(e.pointerId);
 });
-canvas.addEventListener("pointercancel", () => sim.endGrab(false));
-canvas.addEventListener("lostpointercapture", () => sim.endGrab(false));
+canvas.addEventListener("pointercancel", cancelDrag);
+canvas.addEventListener("lostpointercapture", cancelDrag);
+function cancelDrag() {
+  sim.endGrab(false);
+  sim.endResize();
+}
 canvas.addEventListener("contextmenu", (e) => {
   const p = locate(e),
     id = sim.hit(p) || linkAt(p);
@@ -331,7 +439,7 @@ canvas.addEventListener("contextmenu", (e) => {
     return;
   }
   e.preventDefault();
-  sim.endGrab(false);
+  cancelDrag();
   pending = null;
   openMenu(id, e.clientX, e.clientY);
 });
@@ -352,10 +460,50 @@ canvas.addEventListener("keydown", (e) => {
   }
 });
 $("lock-position").onchange = (e) => {
-  sim.setLock(selected, "position", e.target.checked);
+  try {
+    sim.setLock(selected, "position", e.target.checked);
+  } catch (error) {
+    toast(error.message);
+    select(selected);
+  }
 };
 $("lock-rotation").onchange = (e) => {
   sim.setLock(selected, "rotation", e.target.checked);
+};
+$("lock-angle").onchange = (e) => {
+  try {
+    sim.setSpringAngle(selected, e.target.checked);
+  } catch (error) {
+    toast(error.message);
+    select(selected);
+  }
+};
+for (const [id, key] of [
+  ["crossed-belt", "crossed"],
+  ["belt-motor", "motor"],
+  ["belt-speed", "speed"],
+])
+  $(id).onchange = (e) => {
+    try {
+      sim.mechanisms.configureBelt(selected, {
+        [key]: key === "speed" ? Number(e.target.value) : e.target.checked,
+      });
+    } catch (error) {
+      toast(error.message);
+      select(selected);
+    }
+  };
+$("resize-object").onclick = () => {
+  sim.endGrab(false);
+  chooseTool("resize");
+  canvas.focus();
+};
+$("shortcuts").onclick = () => {
+  $("keys-panel").hidden = !$("keys-panel").hidden;
+};
+$("close-keys").onclick = () => {
+  $("keys-panel").hidden = true;
+  canvas.focus();
 };
 function removeSelected() {
   if (selected) {
@@ -369,6 +517,7 @@ $("pause").onclick = () => {
   running = !running;
   accumulator = 0;
   $("pause").textContent = running ? "Ⅱ Pause" : "▶ Run";
+  canvas.focus();
 };
 $("clear").onclick = () => {
   sim.dispose();
@@ -384,36 +533,93 @@ for (const b of document.querySelectorAll("[data-tool]"))
   b.onclick = () => {
     sim.endGrab(false);
     chooseTool(b.dataset.tool);
+    canvas.focus();
   };
+function typing(e) {
+  return (
+    ["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A"].includes(e.target.tagName) ||
+    e.target.isContentEditable ||
+    e.target.closest?.('[contenteditable="true"]')
+  );
+}
 document.addEventListener("keydown", (e) => {
-  if (["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
+  if (typing(e) || !$("material-menu").hidden) return;
   if (e.key === "Control") syncCtrl(true);
   if (e.key === "Alt") {
     alt = true;
     e.preventDefault();
   }
+  if (e.key.toLowerCase() === "r" && !e.metaKey && !e.altKey) {
+    resizeHeld = true;
+    e.preventDefault();
+  }
   if (sim.grab && pointer && ["Alt", "Control"].includes(e.key))
     sim.moveGrab(pointer, ctrl, alt);
+  if (sim.sizing && pointer && e.key === "Control") {
+    try {
+      sim.moveResize(pointer, true);
+      showDimensions();
+    } catch (error) {
+      toast(error.message);
+    }
+  }
   if (e.key === "Escape") {
     pending = null;
-    sim.endGrab(false);
+    cancelDrag();
+    resizeHeld = false;
     chooseTool("grab");
     closeMenu();
+    $("keys-panel").hidden = true;
   }
-  if (e.key === "Delete") removeSelected();
+  if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.code === "Space" || e.key === " ") {
+    e.preventDefault();
+    $("pause").click();
+    return;
+  }
+  const keys = {
+    g: "grab",
+    b: "ball",
+    n: "block",
+    s: "spring",
+    d: "rod",
+    t: "belt",
+    u: "pulley",
+  };
+  if (keys[e.key.toLowerCase()]) {
+    e.preventDefault();
+    cancelDrag();
+    chooseTool(keys[e.key.toLowerCase()]);
+  }
+  if (e.key.toLowerCase() === "v") {
+    $("vectors").checked = !$("vectors").checked;
+    e.preventDefault();
+  }
+  if (e.key === "?") {
+    $("keys-panel").hidden = !$("keys-panel").hidden;
+    e.preventDefault();
+  }
+  if (e.key === "Delete") {
+    e.preventDefault();
+    removeSelected();
+  }
 });
 document.addEventListener("keyup", (e) => {
   if (e.key === "Control") syncCtrl(false);
   if (e.key === "Alt") alt = false;
+  if (e.key.toLowerCase() === "r") resizeHeld = false;
   if (sim.grab && pointer && ["Alt", "Control"].includes(e.key))
     sim.moveGrab(pointer, ctrl, alt);
 });
 window.addEventListener("blur", () => {
-  sim.endGrab(false);
+  cancelDrag();
+  resizeHeld = false;
+  alt = false;
   syncCtrl(false);
 });
 document.addEventListener("visibilitychange", () => {
-  sim.endGrab(false);
+  cancelDrag();
+  resizeHeld = false;
   last = 0;
   accumulator = 0;
 });
@@ -475,6 +681,24 @@ function draw() {
   for (let x = Math.ceil(min.x); x <= max.x; x++)
     ctx.fillText(x + " m", screen({ x, y: 0 }).x + 4, view.y + 16);
   for (const l of sim.links.values()) {
+    if (["belt", "pulley"].includes(l.type)) {
+      const path = linkPath(l).map(screen);
+      ctx.beginPath();
+      path.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.strokeStyle = l.id === selected ? "#566b91" : "#617569";
+      ctx.lineWidth = l.type === "belt" ? 5 : 2.5;
+      ctx.stroke();
+      if (l.type === "belt") {
+        ctx.setLineDash([5, 14]);
+        ctx.lineDashOffset = -l.travel * view.scale;
+        ctx.strokeStyle = "#cdd9bd";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.lineDashOffset = 0;
+      }
+      continue;
+    }
     const a = screen(sim.endpoint(l, "a")),
       b = screen(sim.endpoint(l, "b")),
       dx = b.x - a.x,
@@ -494,6 +718,11 @@ function draw() {
     ctx.strokeStyle = l.id === selected ? "#566b91" : "#879579";
     ctx.lineWidth = l.type === "rod" ? 3 : 1.8;
     ctx.stroke();
+    if (l.type === "spring" && l.lockAngle) {
+      ctx.font = "10px system-ui";
+      ctx.fillStyle = "#46553e";
+      ctx.fillText("axis locked", (a.x + b.x) / 2 + 8, (a.y + b.y) / 2 - 12);
+    }
     for (const [id, p] of [
       [l.a, a],
       [l.b, b],
@@ -594,6 +823,7 @@ function draw() {
     line(screen(pending.point), screen(pointer), "#7d946e", 2);
     ctx.setLineDash([]);
   }
+  if (sim.sizing) showDimensions();
   $("time").textContent = sim.time.toFixed(2) + " s";
 }
 function frame(now) {
@@ -609,6 +839,17 @@ function frame(now) {
   draw();
   requestAnimationFrame(frame);
 }
+for (const [key, t] of Object.entries({
+  G: "grab",
+  B: "ball",
+  N: "block",
+  S: "spring",
+  D: "rod",
+  T: "belt",
+  U: "pulley",
+}))
+  document.querySelector(`[data-tool="${t}"]`).title =
+    `${t[0].toUpperCase() + t.slice(1)} (${key})`;
 chooseTool("grab");
 draw();
 requestAnimationFrame(frame);
