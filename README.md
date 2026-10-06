@@ -22,6 +22,8 @@ Click **Keys ?** (or press **?**) for the built-in shortcut guide. Shortcuts do 
 | Q / Shift-box           | Select tool / add objects to a selection box                                         |
 | G / B / N               | Grab / Ball / Block                                                                  |
 | S / D / T / U           | Spring / Rod / Belt / Pulley                                                         |
+| I / H | Impulse / Pan |
+| Wheel / middle-drag | Zoom at cursor / pan in any tool |
 | E / M                   | Electric / Magnetic field                                                            |
 | V                       | Toggle velocity vectors                                                              |
 | R + left-drag           | Resize a body or field about its current centre                                      |
@@ -36,8 +38,8 @@ Click **Keys ?** (or press **?**) for the built-in shortcut guide. Shortcuts do 
 
 - **Ball / Block:** select a tool and click above the floor. The tool returns to Grab after one placement.
 - **Grab:** drag directly without a mouse tether. Release while moving to throw; hold still before release to stop. A rod constrains normal dragging to its arc. Snapping suppresses throwing on release; locks and connections take priority over grid placement.
-- **Independent locks:** use the selection bar to lock position, rotation, or both. For a pinned ball, grab away from its centre to rotate it. With snapping enabled, rotation follows absolute 15° steps. Shift explicitly chooses translation, Ctrl explicitly chooses rotation. When paused, manual edits update the stored locked position/angle without disabling either lock; physics continues to respect those locks on resume. Running interactions cannot edit a locked degree of freedom. Balls have 10° rim ticks, longer 30° ticks, and a distinct zero mark that rotates with the body.
-- **Resize:** hold R before starting a drag, or click the selection bar's **Resize (R)** button. Drag outward/inward to resize a ball's diameter; drag a block near a corner to change width and height along its local axes. Dimensions appear beside the selection. The body stays centred and still during the gesture, even while physics runs. Mass stays constant; inertia is recalculated. Limits are 0.1–10 m. Edits that penetrate the floor or overlap pulley wheels are rejected. Return from the button-operated resize tool with G.
+- **Independent locks:** use the bottom-right selected-item panel to lock position, rotation, or both. For a pinned ball, grab away from its centre to rotate it. With snapping enabled, rotation follows absolute 15° steps. Shift explicitly chooses translation, Ctrl explicitly chooses rotation. When paused, manual edits update the stored locked position/angle without disabling either lock; physics continues to respect those locks on resume. Running interactions cannot edit a locked degree of freedom. Balls have 10° rim ticks, longer 30° ticks, and a distinct zero mark that rotates with the body.
+- **Resize:** hold R before starting a drag, or click the selected-item panel's **Resize (R)** button. Drag outward/inward to resize a ball's diameter; drag a block near a corner to change width and height along its local axes. Dimensions appear beside the selection. The body stays centred and still during the gesture, even while physics runs. Mass stays constant; inertia is recalculated. Limits are 0.1–10 m. Edits that penetrate the floor or overlap pulley wheels are rejected. Return from the button-operated resize tool with G.
 - **Spring / Rod:** click two bodies, or a world anchor and a body. Connections attach at body centres. Select a connection by clicking its line. Alt-drag changes rod length while paused or running.
 - **Pause / Clear scene:** pause deliberately stops physics but editing still works. Clear removes everything except the static floor. Dragging does not pause the world.
 
@@ -45,9 +47,11 @@ Click **Keys ?** (or press **?**) for the built-in shortcut guide. Shortcuts do 
 
 Choose **Select (Q)** and drag a rectangle over objects. Shift-box selection adds objects to the current selection. Drag a selected body to move the group. With snapping enabled, translation follows 0.5 m increments, preserving the spacing between objects. Delete removes the selected objects and their attached connections.
 
-Moving a selection includes every body connected to it, so springs, rods, cables and belts stay assembled. The expanded selection is highlighted and announced. World anchors and pinned positions translate with the group; lock states, dimensions, angles and connection lengths remain unchanged. This is a layout edit and does not throw the group: selected bodies stay still during placement and release with zero velocity. Assemblies containing position-locked objects can only be moved while paused. The rest of the simulation keeps running for unlocked group moves. Ctrl in Select mode rotates the clicked body individually. Use Grab for individual, constraint-respecting physical manipulation instead.
+Moving a selection includes every body connected to it, so springs, rods, cables and belts stay assembled. Enable **Bodies** and/or **Fields** in the tool-settings bar under the toolbar. Mixed selections move both together; fields move as prescribed regions, preserving gradient settings. A field-only selection can move through the floor. The expanded selection is highlighted and announced. World anchors and pinned positions translate with the group; lock states, dimensions, angles and connection lengths remain unchanged. This is a layout edit and does not throw the group: selected bodies stay still during placement and release with zero velocity. Assemblies containing position-locked objects can only be moved while paused. The rest of the simulation keeps running for unlocked group moves. Ctrl in Select mode rotates the clicked body individually. Use Grab for individual, constraint-respecting physical manipulation instead.
 
 ### Simulation settings
+
+Tools are grouped into Edit, Bodies, Connections and Fields. The bar below contains the active tool’s options. Selected-item controls live in the bottom-right panel.
 
 Click **Settings** in the header to open the side panel. Gravity and air resistance offer numeric entry and a live slider:
 
@@ -55,17 +59,47 @@ Click **Settings** in the header to open the side panel. Gravity and air resista
 - **Air resistance:** 0–10 s⁻¹; an isotropic linear velocity and spin damping rate, added to each body's existing damping. Default 0. This is a simple linear drag model rather than a fluid simulation.
 
 - **Snapping (Z):** one persistent toggle for position and group translations (0.5 m), rotation (15°), dimensions (0.5 m), and Alt-refitted connection lengths (0.5 m). The active operation determines what is snapped; physical constraints and walls take priority when exact grid placement is impossible. Shift/Ctrl/Alt can be changed during a drag; Shift wins if Shift and Ctrl are held together. R chooses resizing and works with the snapping toggle, but Ctrl+R and Cmd+R retain browser reload.
-- **Screen-edge walls:** enables four nonselectable static colliders at the canvas edges, tracking browser viewport changes. The existing ground remains in place. Disabled by default.
+- **Scene boundary walls:** enables four nonselectable static colliders at the world-space scene bounds. New scenes start with walls at the initial visible edges. Panning, zooming and browser resizing do not move them. The ground remains at y = 0.
 
-Changes preserve the current scene, velocities and simulation time. **Restore defaults** resets just these settings. Clear scene retains them; reloading the page restores defaults. Global electric X/Y fields (N/C) and magnetic Z field (T) each range from −100 to +100 and default to zero. Positive X points right, positive Y up, and positive magnetic Z out of the screen.
+Changes preserve the current scene, velocities and simulation time. **Restore defaults** resets just these settings. Clear scene retains force settings but resets the scene bounds and enables walls; reloading the page restores simulation defaults. Website preferences are stored separately and persist. Global electric X/Y fields (N/C) and magnetic Z field (T) each range from −100 to +100 and default to zero. Positive X points right, positive Y up, and positive magnetic Z out of the screen.
 
 ### Electric and magnetic fields
 
-Press **E** or **M**, then click to place a field. Electric regions start rectangular; magnetic regions start circular. Right-click the region to choose **rectangle, ellipse or circle**, edit dimensions (0.1–50 m), strength (−100 to +100 N/C or T), and angle. Drag empty space within a region to move it; Ctrl-drag rotates it; R-drag resizes it about its centre. Z snaps position/dimensions to 0.5 m and rotation to 15°. These are stationary prescribed regions, editable while running. Bodies and connections take pointer priority over fields; box selection remains for physical bodies.
+Press **E** or **M**, then click to place a field. Electric regions start rectangular; magnetic regions start circular. Right-click the region to choose **rectangle, ellipse or circle**, edit dimensions (0.1–50 m), strength (−100 to +100 N/C or T), and angle. Drag empty space within a region to move it; Ctrl-drag rotates it; R-drag resizes it about its centre. Z snaps position/dimensions to 0.5 m and rotation to 15°. These are stationary prescribed regions, editable while running. Bodies and connections take pointer priority in Grab. Select tool options let you include bodies, fields, or both.
 
-Right-click a ball or block and set its signed **Charge (C)** (−100 to +100; default 0). Electric force is `F = qE`; magnetic force is `F = q(v × B)`. The electric arrows follow the region's angle, reversing when strength is negative. Magnetic symbols are ⊙ for out of screen and ⊗ for into screen. Magnetic fields bend a moving charge's trajectory without doing work; they do not start a stationary charge moving. Overlapping regions and global fields add together.
+Right-click a ball or block and set its signed **Charge (C)** (−100 to +100; default 0). Electric force is `F = qE`; magnetic force is `F = q(v × B)`. The electric arrows follow the region's angle, reversing when strength is negative. Electric indicators are continuous lines with embedded arrowheads. Magnetic indicators are standalone dots for out of screen and crosses for into screen. Indicator spacing decreases with strength on a bounded logarithmic scale; local gradient strength also affects opacity and magnetic density. Magnetic fields bend a moving charge's trajectory without doing work; they do not start a stationary charge moving. Overlapping regions and global fields add together.
 
-Fields sample the body's centre and model charge as a point charge at that centre, without torque. Boundaries are abrupt, with no fringe field. There is no mutual Coulomb interaction, induction, current, or magnetic material model yet. Position/rotation locks retain their normal behaviour. Each fixed step uses the exact constant-field velocity solution for combined E/B; position, boundary crossings, contacts and mechanical constraints retain the simulation's finite-step approximation. Very rapid motion or very tight cyclotron orbits relative to the timestep remain under-resolved.
+Fields sample the body's centre and model charge as a point charge at that centre, without torque. Boundaries are abrupt, with no fringe field. Mutual electrostatic interaction is optional; induction, current and magnetic material models are not implemented. Position/rotation locks retain their normal behaviour. Each fixed step uses the exact constant-field velocity solution for combined E/B; position, boundary crossings, contacts and mechanical constraints retain the simulation's finite-step approximation. Very rapid motion or very tight cyclotron orbits relative to the timestep remain under-resolved.
+
+### Field gradients and charge interactions
+
+Right-click a field to configure **Falloff** independently of its boundary shape. **Gradient shape** can be axial, circular, elliptical or box-shaped. Its origin is an X/Y offset from the region centre in world coordinates; its angle and X/Y scales are independent of the region angle and dimensions. Circular profiles use X scale. Electric direction can be parallel to the region angle or radial from the gradient origin. Negative strength reverses it.
+
+The normalized distance `d` is measured along the positive gradient axis (axial), radially (circular/elliptical), or by the maximum absolute normalized axis distance (box). Profiles are:
+
+| Profile | Strength multiplier |
+|---|---|
+| Uniform | 1 |
+| Linear | max(0, 1 − d) |
+| Inverse r | 1 / √(1 + d²) |
+| Inverse r² | 1 / (1 + d²) |
+| Exponential | exp(−d) |
+
+Inverse profiles are softened at the origin: the configured strength is the peak, and the far-field falloff follows the selected power. These are prescribed educational fields, not a solver for Maxwell's equations or arbitrary charge distributions.
+
+In **Settings → Charge interactions**, enable **Mutual electric forces**. Every charged body becomes a source: like charges repel, opposite charges attract. Forces are evaluated pairwise, equal and opposite, with no self-force. A locked body still acts as a source. The Coulomb constant defaults to 1 N·m²/C² for manageable sandbox motion; the real vacuum value is approximately 8.99 × 10⁹. Near-contact smoothing defaults to 0.1 m and uses `F = k q₁ q₂ r / (r² + ε²)^(3/2)`, preventing a singularity at overlap. Very large charge/constant combinations can still exceed the resolution of the fixed timestep. Local/global prescribed fields remain active alongside these forces.
+
+### Impulse tool
+
+Choose **Impulse (I)** and drag a vector from a body in the desired direction. Tool settings offer **Impulse (N·s)** or **Add velocity (m/s)** and a gain per metre dragged. On release, impulse mode adds `Δv = J/m`; velocity mode adds the vector directly, independent of mass. Z snaps vector components before applying gain. The kick acts at the centre and adds no spin. Position locks reject kicks; mechanical constraints remove forbidden velocity components on the next physics step. Paused kicks take effect when resumed. Escape cancels the preview.
+
+### Resizing and camera
+
+Resizing captures the starting side/direction for the whole gesture. Crossing the object's centre keeps reducing the size to its minimum rather than reversing into growth. Moving back restores the size continuously. This applies to balls, blocks and field regions; their centres stay fixed. Z still snaps dimensions.
+
+**Scroll** zooms around the cursor; **Pan (H)** or **middle-drag** moves the camera. The bottom-left buttons zoom and **Fit scene**. Settings lets you resize the scene from 2–1000 m on each axis, or set bounds to the current view. Resizing the scene preserves its horizontal centre and bottom edge; it never teleports existing bodies. If you shrink bounds past an existing body, reposition that body or disable walls while arranging the scene. The initial scene matches the visible canvas; zoom and pan are independent of its walls. Grid drawing becomes coarser at distant zoom levels, while geometric snapping remains 0.5 m.
+
+**Website settings** include Light, Dark or System theme, GUI size (80–140%), and grid visibility. They are remembered in this browser and do not change physics units or scene geometry.
 
 ### Spring angle lock / horizontal SHO
 
@@ -113,7 +147,7 @@ Surface friction is not internal material hysteresis. The two damping coefficien
 
 Springs expose stiffness, axial damping and rest length; rods expose length. Every numeric property also has a slider. Sliders apply continuously while dragged and stay synchronized with manual input; manual changes apply on Enter or leaving the field, without pausing, resetting time, or rebuilding the world. Invalid values are rejected. Close with Escape, the cross, or clicking outside. Shift+F10 opens the menu for a selected object while the canvas is focused.
 
-Material menus contain no position/velocity inputs or geometry controls. Geometry, locks and belt drive controls are separate from material constants. Field menus separately expose shape, dimensions, angle and strength. There are no temperature placeholders, equation editor, graph panel, presets, additional body shapes, inspector, autosave or scene import/export. Old localStorage saves are not loaded or deleted. This is a fresh, transient sandbox on every page load.
+Material menus contain no position/velocity inputs or geometry controls. Geometry, locks and belt drive controls are separate from material constants. Field menus separately expose shape, dimensions, angle and strength. There are no temperature placeholders, equation editor, graph panel, presets, additional body shapes, inspector, scene autosave or scene import/export. Only website preferences use localStorage; old scene saves are not loaded or deleted. This is a fresh, transient sandbox on every page load.
 
 ## Physics implementation
 
@@ -139,6 +173,8 @@ Numerical regression coverage also checks SHO period, guide motion, snapped rota
 
 The original regression coverage includes free fall, static floor, grab/throw velocity, pinned-object rotation, independent locks, lock/unlock after mass changes, pinned contacts, snapping, rod safety, springs and live constants. DOM checks exercise the actual creation/drag/menu/lock/snap controls. Visual browser verification was not available in the authoring environment; these checks do not claim exhaustive browser/device coverage.
 
-`src/physics.js` owns bodies, global settings, locks, dragging, resizing and spring guides. `src/group-move.js` owns connected-assembly layout translation. `src/mechanisms.js` owns belts and conveyor contact; `src/pulley.js` owns tangent cable geometry and its coupled translational/rotational constraints. `src/fields.js` owns field regions, overlap sampling and Lorentz integration; `src/field-view.js` owns field rendering and editing gestures. `src/app.js` owns keyboard/pointer input, body drawing and menus.
+`src/physics.js` owns bodies, global settings, locks, dragging, resizing and spring guides. `src/group-move.js` owns connected-assembly layout translation. `src/mechanisms.js` owns belts and conveyor contact; `src/pulley.js` owns tangent cable geometry and its coupled translational/rotational constraints. `src/fields.js` owns field regions, overlap sampling and Lorentz integration; `src/field-view.js` owns field rendering and editing gestures. `src/preferences.js` owns persistent website appearance settings. `src/app.js` owns keyboard/pointer input, body drawing and menus.
 
 Field regressions verify signed qE/m acceleration, neutral and stationary magnetic cases, magnetic speed conservation, crossed-field drift, region boundaries and superposition, locked bodies, atomic validation, and snapped editing. DOM checks cover field creation/shape/strength/rotation/resize/delete, global field settings, gravity detent and keyboard escape from zero.
+
+Additional tests cover independent gradient geometry and falloff, radial direction, pairwise charge momentum/polarity, softened overlaps, impulse units and locks, resizing through the centre, mixed field/body group moves, scene dimensions, tool options, camera-independent bounds and website preferences.

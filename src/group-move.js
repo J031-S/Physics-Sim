@@ -5,6 +5,9 @@ export class GroupMove {
   constructor(sim, ids, start, options = { paused: true }) {
     this.sim = sim;
     this.ids = new Set(ids.filter((id) => sim.objects.has(id)));
+    this.fieldStarts = ids
+      .filter((id) => sim.fields.regions.has(id))
+      .map((id) => ({ ...sim.fields.regions.get(id) }));
     this.start = { ...start };
     this.offset = { x: 0, y: 0 };
     let changed = true;
@@ -51,7 +54,7 @@ export class GroupMove {
               0.001,
           ),
         )
-      : 0;
+      : -Infinity;
   }
   move(p, snapping = false) {
     if (this.blocked) return;
@@ -101,6 +104,9 @@ export class GroupMove {
   hold() {
     if (this.blocked) return;
     const { x, y } = this.offset;
+    for (const f of this.fieldStarts)
+      if (this.sim.fields.regions.has(f.id))
+        this.sim.fields.update(f.id, { x: f.x + x, y: f.y + y });
     for (const saved of this.bodies) {
       const o = this.sim.objects.get(saved.id);
       if (!o) continue;

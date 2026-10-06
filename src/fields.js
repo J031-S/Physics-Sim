@@ -18,6 +18,14 @@ export class Fields {
       height: type === "magnetic" ? 4 : 3,
       angle: 0,
       strength: type === "electric" ? 5 : 1,
+      gradient: "uniform",
+      gradientShape: "radial",
+      gradientAngle: 0,
+      gradientX: 0,
+      gradientY: 0,
+      gradientScaleX: 2,
+      gradientScaleY: 2,
+      direction: "parallel",
     });
     return id;
   }
@@ -31,11 +39,28 @@ export class Fields {
       height: [0.1, 50],
       angle: [-360, 360],
       strength: [-100, 100],
+      gradientAngle: [-360, 360],
+      gradientX: [-50, 50],
+      gradientY: [-50, 50],
+      gradientScaleX: [0.05, 100],
+      gradientScaleY: [0.05, 100],
+    };
+    const enums = {
+      shape: ["rectangle", "ellipse", "circle"],
+      gradient: [
+        "uniform",
+        "linear",
+        "inverse",
+        "inverseSquare",
+        "exponential",
+      ],
+      gradientShape: ["axial", "radial", "elliptical", "box"],
+      direction: ["parallel", "radial"],
     };
     for (const [key, v] of Object.entries(patch)) {
       if (
-        key === "shape"
-          ? !["rectangle", "ellipse", "circle"].includes(v)
+        enums[key]
+          ? !enums[key].includes(v)
           : !ranges[key] ||
             !Number.isFinite(v) ||
             v < ranges[key][0] ||
@@ -71,20 +96,75 @@ export class Fields {
     return [...this.regions.values()].reverse().find((f) => this.contains(f, p))
       ?.id;
   }
+  profile(f, p) {
+    if (f.gradient === "uniform") return 1;
+    const dx = p.x - f.x - f.gradientX,
+      dy = p.y - f.y - f.gradientY,
+      a = (f.gradientAngle * Math.PI) / 180;
+    const u = dx * Math.cos(a) + dy * Math.sin(a),
+      v = -dx * Math.sin(a) + dy * Math.cos(a);
+    const x = u / f.gradientScaleX,
+      y = v / f.gradientScaleY;
+    const d =
+      f.gradientShape === "axial"
+        ? Math.max(0, x)
+        : f.gradientShape === "radial"
+          ? Math.hypot(u, v) / f.gradientScaleX
+          : f.gradientShape === "box"
+            ? Math.max(Math.abs(x), Math.abs(y))
+            : Math.hypot(x, y);
+    if (f.gradient === "linear") return Math.max(0, 1 - d);
+    if (f.gradient === "inverse") return 1 / Math.sqrt(1 + d * d);
+    if (f.gradient === "inverseSquare") return 1 / (1 + d * d);
+    return Math.exp(-d);
+  }
+  sample(f, p) {
+    if (!this.contains(f, p)) return { ex: 0, ey: 0, bz: 0, strength: 0 };
+    const strength = f.strength * this.profile(f, p);
+    if (f.type === "magnetic") return { ex: 0, ey: 0, bz: strength, strength };
+    let nx = Math.cos((f.angle * Math.PI) / 180),
+      ny = Math.sin((f.angle * Math.PI) / 180);
+    if (f.direction === "radial") {
+      const dx = p.x - f.x - f.gradientX,
+        dy = p.y - f.y - f.gradientY,
+        d = Math.hypot(dx, dy);
+      nx = d > 1e-9 ? dx / d : 0;
+      ny = d > 1e-9 ? dy / d : 0;
+    }
+    return { ex: strength * nx, ey: strength * ny, bz: 0, strength };
+  }
+  interact() {
+    const sim = this.sim;
+    if (!sim.settings.chargeInteractions) return;
+    const charged = [...sim.objects.values()].filter((o) => o.charge);
+    for (let i = 0; i < charged.length; i++)
+      for (let j = i + 1; j < charged.length; j++) {
+        const a = charged[i],
+          b = charged[j],
+          pa = sim.state(a.id),
+          pb = sim.state(b.id);
+        const dx = pb.x - pa.x,
+          dy = pb.y - pa.y,
+          r2 = dx * dx + dy * dy + sim.settings.chargeSoftening ** 2;
+        const k =
+          (sim.settings.coulombConstant * a.charge * b.charge) /
+          (r2 * Math.sqrt(r2));
+        if (!a.lockPosition)
+          sim.applyForce(a.id, pa, { x: -k * dx, y: -k * dy });
+        if (!b.lockPosition) sim.applyForce(b.id, pb, { x: k * dx, y: k * dy });
+      }
+  }
   at(p) {
     const settings = this.sim.settings;
     let ex = settings.electricX,
       ey = settings.electricY,
       bz = settings.magneticZ;
-    for (const f of this.regions.values())
-      if (this.contains(f, p)) {
-        if (f.type === "magnetic") bz += f.strength;
-        else {
-          const a = (f.angle * Math.PI) / 180;
-          ex += f.strength * Math.cos(a);
-          ey += f.strength * Math.sin(a);
-        }
-      }
+    for (const f of this.regions.values()) {
+      const sample = this.sample(f, p);
+      ex += sample.ex;
+      ey += sample.ey;
+      bz += sample.bz;
+    }
     return { ex, ey, bz };
   }
   advance(o, state, dt) {

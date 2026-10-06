@@ -29,6 +29,9 @@ export class Sandbox {
       airResistance: 0,
       snapping: false,
       walls: false,
+      chargeInteractions: false,
+      coulombConstant: 1,
+      chargeSoftening: 0.1,
     };
     this.viewport = null;
     this.walls = [];
@@ -69,10 +72,12 @@ export class Sandbox {
       electricX: [-100, 100],
       electricY: [-100, 100],
       magneticZ: [-100, 100],
+      coulombConstant: [0, 1e10],
+      chargeSoftening: [0.01, 10],
     };
     for (const [key, v] of Object.entries(patch))
       if (
-        ["walls", "snapping"].includes(key)
+        ["walls", "snapping", "chargeInteractions"].includes(key)
           ? typeof v !== "boolean"
           : !ranges[key] ||
             !Number.isFinite(v) ||
@@ -133,7 +138,7 @@ export class Sandbox {
     this.endGrab(false);
     this.endResize();
     this.group = new GroupMove(this, ids, p, options);
-    return [...this.group.ids];
+    return [...this.group.ids, ...this.group.fieldStarts.map((f) => f.id)];
   }
   moveGroup(p, snapping = false) {
     this.group?.move(p, snapping);
@@ -484,11 +489,12 @@ export class Sandbox {
       dy = p.y - g.start.y;
     let w, h;
     if (o.shape === "ball") {
+      const sx = g.start.x - g.centre.x,
+        sy = g.start.y - g.centre.y,
+        d = Math.hypot(sx, sy);
       w =
         g.width +
-        2 *
-          (Math.hypot(p.x - g.centre.x, p.y - g.centre.y) -
-            Math.hypot(g.start.x - g.centre.x, g.start.y - g.centre.y));
+        2 * (dx * (d > 1e-6 ? sx / d : 1) + dy * (d > 1e-6 ? sy / d : 0));
       h = w;
     } else {
       const sx =
@@ -952,6 +958,38 @@ export class Sandbox {
       }
     }
   }
+  impulse(id, vector, mode = "impulse") {
+    const o = this.objects.get(id);
+    if (!o || o.lockPosition) return false;
+    if (
+      !["impulse", "velocity"].includes(mode) ||
+      ![vector.x, vector.y].every(Number.isFinite)
+    )
+      throw new Error("Invalid impulse.");
+    const s = this.state(id),
+      factor = mode === "impulse" ? 1 / o.mass : 1;
+    Body.setVelocity(o.body, {
+      x: ((s.vx + vector.x * factor) * SCALE) / 60,
+      y: (-(s.vy + vector.y * factor) * SCALE) / 60,
+    });
+    // Mechanical constraints remove forbidden components on the next solver step.
+    return true;
+  }
+  setSceneSize(width, height) {
+    if (
+      ![width, height].every((v) => Number.isFinite(v) && v >= 2 && v <= 1000)
+    )
+      throw new Error("Scene dimensions must be between 2 and 1000 m.");
+    const v = this.viewport,
+      cx = v ? (v.minX + v.maxX) / 2 : 0,
+      bottom = v?.minY ?? 0;
+    this.setViewport({
+      minX: cx - width / 2,
+      maxX: cx + width / 2,
+      minY: bottom,
+      maxY: bottom + height,
+    });
+  }
   step() {
     for (const o of this.objects.values()) {
       const s = this.state(o.id),
@@ -975,6 +1013,7 @@ export class Sandbox {
             Math.exp(-(o.angularDamping + this.settings.airResistance) * DT),
         );
     }
+    this.fields.interact();
     for (const l of this.links.values())
       if (l.type === "spring") {
         const a = this.endpoint(l, "a"),

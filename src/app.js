@@ -1,6 +1,9 @@
 import { Sandbox, DT, GRID, snap } from "./physics.js";
+import { setupPreferences } from "./preferences.js";
 import { drawFields, FieldDrag } from "./field-view.js";
-let fieldDrag = null;
+let fieldDrag = null,
+  impulseDrag = null,
+  panDrag = null;
 const settingKeys = [
   "gravity",
   "airResistance",
@@ -28,6 +31,8 @@ let sim = new Sandbox(),
   menuId = null,
   menuPoint = null,
   toastTimer;
+sim.updateSettings({ walls: true });
+const prefs = setupPreferences($);
 const view = { scale: 65, x: 0, y: 0, width: 0, height: 0 };
 function toast(message) {
   $("toast").textContent = message;
@@ -47,6 +52,7 @@ function locate(e) {
 }
 function chooseTool(next) {
   fieldDrag = null;
+  impulseDrag = null;
   sim.endResize();
   sim.endGroup();
   marquee = null;
@@ -65,17 +71,25 @@ function chooseTool(next) {
     belt: "Click two balls to wrap a belt around them. Their centres will be pinned. Escape cancels.",
     pulley:
       "Click endpoint → wheel ball → endpoint. Any angle; springs can share endpoints. Alt-drag refits cable length.",
+    impulse:
+      "Drag from a body to aim a kick. Choose impulse or velocity mode above.",
+    pan: "Drag to pan. Scroll to zoom at the cursor. Fit scene restores the view.",
     electric:
       "Click to place an electric field. Drag to move · Ctrl rotates · R resizes · right-click to edit.",
     magnetic:
-      "Click to place a magnetic field. ⊙ out of screen · ⊗ into screen · right-click to edit.",
+      "Click to place a magnetic field. Dots point out; crosses point in. Right-click to edit.",
     ball: "Click to add a ball. Z toggles grid snapping.",
     block: "Click to add a block. Z toggles grid snapping.",
     spring:
       "Click two objects, or an empty anchor point and an object. Escape cancels.",
     rod: "Click two objects, or an empty anchor point and an object. Escape cancels.",
   }[tool];
-  canvas.style.cursor = tool === "grab" ? "grab" : "crosshair";
+  $("tool-name").textContent = tool[0].toUpperCase() + tool.slice(1);
+  $("select-options").hidden = tool !== "select";
+  $("impulse-options").hidden = tool !== "impulse";
+  $("tool-help").hidden = ["select", "impulse"].includes(tool);
+  $("tool-help").textContent = $("hint").textContent;
+  canvas.style.cursor = ["grab", "pan"].includes(tool) ? "grab" : "crosshair";
 }
 function select(id) {
   selectionSet = new Set(id ? [id] : []);
@@ -138,12 +152,30 @@ function finishMarquee(p) {
   const ids = [...sim.objects.values()]
     .filter(
       (o) =>
+        $("select-bodies").checked &&
         o.body.bounds.max.x / 100 >= minX &&
         o.body.bounds.min.x / 100 <= maxX &&
         -o.body.bounds.min.y / 100 >= minY &&
         -o.body.bounds.max.y / 100 <= maxY,
     )
     .map((o) => o.id);
+  if ($("select-fields").checked)
+    for (const f of sim.fields.regions.values()) {
+      const a = (f.angle * Math.PI) / 180,
+        ex =
+          (Math.abs(Math.cos(a)) * f.width + Math.abs(Math.sin(a)) * f.height) /
+          2,
+        ey =
+          (Math.abs(Math.sin(a)) * f.width + Math.abs(Math.cos(a)) * f.height) /
+          2;
+      if (
+        f.x + ex >= minX &&
+        f.x - ex <= maxX &&
+        f.y + ey >= minY &&
+        f.y - ey <= maxY
+      )
+        ids.push(f.id);
+    }
   selectMany([...box.base, ...ids]);
   marquee = null;
 }
@@ -201,9 +233,13 @@ function positionMenu() {
     w = box.width || 285,
     h = box.height || 420;
   $("material-menu").style.left =
-    Math.max(10, Math.min(menuPoint.x, window.innerWidth - w - 10)) + "px";
+    Math.max(10, Math.min(menuPoint.x, window.innerWidth - w - 10)) /
+      (prefs.size / 100) +
+    "px";
   $("material-menu").style.top =
-    Math.max(10, Math.min(menuPoint.y, window.innerHeight - h - 10)) + "px";
+    Math.max(10, Math.min(menuPoint.y, window.innerHeight - h - 10)) /
+      (prefs.size / 100) +
+    "px";
 }
 function openMenu(id, x, y) {
   const o = sim.objects.get(id),
@@ -229,7 +265,7 @@ function openMenu(id, x, y) {
   $("menu-note").textContent = f
     ? "Uniform field inside this region; overlaps add. B is perpendicular to the screen: positive out, negative in. Electric direction follows the region angle."
     : l?.type === "belt"
-      ? "Ideal no-slip belt. Crossed / drive controls are in the selection bar. Wheel mass and damping are edited on each ball."
+      ? "Ideal no-slip belt. Crossed / drive controls are in the selected-item panel. Wheel mass and damping are edited on each ball."
       : l?.type === "pulley"
         ? "Taut cable with freely angled ends. Wheel mass and radius determine inertia. Alt-drag refits length; select the wheel to unlock its axle."
         : "Changes apply while the simulation runs.";
@@ -274,6 +310,51 @@ function openMenu(id, x, y) {
           180,
           1,
           "Counterclockwise from right. Ctrl-drag to rotate.",
+        ],
+        [
+          "gradientX",
+          "Gradient origin X",
+          "m",
+          -50,
+          50,
+          0.1,
+          "Offset from the region centre in world axes.",
+        ],
+        [
+          "gradientY",
+          "Gradient origin Y",
+          "m",
+          -50,
+          50,
+          0.1,
+          "Offset from the region centre in world axes.",
+        ],
+        [
+          "gradientAngle",
+          "Gradient angle",
+          "°",
+          -180,
+          180,
+          1,
+          "Independent of the region angle.",
+        ],
+        [
+          "gradientScaleX",
+          "Gradient X scale",
+          "m",
+          0.05,
+          100,
+          0.1,
+          "Reference distance for falloff; circular profiles use this scale.",
+        ],
+        [
+          "gradientScaleY",
+          "Gradient Y scale",
+          "m",
+          0.05,
+          100,
+          0.1,
+          "Second axis for ellipse and box profiles.",
         ],
       ]
     : o
@@ -372,23 +453,71 @@ function openMenu(id, x, y) {
   form.replaceChildren();
   form.onsubmit = (e) => e.preventDefault();
   if (f) {
-    const label = document.createElement("label"),
-      shape = document.createElement("select");
-    label.textContent = "Shape";
-    shape.setAttribute("aria-label", "Field shape");
-    for (const value of ["rectangle", "ellipse", "circle"]) {
-      const option = document.createElement("option");
-      option.value = value;
-      option.textContent = value[0].toUpperCase() + value.slice(1);
-      shape.append(option);
+    const controls = [
+      [
+        "shape",
+        "Field shape",
+        [
+          ["rectangle", "Rectangle"],
+          ["ellipse", "Ellipse"],
+          ["circle", "Circle"],
+        ],
+      ],
+      [
+        "gradient",
+        "Falloff",
+        [
+          ["uniform", "Uniform"],
+          ["linear", "Linear"],
+          ["inverse", "Inverse r (smoothed)"],
+          ["inverseSquare", "Inverse r² (smoothed)"],
+          ["exponential", "Exponential"],
+        ],
+      ],
+      [
+        "gradientShape",
+        "Gradient shape",
+        [
+          ["axial", "Along an axis"],
+          ["radial", "Circular"],
+          ["elliptical", "Elliptical"],
+          ["box", "Box"],
+        ],
+      ],
+      ...(f.type === "electric"
+        ? [
+            [
+              "direction",
+              "Field direction",
+              [
+                ["parallel", "Parallel"],
+                ["radial", "Radial from gradient origin"],
+              ],
+            ],
+          ]
+        : []),
+    ];
+    for (const [key, name, options] of controls) {
+      const label = document.createElement("label"),
+        control = document.createElement("select");
+      label.textContent = name;
+      control.setAttribute("aria-label", name);
+      for (const [value, text] of options) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = text;
+        control.append(option);
+      }
+      control.value = f[key];
+      control.onchange = () => {
+        sim.fields.update(id, { [key]: control.value });
+        openMenu(id, x, y);
+      };
+      label.append(control);
+      form.append(label);
     }
-    shape.value = f.shape;
-    shape.onchange = () => {
-      sim.fields.update(id, { shape: shape.value });
-      openMenu(id, x, y);
-    };
-    label.append(shape);
-    form.append(label);
+    $("menu-note").textContent =
+      "Strength is the peak. Gradient origin/axes are independent of the boundary. Linear: max(0, 1−d); inverse: 1/√(1+d²); inverse-square: 1/(1+d²); exponential: exp(−d). Scales define d. Axial falloff starts at the origin and decreases along +axis.";
   }
   for (const [key, name, unit, min, max, step, help] of fields) {
     const label = document.createElement("label");
@@ -510,9 +639,12 @@ function updateInteraction() {
   if (sim.group && ctrl && !shift) {
     const id = sim.group.handle;
     sim.endGroup();
-    if (id) {
+    if (id && sim.objects.has(id)) {
       select(id);
       sim.beginGrab(id, pointer, performance.now(), grabOptions());
+    } else if (id && sim.fields.regions.has(id)) {
+      select(id);
+      fieldDrag = new FieldDrag(sim.fields, id, pointer, fieldMode());
     }
   }
   if (sim.group) sim.moveGroup(pointer, sim.settings.snapping);
@@ -533,11 +665,24 @@ function fieldMode() {
       : "move";
 }
 canvas.addEventListener("pointerdown", (e) => {
+  if (e.button === 1 || (e.button === 0 && tool === "pan")) {
+    e.preventDefault();
+    cancelDrag();
+    canvas.setPointerCapture(e.pointerId);
+    panDrag = { x: e.clientX, y: e.clientY, viewX: view.x, viewY: view.y };
+    return;
+  }
   if (e.button !== 0) return;
   canvas.focus();
   pointer = locate(e);
   syncModifiers(e);
   canvas.setPointerCapture(e.pointerId);
+  if (tool === "impulse") {
+    const id = sim.hit(pointer);
+    select(id);
+    if (id) impulseDrag = { id, start: { ...pointer } };
+    return;
+  }
   if (["electric", "magnetic"].includes(tool)) {
     const p = sim.settings.snapping
       ? { x: snap(pointer.x), y: snap(pointer.y) }
@@ -559,11 +704,15 @@ canvas.addEventListener("pointerdown", (e) => {
     }
   }
   if (tool === "select") {
-    const id = sim.hit(pointer);
+    const id =
+      ($("select-bodies").checked && sim.hit(pointer)) ||
+      ($("select-fields").checked && sim.fields.hit(pointer));
     if (id) {
       if (ctrl || resizeHeld) {
         select(id);
-        if (resizeHeld) sim.beginResize(id, pointer);
+        if (sim.fields.regions.has(id))
+          fieldDrag = new FieldDrag(sim.fields, id, pointer, fieldMode());
+        else if (resizeHeld) sim.beginResize(id, pointer);
         else sim.beginGrab(id, pointer, performance.now(), grabOptions());
         return;
       }
@@ -662,15 +811,32 @@ canvas.addEventListener("pointerdown", (e) => {
   }
 });
 canvas.addEventListener("pointermove", (e) => {
+  if (panDrag) {
+    view.x = panDrag.viewX + e.clientX - panDrag.x;
+    view.y = panDrag.viewY + e.clientY - panDrag.y;
+    return;
+  }
   pointer = locate(e);
   syncModifiers(e);
   if (marquee) marquee.end = { ...pointer };
   updateInteraction();
 });
 canvas.addEventListener("pointerup", (e) => {
+  if (panDrag) {
+    panDrag = null;
+    if (canvas.hasPointerCapture?.(e.pointerId))
+      canvas.releasePointerCapture(e.pointerId);
+    return;
+  }
   if (e.button !== 0) return;
   syncModifiers(e);
   pointer = locate(e);
+  if (impulseDrag) {
+    const v = impulseVector();
+    if (!sim.impulse(impulseDrag.id, v, $("impulse-mode").value))
+      toast("Unlock position to apply a kick.");
+    impulseDrag = null;
+  }
   if (fieldDrag) {
     fieldDrag.move(pointer, fieldMode(), sim.settings.snapping);
     fieldDrag = null;
@@ -708,6 +874,8 @@ canvas.addEventListener("pointercancel", cancelDrag);
 canvas.addEventListener("lostpointercapture", cancelDrag);
 function cancelDrag() {
   fieldDrag = null;
+  impulseDrag = null;
+  panDrag = null;
   marquee = null;
   sim.endGroup();
   sim.endGrab(false);
@@ -795,6 +963,17 @@ $("close-keys").onclick = () => {
 };
 function syncSettings() {
   $("setting-walls").checked = sim.settings.walls;
+  $("setting-chargeInteractions").checked = sim.settings.chargeInteractions;
+  for (const key of ["coulombConstant", "chargeSoftening"])
+    $("setting-" + key).value = sim.settings[key];
+  if (sim.viewport) {
+    $("scene-width").value = Number(
+      (sim.viewport.maxX - sim.viewport.minX).toFixed(3),
+    );
+    $("scene-height").value = Number(
+      (sim.viewport.maxY - sim.viewport.minY).toFixed(3),
+    );
+  }
   snapStatus();
   for (const key of settingKeys) {
     $("setting-" + key).value = sim.settings[key];
@@ -862,11 +1041,21 @@ for (const key of settingKeys) {
     input.value = sim.settings[key];
   };
 }
-for (const key of ["snapping", "walls"])
+for (const key of ["snapping", "walls", "chargeInteractions"])
   $("setting-" + key).onchange = (e) => {
     sim.updateSettings({ [key]: e.target.checked });
     snapStatus();
     updateInteraction();
+  };
+for (const key of ["coulombConstant", "chargeSoftening"])
+  $("setting-" + key).onchange = (e) => {
+    try {
+      if (e.target.value === "") throw new Error("Enter a number.");
+      sim.updateSettings({ [key]: Number(e.target.value) });
+    } catch (error) {
+      toast(error.message);
+    }
+    syncSettings();
   };
 $("reset-settings").onclick = () => {
   sim.updateSettings({
@@ -876,7 +1065,10 @@ $("reset-settings").onclick = () => {
     electricY: 0,
     magneticZ: 0,
     snapping: false,
-    walls: false,
+    walls: true,
+    chargeInteractions: false,
+    coulombConstant: 1,
+    chargeSoftening: 0.1,
   });
   syncSettings();
 };
@@ -900,7 +1092,9 @@ $("clear").onclick = () => {
   const settings = { ...sim.settings };
   sim.dispose();
   sim = new Sandbox();
-  sim.updateSettings(settings);
+  sim.updateSettings({ ...settings, walls: true });
+  view.width = 0;
+  view.height = 0;
   selected = null;
   pending = null;
   select(null);
@@ -974,6 +1168,8 @@ document.addEventListener("keydown", (e) => {
     d: "rod",
     t: "belt",
     u: "pulley",
+    i: "impulse",
+    h: "pan",
     e: "electric",
     m: "magnetic",
   };
@@ -1015,6 +1211,87 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("resize", () => {
   if (menuId) positionMenu();
 });
+function impulseVector() {
+  const gain = Number($("impulse-gain").value);
+  const factor = Number.isFinite(gain)
+    ? Math.max(0.01, Math.min(100, gain))
+    : 1;
+  const q = (v) => (sim.settings.snapping ? snap(v) : v);
+  return {
+    x: q(pointer.x - impulseDrag.start.x) * factor,
+    y: q(pointer.y - impulseDrag.start.y) * factor,
+  };
+}
+function visibleBounds() {
+  return {
+    minX: -view.x / view.scale,
+    maxX: (view.width - view.x) / view.scale,
+    minY: (view.y - view.height) / view.scale,
+    maxY: view.y / view.scale,
+  };
+}
+function zoom(factor, point = { x: view.width / 2, y: view.height / 2 }) {
+  cancelDrag();
+  const before = world(point);
+  view.scale = Math.max(0.1, Math.min(400, view.scale * factor));
+  view.x = point.x - before.x * view.scale;
+  view.y = point.y + before.y * view.scale;
+}
+canvas.addEventListener(
+  "wheel",
+  (e) => {
+    e.preventDefault();
+    const r = canvas.getBoundingClientRect();
+    zoom(Math.exp(-e.deltaY * 0.001), {
+      x: e.clientX - r.left,
+      y: e.clientY - r.top,
+    });
+  },
+  { passive: false },
+);
+$("zoom-in").onclick = () => zoom(1.25);
+$("zoom-out").onclick = () => zoom(0.8);
+$("fit-scene").onclick = () => {
+  cancelDrag();
+  const v = sim.viewport;
+  if (!v) return;
+  view.scale = Math.max(
+    0.1,
+    Math.min(
+      400,
+      (view.width - 40) / (v.maxX - v.minX),
+      (view.height - 40) / (v.maxY - v.minY),
+    ),
+  );
+  view.x = view.width / 2 - ((v.minX + v.maxX) / 2) * view.scale;
+  view.y = view.height / 2 + ((v.minY + v.maxY) / 2) * view.scale;
+};
+$("apply-scene").onclick = () => {
+  try {
+    sim.setSceneSize(
+      Number($("scene-width").value),
+      Number($("scene-height").value),
+    );
+    syncSettings();
+  } catch (error) {
+    toast(error.message);
+  }
+};
+$("scene-to-view").onclick = () => {
+  cancelDrag();
+  const v = visibleBounds();
+  if (
+    v.maxX - v.minX < 2 ||
+    v.maxY - v.minY < 2 ||
+    v.maxX - v.minX > 1000 ||
+    v.maxY - v.minY > 1000
+  ) {
+    toast("Current view must span between 2 and 1000 m on each axis.");
+    return;
+  }
+  sim.setViewport(v);
+  syncSettings();
+};
 function line(a, b, colour, width = 1) {
   ctx.beginPath();
   ctx.moveTo(a.x, a.y);
@@ -1027,11 +1304,19 @@ function draw() {
   const r = canvas.getBoundingClientRect(),
     dpr = window.devicePixelRatio || 1;
   if (view.width !== r.width || view.height !== r.height) {
+    if (view.width) {
+      view.x += (r.width - view.width) / 2;
+      view.y += (r.height - view.height) / 2;
+    } else {
+      view.scale = Math.max(
+        25,
+        Math.min(75, r.width / 15, (r.height - 160) / 8),
+      );
+      view.x = r.width / 2;
+      view.y = r.height - 100;
+    }
     view.width = r.width;
     view.height = r.height;
-    view.scale = Math.max(25, Math.min(75, r.width / 15, (r.height - 160) / 8));
-    view.x = r.width / 2;
-    view.y = r.height - 100;
   }
   if (
     canvas.width !== Math.round(r.width * dpr) ||
@@ -1040,47 +1325,77 @@ function draw() {
     canvas.width = Math.round(r.width * dpr);
     canvas.height = Math.round(r.height * dpr);
   }
-  sim.setViewport({
-    minX: -view.x / view.scale,
-    maxX: (r.width - view.x) / view.scale,
-    minY: (view.y - r.height) / view.scale,
-    maxY: view.y / view.scale,
-  });
+  if (!sim.viewport)
+    sim.setViewport({
+      minX: -view.x / view.scale,
+      maxX: (r.width - view.x) / view.scale,
+      minY: (view.y - r.height) / view.scale,
+      maxY: view.y / view.scale,
+    });
+  $("zoom-level").textContent = Math.round((view.scale / 65) * 100) + "%";
+  const toolbar = document.querySelector(".tools");
+  $("tool-settings").style.top =
+    toolbar.offsetTop + toolbar.offsetHeight + 8 + "px";
+  const dark = document.documentElement.dataset.theme === "dark";
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, r.width, r.height);
   const min = world({ x: 0, y: r.height }),
     max = world({ x: r.width, y: 0 });
-  for (let x = Math.ceil(min.x / GRID) * GRID; x <= max.x; x += GRID) {
-    const major = Math.abs(x - Math.round(x)) < 0.01;
-    line(
-      screen({ x, y: min.y }),
-      screen({ x, y: max.y }),
-      major ? "#c6cebf" : "#dce1d4",
-      major ? 1 : 0.75,
-    );
-  }
-  for (let y = Math.ceil(min.y / GRID) * GRID; y <= max.y; y += GRID) {
-    const major = Math.abs(y - Math.round(y)) < 0.01;
-    line(
-      screen({ x: min.x, y }),
-      screen({ x: max.x, y }),
-      major ? "#c6cebf" : "#dce1d4",
-      major ? 1 : 0.75,
-    );
-  }
-  ctx.fillStyle = "#e0e3d8";
+  const gridStep =
+    GRID * 2 ** Math.max(0, Math.ceil(Math.log2(12 / (GRID * view.scale))));
+  if (prefs.grid)
+    for (
+      let x = Math.ceil(min.x / gridStep) * gridStep;
+      x <= max.x;
+      x += gridStep
+    ) {
+      const major = Math.abs(x - Math.round(x)) < 0.01;
+      line(
+        screen({ x, y: min.y }),
+        screen({ x, y: max.y }),
+        major ? (dark ? "#3c5042" : "#c6cebf") : dark ? "#2c3931" : "#dce1d4",
+        major ? 1 : 0.75,
+      );
+    }
+  if (prefs.grid)
+    for (
+      let y = Math.ceil(min.y / gridStep) * gridStep;
+      y <= max.y;
+      y += gridStep
+    ) {
+      const major = Math.abs(y - Math.round(y)) < 0.01;
+      line(
+        screen({ x: min.x, y }),
+        screen({ x: max.x, y }),
+        major ? (dark ? "#3c5042" : "#c6cebf") : dark ? "#2c3931" : "#dce1d4",
+        major ? 1 : 0.75,
+      );
+    }
+  ctx.fillStyle = dark ? "#25332a" : "#e0e3d8";
   ctx.fillRect(0, view.y, r.width, r.height - view.y);
   line({ x: 0, y: view.y }, { x: r.width, y: view.y }, "#7f9076", 2);
   if (sim.settings.walls) {
     ctx.strokeStyle = "#7f9076";
     ctx.lineWidth = 4;
-    ctx.strokeRect(1, 1, r.width - 2, r.height - 2);
+    const v = sim.viewport,
+      p = screen({ x: v.minX, y: v.maxY });
+    ctx.strokeRect(
+      p.x,
+      p.y,
+      (v.maxX - v.minX) * view.scale,
+      (v.maxY - v.minY) * view.scale,
+    );
   }
   ctx.font = "9px ui-monospace,monospace";
   ctx.fillStyle = "#819078";
-  for (let x = Math.ceil(min.x); x <= max.x; x++)
+  const labelStep = Math.max(1, Math.ceil(60 / view.scale));
+  for (
+    let x = Math.ceil(min.x / labelStep) * labelStep;
+    x <= max.x;
+    x += labelStep
+  )
     ctx.fillText(x + " m", screen({ x, y: 0 }).x + 4, view.y + 16);
-  drawFields(ctx, sim.fields, screen, view.scale, highlighted);
+  drawFields(ctx, sim.fields, screen, view.scale, highlighted, { min, max });
   for (const l of sim.links.values()) {
     if (["belt", "pulley"].includes(l.type)) {
       const path = linkPath(l).map(screen);
@@ -1176,6 +1491,15 @@ function draw() {
         );
       }
     }
+    if (o.charge) {
+      ctx.fillStyle = o.charge > 0 ? "#bd5948" : "#467cb8";
+      ctx.font = "bold 11px system-ui";
+      ctx.fillText(
+        (o.charge > 0 ? "+" : "") + o.charge + " C",
+        p.x + 12,
+        p.y + 20,
+      );
+    }
     if (o.lockPosition) {
       ctx.beginPath();
       ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
@@ -1250,6 +1574,46 @@ function draw() {
     );
     ctx.setLineDash([]);
   }
+  if (impulseDrag && pointer) {
+    const o = sim.state(impulseDrag.id);
+    if (o) {
+      const start = screen(o),
+        delta = {
+          x: pointer.x - impulseDrag.start.x,
+          y: pointer.y - impulseDrag.start.y,
+        };
+      const end = screen({ x: o.x + delta.x, y: o.y + delta.y }),
+        a = Math.atan2(end.y - start.y, end.x - start.x);
+      line(start, end, "#c16145", 3);
+      line(
+        end,
+        {
+          x: end.x - 10 * Math.cos(a - 0.45),
+          y: end.y - 10 * Math.sin(a - 0.45),
+        },
+        "#c16145",
+        3,
+      );
+      line(
+        end,
+        {
+          x: end.x - 10 * Math.cos(a + 0.45),
+          y: end.y - 10 * Math.sin(a + 0.45),
+        },
+        "#c16145",
+        3,
+      );
+      const v = impulseVector();
+      ctx.fillStyle = "#c16145";
+      ctx.font = "12px system-ui";
+      ctx.fillText(
+        Math.hypot(v.x, v.y).toFixed(2) +
+          ($("impulse-mode").value === "impulse" ? " N·s" : " m/s"),
+        end.x + 8,
+        end.y - 8,
+      );
+    }
+  }
   if (pending && pointer) {
     ctx.setLineDash([4, 4]);
     line(screen(pending.point), screen(pointer), "#7d946e", 2);
@@ -1280,6 +1644,8 @@ for (const [key, t] of Object.entries({
   D: "rod",
   T: "belt",
   U: "pulley",
+  I: "impulse",
+  H: "pan",
   E: "electric",
   M: "magnetic",
 }))

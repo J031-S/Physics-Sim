@@ -28,24 +28,79 @@
         tabindex="0"
         aria-label="Physics sandbox. Choose Ball or Block, then click to create. Drag to throw. Press Z to toggle snapping."
       ></canvas>
-      <div class="tools" role="toolbar" aria-label="Creation tools">
-        <button data-tool="grab" class="active" aria-pressed="true">
-          <b>↖</b> Grab</button
-        ><button data-tool="select" aria-pressed="false"><b>⬚</b> Select</button
-        ><button data-tool="ball" aria-pressed="false"><b>○</b> Ball</button
-        ><button data-tool="block" aria-pressed="false"><b>□</b> Block</button
-        ><span class="divider"></span
-        ><button data-tool="spring" aria-pressed="false"><b>∿</b> Spring</button
-        ><button data-tool="rod" aria-pressed="false"><b>⊶</b> Rod</button
-        ><button data-tool="belt" aria-pressed="false"><b>▱</b> Belt</button
-        ><button data-tool="pulley" aria-pressed="false"><b>∩</b> Pulley</button
-        ><button data-tool="electric" aria-pressed="false">
-          <b>⇢</b> Electric</button
-        ><button data-tool="magnetic" aria-pressed="false">
-          <b>⊙</b> Magnetic</button
-        ><label class="vectors"
+      <div class="tools" role="toolbar" aria-label="Simulation tools">
+        <div class="tool-group">
+          <small>Edit</small>
+          <div>
+            <button data-tool="grab" aria-pressed="true">↖ Grab</button
+            ><button data-tool="select" aria-pressed="false">⬚ Select</button
+            ><button data-tool="impulse" aria-pressed="false">↗ Impulse</button
+            ><button data-tool="pan" aria-pressed="false">✥ Pan</button>
+          </div>
+        </div>
+        <div class="tool-group">
+          <small>Bodies</small>
+          <div>
+            <button data-tool="ball" aria-pressed="false">○ Ball</button
+            ><button data-tool="block" aria-pressed="false">□ Block</button>
+          </div>
+        </div>
+        <div class="tool-group">
+          <small>Connections</small>
+          <div>
+            <button data-tool="spring" aria-pressed="false">∿ Spring</button
+            ><button data-tool="rod" aria-pressed="false">⊶ Rod</button
+            ><button data-tool="belt" aria-pressed="false">▱ Belt</button
+            ><button data-tool="pulley" aria-pressed="false">∩ Pulley</button>
+          </div>
+        </div>
+        <div class="tool-group">
+          <small>Fields</small>
+          <div>
+            <button data-tool="electric" aria-pressed="false">⇢ Electric</button
+            ><button data-tool="magnetic" aria-pressed="false">
+              • Magnetic
+            </button>
+          </div>
+        </div>
+        <label class="vectors"
           ><input type="checkbox" id="vectors" /> Velocity vectors</label
         >
+      </div>
+      <div id="tool-settings" class="tool-settings">
+        <strong id="tool-name">Grab</strong>
+        <span id="tool-help"
+          >Drag bodies or fields. Ctrl rotates; R resizes.</span
+        >
+        <div id="select-options" hidden>
+          <label
+            ><input id="select-bodies" type="checkbox" checked /> Bodies</label
+          ><label><input id="select-fields" type="checkbox" /> Fields</label>
+        </div>
+        <div id="impulse-options" hidden>
+          <label
+            >Mode
+            <select id="impulse-mode">
+              <option value="impulse">Impulse (N·s)</option>
+              <option value="velocity">Add velocity (m/s)</option>
+            </select></label
+          ><label
+            >Per metre dragged
+            <input
+              id="impulse-gain"
+              type="number"
+              min=".01"
+              max="100"
+              step="any"
+              value="1" /></label
+          ><span>Drag from a body towards the desired kick.</span>
+        </div>
+      </div>
+      <div class="camera-controls">
+        <button id="zoom-out" aria-label="Zoom out">−</button
+        ><span id="zoom-level">100%</span
+        ><button id="zoom-in" aria-label="Zoom in">+</button
+        ><button id="fit-scene">Fit scene</button>
       </div>
       <div id="selection" class="selection" hidden>
         <strong id="selected-name"></strong
@@ -119,7 +174,8 @@
         15°</label
       >
       <label class="setting-toggle"
-        ><input id="setting-walls" type="checkbox" /> Screen-edge walls</label
+        ><input id="setting-walls" type="checkbox" /> Scene boundary
+        walls</label
       >
       <label for="setting-gravity">Gravity ↓ <span>m/s²</span></label>
       <input
@@ -241,6 +297,85 @@
         >Positive points out of the screen (⊙); negative into it (⊗). Global and
         local fields add together.</small
       >
+      <h3>Charge interactions</h3>
+      <label class="setting-toggle"
+        ><input id="setting-chargeInteractions" type="checkbox" /> Mutual
+        electric forces</label
+      >
+      <label for="setting-coulombConstant"
+        >Coulomb constant <span>N·m²/C²</span></label
+      ><input
+        id="setting-coulombConstant"
+        type="number"
+        min="0"
+        max="10000000000"
+        step="any"
+        value="1"
+      />
+      <small
+        >Default 1 for manageable sandbox motion. Vacuum value ≈ 8.99 × 10⁹.
+        Like charges repel; opposite charges attract.</small
+      >
+      <label for="setting-chargeSoftening"
+        >Near-contact smoothing <span>m</span></label
+      ><input
+        id="setting-chargeSoftening"
+        type="number"
+        min=".01"
+        max="10"
+        step="any"
+        value=".1"
+      />
+      <small
+        >Uses r / (r² + smoothing²)³ᐟ² to keep overlapping charges
+        finite.</small
+      >
+      <h3>Scene</h3>
+      <label
+        >Width (m)
+        <input
+          id="scene-width"
+          type="number"
+          min="2"
+          max="1000"
+          step="any" /></label
+      ><label
+        >Height (m)
+        <input
+          id="scene-height"
+          type="number"
+          min="2"
+          max="1000"
+          step="any" /></label
+      ><button id="apply-scene">Resize scene</button
+      ><button id="scene-to-view">Bounds to current view</button>
+      <small
+        >Bounds stay fixed while you pan or zoom. Ground stays at y = 0.
+        Resizing does not reposition existing objects.</small
+      >
+      <h3>Website</h3>
+      <label
+        >Theme
+        <select id="ui-theme">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          <option value="system">System</option>
+        </select></label
+      >
+      <label
+        >GUI size <output id="ui-size-value">100%</output
+        ><input
+          id="ui-size"
+          type="range"
+          min="80"
+          max="140"
+          step="5"
+          value="100"
+      /></label>
+      <label class="setting-toggle"
+        ><input id="ui-grid" type="checkbox" checked /> Show grid</label
+      >
+      <small>Website preferences are remembered on this browser.</small>
       <button id="reset-settings">Restore defaults</button>
     </section>
     <section id="keys-panel" hidden aria-label="Keyboard shortcuts">
@@ -257,6 +392,8 @@
         <dd>Grab · Ball · Block</dd>
         <dt>S · D · T · U</dt>
         <dd>Spring · Rod · Belt · Pulley</dd>
+        <dt>I · H</dt>
+        <dd>Impulse · Pan. Scroll to zoom; middle-drag pans in any tool.</dd>
         <dt>E · M</dt>
         <dd>
           Electric · Magnetic field. Right-click for shape, size and strength;
@@ -285,13 +422,14 @@
         <dd>Delete selection · cancel interaction</dd>
       </dl>
       <p>
-        Select: drag a box, then drag a selected body to move the connected
-        assembly. Z toggles snapping. Pause to move an assembly containing
-        locked positions. Pins and world anchors move with the layout. Belt:
-        click two balls. Pulley: click endpoint, wheel ball, endpoint. Cable
-        ends can move at any angle and connect to springs. Pulley axles start
-        pinned; unlock position to move them. Select a belt for crossed / driven
-        modes. Select a spring to lock its current angle.
+        Select: enable Bodies and/or Fields in tool settings, drag a box, then
+        drag a selected item to move the connected assembly. Z toggles snapping.
+        Pause to move an assembly containing locked positions. Pins and world
+        anchors move with the layout. Belt: click two balls. Pulley: click
+        endpoint, wheel ball, endpoint. Cable ends can move at any angle and
+        connect to springs. Pulley axles start pinned; unlock position to move
+        them. Select a belt for crossed / driven modes. Select a spring to lock
+        its current angle.
       </p>
     </section>
     <script src="vendor/matter.js"></script>

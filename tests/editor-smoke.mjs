@@ -79,6 +79,8 @@ assert.deepEqual(
   [
     "grab",
     "select",
+    "impulse",
+    "pan",
     "ball",
     "block",
     "spring",
@@ -533,7 +535,106 @@ $("reset-settings").click();
 assert.equal($("setting-electricX").value, "0");
 assert.equal($("setting-magneticZ").value, "0");
 $("close-settings").click();
+// Gradient controls, mixed selection, impulse options, camera and website preferences.
+$("clear").click();
+frames(1);
+canvas.focus();
+if ($("pause").textContent.includes("Pause")) key(" ");
+key("e");
+click(350, 300);
+menu(350, 300);
+change($("constants").querySelector('[aria-label="Falloff"]'), "inverseSquare");
+change(
+  $("constants").querySelector('[aria-label="Gradient shape"]'),
+  "elliptical",
+);
+change($("constants").querySelector('[aria-label="Gradient X scale"]'), "3");
+assert.equal(
+  $("constants").querySelector('[aria-label="Gradient X scale"]').value,
+  "3",
+);
+change(
+  $("constants").querySelector('[aria-label="Field direction"]'),
+  "radial",
+);
+$("close-menu").click();
+key("b");
+click(650, 300);
+key("q");
+assert.equal($("select-options").hidden, false);
+assert.equal($("impulse-options").hidden, true);
+$("select-fields").checked = true;
+pointer("pointerdown", 180, 180);
+pointer("pointermove", 720, 450);
+pointer("pointerup", 720, 450);
+assert.equal($("selected-name").textContent, "2 objects selected");
+pointer("pointerdown", 650, 300);
+pointer("pointermove", 650, 350);
+pointer("pointerup", 650, 350);
+menu(350, 350);
+assert.equal(
+  $("constants").querySelector('[aria-label="Falloff"]').value,
+  "inverseSquare",
+);
+$("close-menu").click();
+key("i");
+assert.equal($("impulse-options").hidden, false);
+assert.equal($("select-options").hidden, true);
+change($("impulse-mode"), "velocity");
+change($("impulse-gain"), "2");
+pointer("pointerdown", 650, 350);
+pointer("pointermove", 700, 350);
+frames(1);
+pointer("pointerup", 700, 350);
+assert.equal($("pause").textContent, "▶ Run");
+$("settings-toggle").click();
+const originalWidth = $("scene-width").value,
+  originalHeight = $("scene-height").value;
+$("setting-chargeInteractions").checked = true;
+$("setting-chargeInteractions").dispatchEvent(new window.Event("change"));
+change($("setting-coulombConstant"), "2");
+assert.equal($("setting-coulombConstant").value, "2");
+change($("ui-theme"), "dark");
+assert.equal(document.documentElement.dataset.theme, "dark");
+change($("ui-size"), "125", "input");
+assert.equal($("ui-size-value").textContent, "125%");
+assert.equal(
+  JSON.parse(window.localStorage.getItem("physics-sim-ui")).size,
+  125,
+);
+$("close-settings").click();
+const priorZoom = $("zoom-level").textContent;
+$("zoom-out").click();
+frames(1);
+assert.notEqual($("zoom-level").textContent, priorZoom);
+key("h");
+pointer("pointerdown", 500, 500);
+pointer("pointermove", 560, 540);
+pointer("pointerup", 560, 540);
+frames(1);
+$("settings-toggle").click();
+assert.equal($("scene-width").value, originalWidth);
+assert.equal($("scene-height").value, originalHeight);
+change($("scene-width"), "30");
+change($("scene-height"), "20");
+$("apply-scene").click();
+assert.equal($("scene-width").value, "30");
+assert.equal($("scene-height").value, "20");
+$("close-settings").click();
+$("fit-scene").click();
+frames(1);
+assert.ok(Number.parseInt($("zoom-level").textContent) > 0);
+// Each new scene fits initial screen bounds but retains website preferences.
+$("clear").click();
+frames(1);
+$("settings-toggle").click();
+assert.equal($("setting-walls").checked, true);
+assert.equal($("scene-width").value, originalWidth);
+assert.equal(document.documentElement.dataset.theme, "dark");
+change($("ui-theme"), "light");
+change($("ui-size"), "100", "input");
+$("close-settings").click();
 console.log(
-  "PASS: creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
+  "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );
 await window.happyDOM.close();

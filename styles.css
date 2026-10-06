@@ -500,3 +500,216 @@ input[type="checkbox"] {
     top: 138px;
   }
 }
+
+:root {
+  --ui-scale: 1;
+  --panel: #fffefa;
+  --canvas-bg: #f2f0e9;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #dde6df;
+  --line: #48534b;
+  --panel: #252d29;
+  --canvas-bg: #18201c;
+  color: var(--ink);
+  background: var(--canvas-bg);
+}
+header {
+  height: calc(62px * var(--ui-scale));
+  background: var(--panel);
+}
+main {
+  height: calc(100dvh - 62px * var(--ui-scale));
+  background: var(--canvas-bg);
+}
+button,
+select {
+  background: var(--panel);
+  color: var(--ink);
+}
+button:hover {
+  background: color-mix(in srgb, var(--panel), #8aa17c 18%);
+}
+select {
+  font: inherit;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  max-width: 100%;
+}
+.tools {
+  top: 12px;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  flex-wrap: wrap;
+  justify-content: center;
+  background: var(--panel);
+  zoom: var(--ui-scale);
+}
+.tool-group {
+  border-right: 1px solid var(--line);
+  padding-right: 8px;
+}
+.tool-group > small {
+  display: block;
+  padding: 0 7px 4px;
+  opacity: 0.65;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.tool-group > div {
+  display: flex;
+}
+.tools button {
+  padding: 5px 7px;
+}
+.tool-settings {
+  position: absolute;
+  top: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 9px 12px;
+  border-radius: 9px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  font-size: 11px;
+  zoom: var(--ui-scale);
+}
+.tool-settings label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 10px;
+}
+.tool-settings input[type="number"] {
+  width: 60px;
+}
+#tool-help,
+#impulse-options > span {
+  opacity: 0.7;
+}
+#selection.selection {
+  top: auto;
+  left: auto;
+  right: 16px;
+  bottom: 64px;
+  transform: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: 245px;
+  max-height: 50vh;
+  overflow: auto;
+  white-space: normal;
+  background: var(--panel);
+  border-color: var(--line);
+  zoom: var(--ui-scale);
+}
+#selection > strong {
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+}
+.camera-controls {
+  position: absolute;
+  bottom: 54px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  zoom: var(--ui-scale);
+}
+#zoom-level {
+  min-width: 42px;
+  text-align: center;
+  font-size: 11px;
+}
+#settings-panel,
+#keys-panel,
+#material-menu {
+  background: var(--panel);
+  color: var(--ink);
+  zoom: var(--ui-scale);
+}
+:root[data-theme="dark"] #constants input,
+:root[data-theme="dark"] #constants select,
+:root[data-theme="dark"] #settings-panel input[type="number"] {
+  background: #18201c;
+  color: var(--ink);
+}
+:root[data-theme="dark"] .tools .active {
+  background: #3b4c3f;
+  color: #ecf5e8;
+  border-color: #768d70;
+}
+:root[data-theme="dark"] .hint,
+:root[data-theme="dark"] .status {
+  color: #abbba8;
+}
+#settings-panel h3 {
+  margin-top: 25px;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+#ui-size-value {
+  float: right;
+}
+[hidden] {
+  display: none !important;
+}
+@media (max-width: 700px) {
+  .subtitle {
+    display: none;
+  }
+  header {
+    padding: 0 8px;
+    gap: 6px;
+  }
+  .brand {
+    font-size: 12px;
+  }
+  .playback {
+    gap: 3px;
+  }
+  .playback button {
+    padding: 6px;
+  }
+  #selection.selection {
+    width: 200px;
+    bottom: 95px;
+    max-height: 35vh;
+  }
+  #tool-help {
+    display: none;
+  }
+}
+.brand,
+.playback {
+  zoom: var(--ui-scale);
+}
+#settings-panel,
+#keys-panel {
+  max-height: calc((100dvh - 92px) / var(--ui-scale));
+}
+#material-menu {
+  max-height: calc((100dvh - 20px) / var(--ui-scale));
+}
+:root[data-theme="dark"] #settings-panel p,
+:root[data-theme="dark"] #settings-panel small,
+:root[data-theme="dark"] #constants small,
+:root[data-theme="dark"] #menu-note,
+:root[data-theme="dark"] #keys-panel p { color: #b5c3b0; }
