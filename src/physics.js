@@ -243,7 +243,7 @@ export class Sandbox {
     Object.assign(l, patch);
     if (l.constraint) l.constraint.length = l.length * SCALE;
   }
-  beginGrab(id, p) {
+  beginGrab(id, p, now = performance.now()) {
     const o = this.objects.get(id);
     if (!o) return;
     const b = o.body,
@@ -258,6 +258,9 @@ export class Sandbox {
       target: { ...p },
       snap: false,
       snapCentre: null,
+      resize: false,
+      samples: [{ ...this.state(id), t: now }],
+      angle: b.angle,
     };
   }
   grabPoint() {
@@ -271,44 +274,177 @@ export class Sandbox {
       y: b.position.y + g.local.x * s + g.local.y * c,
     };
   }
-  moveGrab(p, snapping = false) {
+  moveGrab(p, snapping = false, resize = false, now = performance.now()) {
     if (!this.grab) return;
-    const g = this.grab,
-      o = this.objects.get(g.id),
-      at = toWorld(this.grabPoint()),
-      centre = this.state(g.id);
+    const g = this.grab;
+    g.target = { ...p };
     g.snap = snapping;
-    if (snapping && !o.lockPosition) {
-      const clearance =
-        (Math.max(...o.body.vertices.map((v) => v.y)) - o.body.position.y) /
-        SCALE;
-      g.snapCentre = {
-        x: snap(p.x - (at.x - centre.x)),
-        y: Math.max(
-          Math.ceil(clearance / GRID) * GRID,
-          snap(p.y - (at.y - centre.y)),
-        ),
-      };
-      g.target = {
-        x: g.snapCentre.x + at.x - centre.x,
-        y: g.snapCentre.y + at.y - centre.y,
-      };
-    } else {
-      g.snapCentre = null;
-      g.target = { ...p };
-    }
+    g.resize = resize;
+    this.placeGrab(true);
+    const state = this.state(g.id);
+    g.samples.push({ ...state, t: now });
+    while (g.samples.length > 2 && g.samples[1].t < now - 100)
+      g.samples.shift();
   }
-  endGrab(place = true) {
+  grabRods() {
+    const g = this.grab;
+    return [...this.links.values()].filter(
+      (l) => l.type === "rod" && (l.a === g.id || l.b === g.id),
+    );
+  }
+  placeGrab(editLength = false) {
     const g = this.grab;
     if (!g) return;
-    if (place && g.snapCentre) {
-      const o = this.objects.get(g.id);
-      if (o && !o.lockPosition) {
-        Body.setPosition(o.body, toEngine(g.snapCentre));
-        Body.setVelocity(o.body, { x: 0, y: 0 });
+    const o = this.objects.get(g.id),
+      b = o.body;
+    const old = this.state(g.id);
+    if (o.lockPosition) {
+      // A pinned centre leaves only rotation; a centre grab has no lever arm.
+      if (!o.lockRotation && Math.hypot(g.local.x, g.local.y) > 1e-4) {
+        const q = toEngine(g.target),
+          dx = q.x - o.positionAnchor.x,
+          dy = q.y - o.positionAnchor.y;
+        if (Math.hypot(dx, dy) > 1e-4) {
+          const desired = Math.atan2(dy, dx) - Math.atan2(g.local.y, g.local.x);
+          g.angle =
+            b.angle +
+            Math.atan2(
+              Math.sin(desired - b.angle),
+              Math.cos(desired - b.angle),
+            );
+        }
       }
+      Body.setPosition(b, o.positionAnchor);
+    } else {
+      const c = Math.cos(g.angle),
+        sn = Math.sin(g.angle);
+      let desired = {
+        x: g.target.x - (g.local.x * c - g.local.y * sn) / SCALE,
+        y: g.target.y + (g.local.x * sn + g.local.y * c) / SCALE,
+      };
+      Body.setAngle(b, o.lockRotation ? o.angleAnchor : g.angle);
+      const floor =
+        (Math.max(...b.vertices.map((v) => v.y)) - b.position.y) / SCALE;
+      if (g.snap)
+        desired = {
+          x: snap(desired.x),
+          y: Math.max(Math.ceil(floor / GRID) * GRID, snap(desired.y)),
+        };
+      desired.y = Math.max(floor, desired.y);
+      const rods = this.grabRods();
+      const circles = rods.map((l) => ({
+        ...this.endpoint(l, l.a === g.id ? "b" : "a"),
+        r: l.length,
+      }));
+      if (g.resize && editLength) {
+        // Reject impossible/extreme edits atomically, without stretching locks.
+        const lengths = circles.map((c) =>
+          Math.hypot(desired.x - c.x, desired.y - c.y),
+        );
+        if (lengths.every((l) => l >= 0.05 && l <= 50)) {
+          rods.forEach((l, i) => this.updateLink(l.id, { length: lengths[i] }));
+        } else desired = old;
+      } else if (circles.length) {
+        const candidates = [old];
+        // Closest point on each circle, plus circle/circle and circle/floor
+        // intersections. This handles multiple rods without iterative drift.
+        for (let i = 0; i < circles.length; i++) {
+          const a = circles[i],
+            dx = desired.x - a.x,
+            dy = desired.y - a.y,
+            d = Math.hypot(dx, dy);
+          if (d > 1e-9)
+            candidates.push({
+              x: a.x + (dx * a.r) / d,
+              y: a.y + (dy * a.r) / d,
+            });
+          if (Math.abs(floor - a.y) <= a.r) {
+            const x = Math.sqrt(Math.max(0, a.r * a.r - (floor - a.y) ** 2));
+            candidates.push({ x: a.x + x, y: floor }, { x: a.x - x, y: floor });
+          }
+          for (const c of circles.slice(i + 1)) {
+            const dx = c.x - a.x,
+              dy = c.y - a.y,
+              d = Math.hypot(dx, dy);
+            if (
+              d < 1e-9 ||
+              d > a.r + c.r + 1e-9 ||
+              d < Math.abs(a.r - c.r) - 1e-9
+            )
+              continue;
+            const u = (a.r * a.r - c.r * c.r + d * d) / (2 * d),
+              h = Math.sqrt(Math.max(0, a.r * a.r - u * u));
+            for (const sign of [-1, 1])
+              candidates.push({
+                x: a.x + (u * dx) / d - (sign * h * dy) / d,
+                y: a.y + (u * dy) / d + (sign * h * dx) / d,
+              });
+          }
+        }
+        const valid = candidates.filter(
+          (p) =>
+            p.y >= floor - 1e-7 &&
+            circles.every(
+              (c) => Math.abs(Math.hypot(p.x - c.x, p.y - c.y) - c.r) < 1e-6,
+            ),
+        );
+        valid.sort(
+          (a, b) =>
+            Math.hypot(a.x - desired.x, a.y - desired.y) -
+            Math.hypot(b.x - desired.x, b.y - desired.y),
+        );
+        desired = valid[0] || old; // Inconsistent constraints must not teleport a body.
+      }
+      Body.setPosition(b, toEngine(desired));
     }
-    this.grab = null; // Ordinary release keeps the velocity imparted by the mouse.
+    Body.setAngle(b, o.lockRotation ? o.angleAnchor : g.angle);
+    Body.setVelocity(b, { x: 0, y: 0 });
+    Body.setAngularVelocity(b, 0);
+    b.positionImpulse.x = b.positionImpulse.y = 0;
+    b.constraintImpulse.x =
+      b.constraintImpulse.y =
+      b.constraintImpulse.angle =
+        0;
+    g.snapCentre = g.snap && !o.lockPosition ? toWorld(b.position) : null;
+  }
+  endGrab(throwObject = true, now = performance.now()) {
+    const g = this.grab;
+    if (!g) return;
+    const o = this.objects.get(g.id),
+      samples = g.samples;
+    const last = samples.at(-1),
+      first = samples.find((s) => s.t >= last.t - 100) || samples[0];
+    const dt = (last.t - first.t) / 1000;
+    if (throwObject && !g.snap && dt > 0.001 && now - last.t < 100) {
+      let vx = (last.x - first.x) / dt,
+        vy = (last.y - first.y) / dt;
+      const rods = this.grabRods();
+      // Release along the allowed tangent, never radially through a rod.
+      if (rods.length === 1) {
+        const c = this.endpoint(rods[0], rods[0].a === g.id ? "b" : "a"),
+          p = this.state(g.id);
+        const dx = p.x - c.x,
+          dy = p.y - c.y,
+          d = Math.hypot(dx, dy);
+        if (d > 1e-9) {
+          const radial = (vx * dx + vy * dy) / (d * d);
+          vx -= radial * dx;
+          vy -= radial * dy;
+        }
+      } else if (rods.length > 1) vx = vy = 0;
+      const scale = Math.min(1, 30 / (Math.hypot(vx, vy) || 1));
+      if (!o.lockPosition)
+        Body.setVelocity(o.body, {
+          x: (vx * scale * SCALE) / 60,
+          y: (-vy * scale * SCALE) / 60,
+        });
+      if (!o.lockRotation && o.lockPosition)
+        Body.setAngularVelocity(
+          o.body,
+          -Math.max(-30, Math.min(30, (last.angle - first.angle) / dt)) / 60,
+        );
+    }
+    this.grab = null;
   }
   applyForce(id, point, force) {
     const o = this.objects.get(id);
@@ -373,31 +509,11 @@ export class Sandbox {
         if (l.a) this.applyForce(l.a, a, { x: f * nx, y: f * ny });
         if (l.b) this.applyForce(l.b, b, { x: -f * nx, y: -f * ny });
       }
-    if (this.grab) {
-      const g = this.grab,
-        o = this.objects.get(g.id),
-        p = toWorld(this.grabPoint()),
-        s = this.state(g.id),
-        rx = p.x - s.x,
-        ry = p.y - s.y;
-      const vx = s.vx - s.omega * ry,
-        vy = s.vy + s.omega * rx;
-      // A damped spring at the grabbed point transfers both force and torque.
-      const k = o.mass * 180,
-        c = o.mass * 22;
-      let fx = k * (g.target.x - p.x) - c * vx,
-        fy = k * (g.target.y - p.y) - c * vy;
-      const limit = o.mass * 180,
-        length = Math.hypot(fx, fy);
-      if (length > limit) {
-        fx *= limit / length;
-        fy *= limit / length;
-      }
-      this.applyForce(o.id, p, { x: fx, y: fy });
-    }
+    this.placeGrab();
     this.enforceLocks();
     Engine.update(this.engine, DT * 1000);
     this.enforceLocks();
+    this.placeGrab();
     this.time += DT;
   }
   remove(id) {

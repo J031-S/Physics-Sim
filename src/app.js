@@ -9,6 +9,7 @@ let sim = new Sandbox(),
   pending = null,
   pointer = null,
   ctrl = false,
+  alt = false,
   accumulator = 0,
   last = 0,
   menuId = null,
@@ -39,7 +40,7 @@ function chooseTool(next) {
     b.setAttribute("aria-pressed", b.dataset.tool === tool);
   }
   $("hint").textContent = {
-    grab: "Grab and throw · right-click for constants · Ctrl-drag to place on the grid",
+    grab: "Drag to move · Alt-drag to resize rods · Ctrl for grid · right-click for constants",
     ball: "Click to add a ball. Hold Ctrl to place its centre on the grid.",
     block: "Click to add a block. Hold Ctrl to place its centre on the grid.",
     spring:
@@ -264,13 +265,13 @@ function syncCtrl(value) {
     ? "SNAP · 0.5 m grid"
     : "Grid: 0.5 m · hold Ctrl to snap";
   $("snap-status").classList.toggle("snapping", ctrl);
-  if (sim.grab && pointer) sim.moveGrab(pointer, ctrl);
 }
 canvas.addEventListener("pointerdown", (e) => {
   if (e.button !== 0) return;
   canvas.focus();
   pointer = locate(e);
   syncCtrl(e.ctrlKey);
+  alt = e.altKey;
   canvas.setPointerCapture(e.pointerId);
   if (tool === "grab") {
     const id = sim.hit(pointer);
@@ -307,13 +308,14 @@ canvas.addEventListener("pointerdown", (e) => {
 canvas.addEventListener("pointermove", (e) => {
   pointer = locate(e);
   syncCtrl(e.ctrlKey);
-  if (sim.grab) sim.moveGrab(pointer, ctrl);
+  alt = e.altKey;
+  if (sim.grab) sim.moveGrab(pointer, ctrl, alt);
 });
 canvas.addEventListener("pointerup", (e) => {
   if (e.button !== 0) return;
   if (sim.grab) {
     pointer = locate(e);
-    sim.moveGrab(pointer, e.ctrlKey);
+    sim.moveGrab(pointer, e.ctrlKey, e.altKey);
     sim.endGrab();
   }
   if (canvas.hasPointerCapture?.(e.pointerId))
@@ -386,6 +388,12 @@ for (const b of document.querySelectorAll("[data-tool]"))
 document.addEventListener("keydown", (e) => {
   if (["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
   if (e.key === "Control") syncCtrl(true);
+  if (e.key === "Alt") {
+    alt = true;
+    e.preventDefault();
+  }
+  if (sim.grab && pointer && ["Alt", "Control"].includes(e.key))
+    sim.moveGrab(pointer, ctrl, alt);
   if (e.key === "Escape") {
     pending = null;
     sim.endGrab(false);
@@ -396,6 +404,9 @@ document.addEventListener("keydown", (e) => {
 });
 document.addEventListener("keyup", (e) => {
   if (e.key === "Control") syncCtrl(false);
+  if (e.key === "Alt") alt = false;
+  if (sim.grab && pointer && ["Alt", "Control"].includes(e.key))
+    sim.moveGrab(pointer, ctrl, alt);
 });
 window.addEventListener("blur", () => {
   sim.endGrab(false);
@@ -570,14 +581,7 @@ function draw() {
     }
   }
   if (sim.grab) {
-    const g = sim.grab,
-      at = sim.grabPoint();
-    line(
-      screen({ x: at.x / 100, y: -at.y / 100 }),
-      screen(g.target),
-      "#779369",
-      1.5,
-    );
+    const g = sim.grab;
     if (g.snapCentre) {
       const p = screen(g.snapCentre);
       ctx.strokeStyle = "#426f3e";

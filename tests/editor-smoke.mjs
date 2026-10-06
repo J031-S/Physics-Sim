@@ -38,7 +38,7 @@ const frames = (n) => {
   }
 };
 const tool = (name) => document.querySelector(`[data-tool=${name}]`).click();
-const pointer = (type, x, y, ctrlKey = false) =>
+const pointer = (type, x, y, ctrlKey = false, altKey = false) =>
   canvas.dispatchEvent(
     new window.PointerEvent(type, {
       clientX: x,
@@ -46,6 +46,7 @@ const pointer = (type, x, y, ctrlKey = false) =>
       button: 0,
       pointerId: 1,
       ctrlKey,
+      altKey,
       bubbles: true,
     }),
   );
@@ -137,6 +138,26 @@ $("clear").click();
 assert.equal($("time").textContent === "NaN", false);
 assert.equal($("selection").hidden, true);
 assert.equal(menu(500, 250).defaultPrevented, false);
+// Paused pointer input must immediately move and resize an actual rod.
+$("pause").click();
+tool("ball");
+click(500, 400);
+tool("rod");
+click(500, 200);
+click(500, 400);
+pointer("pointerdown", 500, 400);
+pointer("pointermove", 700, 400, false, true);
+pointer("pointerup", 700, 400, false, true);
+menu(600, 300);
+const rodLength =
+  $("constants").querySelector('[aria-label="Length"]') ||
+  $("constants").querySelector("input");
+assert.ok(Number(rodLength.value) > 4);
+$("close-menu").click();
+menu(700, 400);
+assert.ok($("constants").querySelector('[aria-label="Mass"]'));
+assert.equal($("pause").textContent.includes("Run"), true);
+$("close-menu").click();
 console.log(
   "PASS: minimal tools; constants-only menu; live validation; grab does not pause; separate locks; Ctrl snapping; spring creation and properties; deletion and clear.",
 );

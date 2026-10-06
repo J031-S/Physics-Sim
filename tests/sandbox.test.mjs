@@ -34,30 +34,29 @@ test("free-fall velocity agrees with g*t; shapes settle above the floor", () => 
 test("mouse grabbing does not reset time; release preserves motion for throwing", () => {
   const s = new Sandbox(),
     id = s.add("ball", { x: 0, y: 5 });
-  s.beginGrab(id, { x: 0, y: 5 });
+  s.beginGrab(id, { x: 0, y: 5 }, 0);
   for (let i = 0; i < 60; i++) {
-    s.moveGrab({ x: i * DT * 5, y: 5 });
+    s.moveGrab({ x: i * DT * 5, y: 5 }, false, false, i * DT * 1000);
     s.step();
   }
   const time = s.time,
-    v = s.state(id).vx,
+    v = 5,
     x = s.state(id).x;
-  assert.ok(v > 2);
-  s.endGrab();
+  s.endGrab(true, 60 * DT * 1000);
   close(s.state(id).vx, v);
   run(s, 0.2);
   assert.ok(s.time > time);
   assert.ok(s.state(id).x > x + 0.3);
   s.dispose();
 });
-test("off-centre mouse grab applies torque", () => {
+test("off-centre pinned grab rotates directly without moving the centre", () => {
   const s = new Sandbox(),
     id = s.add("ball", { x: 0, y: 5 });
   s.setLock(id, "position", true);
   s.beginGrab(id, { x: 0.35, y: 5 });
   s.moveGrab({ x: 0.35, y: 6 });
   run(s, 0.25);
-  assert.ok(Math.abs(s.state(id).omega) > 0.1);
+  assert.ok(Math.abs(s.state(id).angle) > 0.1);
   close(s.state(id).x, 0);
   close(s.state(id).y, 5);
   s.dispose();
@@ -205,5 +204,80 @@ test("constants apply live without disturbing state; invalid and nonconstant edi
   assert.throws(() => s.updateConstants(id, { vx: 10 }));
   assert.throws(() => s.updateConstants(id, { charge: 1 }));
   close(s.objects.get(id).mass, 2);
+  s.dispose();
+});
+
+test("direct paused dragging preserves grab offset and needs no physics tick", () => {
+  const s = new Sandbox(),
+    id = s.add("ball", { x: 0, y: 5 });
+  s.beginGrab(id, { x: 0.2, y: 5 }, 0);
+  s.moveGrab({ x: 2.2, y: 4 }, false, false, 50);
+  close(s.state(id).x, 2);
+  close(s.state(id).y, 4);
+  close(s.time, 0);
+  s.endGrab(true, 200);
+  close(s.state(id).vx, 0);
+  s.dispose();
+});
+for (const running of [false, true])
+  test(`rod dragging follows arc; Alt resizes persistently (${running ? "running" : "paused"})`, () => {
+    const s = new Sandbox(),
+      id = s.add("ball", { x: 0, y: 3 });
+    const link = s.connect("rod", null, id, { x: 0, y: 6 }, s.state(id));
+    s.beginGrab(id, { x: 0, y: 3 }, 0);
+    s.moveGrab({ x: 4, y: 3 }, false, false, 50);
+    if (running) run(s, 0.2);
+    close(Math.hypot(s.state(id).x, s.state(id).y - 6), 3, 1e-6);
+    s.moveGrab({ x: 4, y: 3 }, false, true, 100);
+    close(s.links.get(link).length, 5);
+    close(s.state(id).x, 4);
+    close(s.state(id).y, 3);
+    if (running) run(s, 0.2);
+    s.endGrab(false);
+    run(s, 0.4);
+    close(Math.hypot(s.state(id).x, s.state(id).y - 6), 5, 0.01);
+    finite(s);
+    s.dispose();
+  });
+test("Ctrl does not override rod or floor constraints, including release", () => {
+  const s = new Sandbox(),
+    id = s.add("ball", { x: 0, y: 2 });
+  s.connect("rod", null, id, { x: 0, y: 3 }, s.state(id));
+  s.beginGrab(id, { x: 0, y: 2 });
+  s.moveGrab({ x: 0.8, y: -3 }, true);
+  s.endGrab();
+  close(Math.hypot(s.state(id).x, s.state(id).y - 3), 1, 1e-6);
+  assert.ok(s.state(id).y >= 0.4);
+  s.dispose();
+});
+test("two rods preserve both lengths during direct manipulation", () => {
+  const s = new Sandbox(),
+    id = s.add("ball", { x: 0, y: 4 });
+  s.connect("rod", null, id, { x: -1, y: 6 }, s.state(id));
+  s.connect("rod", null, id, { x: 1, y: 6 }, s.state(id));
+  s.beginGrab(id, { x: 0, y: 4 });
+  s.moveGrab({ x: 3, y: 5 });
+  close(s.state(id).x, 0);
+  close(s.state(id).y, 4);
+  run(s, 0.5);
+  close(s.state(id).x, 0);
+  close(s.state(id).y, 4);
+  finite(s);
+  s.dispose();
+});
+test("both locks defeat dragging and Alt resizing", () => {
+  const s = new Sandbox(),
+    id = s.add("ball", { x: 0, y: 4 });
+  const l = s.connect("rod", null, id, { x: 0, y: 6 }, s.state(id));
+  s.setLock(id, "position", true);
+  s.setLock(id, "rotation", true);
+  s.beginGrab(id, { x: 0.3, y: 4 });
+  s.moveGrab({ x: 3, y: 5 }, false, true);
+  run(s, 0.2);
+  s.endGrab();
+  close(s.state(id).x, 0);
+  close(s.state(id).y, 4);
+  close(s.state(id).angle, 0);
+  close(s.links.get(l).length, 2);
   s.dispose();
 });
