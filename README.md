@@ -20,10 +20,10 @@ Click **Keys ?** (or press **?**) for the built-in shortcut guide. Shortcuts do 
 | ----------------------- | ------------------------------------------------------------------------------------ |
 | Space                   | Play / pause (holding the key does not repeatedly toggle)                            |
 | Q / Shift-box           | Select tool / add objects to a selection box                                         |
-| G / B / N               | Grab / Ball / Block                                                                  |
+| G / B / N / W           | Grab / Ball / Block / Wedge                                                          |
 | S / D / T / U           | Spring / Rod / Belt / Pulley                                                         |
-| I / H | Impulse / Pan |
-| Wheel / middle-drag | Zoom at cursor / pan in any tool |
+| I / H                   | Impulse / Pan                                                                        |
+| Wheel / middle-drag     | Zoom at cursor / pan in any tool                                                     |
 | E / M                   | Electric / Magnetic field                                                            |
 | V                       | Toggle velocity vectors                                                              |
 | R + left-drag           | Resize a body or field about its current centre                                      |
@@ -36,12 +36,18 @@ Click **Keys ?** (or press **?**) for the built-in shortcut guide. Shortcuts do 
 | Delete / Escape         | Delete selection / cancel interaction                                                |
 | Right-click / Shift+F10 | Material constants / constants for selection                                         |
 
-- **Ball / Block:** select a tool and click above the floor. The tool returns to Grab after one placement.
+- **Ball / Block / Wedge:** select a tool and click above the floor. The tool returns to Grab after one placement.
 - **Grab:** drag directly without a mouse tether. Release while moving to throw; hold still before release to stop. A rod constrains normal dragging to its arc. Snapping suppresses throwing on release; locks and connections take priority over grid placement.
 - **Independent locks:** use the bottom-right selected-item panel to lock position, rotation, or both. For a pinned ball, grab away from its centre to rotate it. With snapping enabled, rotation follows absolute 15° steps. Shift explicitly chooses translation, Ctrl explicitly chooses rotation. When paused, manual edits update the stored locked position/angle without disabling either lock; physics continues to respect those locks on resume. Running interactions cannot edit a locked degree of freedom. Balls have 10° rim ticks, longer 30° ticks, and a distinct zero mark that rotates with the body.
 - **Resize:** hold R before starting a drag, or click the selected-item panel's **Resize (R)** button. Drag outward/inward to resize a ball's diameter; drag a block near a corner to change width and height along its local axes. Dimensions appear beside the selection. The body stays centred and still during the gesture, even while physics runs. Mass stays constant; inertia is recalculated. Limits are 0.1–10 m. Edits that penetrate the floor or overlap pulley wheels are rejected. Return from the button-operated resize tool with G.
 - **Spring / Rod:** click two bodies, or a world anchor and a body. Connections attach at body centres. Select a connection by clicking its line. Alt-drag changes rod length while paused or running.
 - **Pause / Clear scene:** pause deliberately stops physics but editing still works. Clear removes everything except the static floor. Dragging does not pause the world.
+
+### Wedge / inclined plane
+
+Choose **Wedge (W)** and click to create a right-triangular ramp, initially 3 m wide and 1.5 m high. It starts with both position and rotation locked. Pause and Shift-drag to reposition it, Ctrl-drag to rotate it, or R-drag to change width/height and therefore slope. The selected-item panel shows the local incline angle. Resize keeps the centre of mass fixed; the triangle's centroid is not its bounding-box centre. The base slopes upward to the right at zero rotation.
+
+Right-click for live **surface friction**, restitution, mass, charge and damping, as with other bodies. Contact friction uses the lower coefficient of the two touching bodies, so adjust both surfaces for a high-friction experiment. Unlock position/rotation independently if you want a movable wedge. Pins remain enabled through paused layout edits and resizing. Changing friction now clears the previous contact's cached tangential impulse, allowing a resting body to start sliding immediately when friction is reduced.
 
 ### Box selection and layout moves
 
@@ -77,13 +83,13 @@ Right-click a field to configure **Falloff** independently of its boundary shape
 
 The normalized distance `d` is measured along the positive gradient axis (axial), radially (circular/elliptical), or by the maximum absolute normalized axis distance (box). Profiles are:
 
-| Profile | Strength multiplier |
-|---|---|
-| Uniform | 1 |
-| Linear | max(0, 1 − d) |
-| Inverse r | 1 / √(1 + d²) |
-| Inverse r² | 1 / (1 + d²) |
-| Exponential | exp(−d) |
+| Profile     | Strength multiplier |
+| ----------- | ------------------- |
+| Uniform     | 1                   |
+| Linear      | max(0, 1 − d)       |
+| Inverse r   | 1 / √(1 + d²)       |
+| Inverse r²  | 1 / (1 + d²)        |
+| Exponential | exp(−d)             |
 
 Inverse profiles are softened at the origin: the configured strength is the peak, and the far-field falloff follows the selected power. These are prescribed educational fields, not a solver for Maxwell's equations or arbitrary charge distributions.
 
@@ -100,6 +106,8 @@ Resizing captures the starting side/direction for the whole gesture. Crossing th
 **Scroll** zooms around the cursor; **Pan (H)** or **middle-drag** moves the camera. The bottom-left buttons zoom and **Fit scene**. Settings lets you resize the scene from 2–1000 m on each axis, or set bounds to the current view. Resizing the scene preserves its horizontal centre and bottom edge; it never teleports existing bodies. If you shrink bounds past an existing body, reposition that body or disable walls while arranging the scene. The initial scene matches the visible canvas; zoom and pan are independent of its walls. Grid drawing becomes coarser at distant zoom levels, while geometric snapping remains 0.5 m.
 
 **Website settings** include Light, Dark or System theme, GUI size (80–140%), and grid visibility. They are remembered in this browser and do not change physics units or scene geometry.
+
+**Settings → Debug · icon preview → Icon set** switches immediately between **Material Rounded** (default), **Lucide** and **Tabler**, including toolbar, playback, zoom and panel controls. Labels and accessible names remain visible or available to assistive technology. The choice persists across reloads. SVG subsets are bundled locally with upstream licences in `vendor/icons`; no remote fonts or runtime icon requests are needed.
 
 ### Spring angle lock / horizontal SHO
 
@@ -132,7 +140,7 @@ The floor is not selectable or editable. Gravity defaults to 9.81 m/s² and is c
 
 ## Right-click menu
 
-For a ball or block, only these constants are editable:
+For a ball, block or wedge, these constants are editable:
 
 | Constant              | Meaning                                         |
 | --------------------- | ----------------------------------------------- |
@@ -147,7 +155,7 @@ Surface friction is not internal material hysteresis. The two damping coefficien
 
 Springs expose stiffness, axial damping and rest length; rods expose length. Every numeric property also has a slider. Sliders apply continuously while dragged and stay synchronized with manual input; manual changes apply on Enter or leaving the field, without pausing, resetting time, or rebuilding the world. Invalid values are rejected. Close with Escape, the cross, or clicking outside. Shift+F10 opens the menu for a selected object while the canvas is focused.
 
-Material menus contain no position/velocity inputs or geometry controls. Geometry, locks and belt drive controls are separate from material constants. Field menus separately expose shape, dimensions, angle and strength. There are no temperature placeholders, equation editor, graph panel, presets, additional body shapes, inspector, scene autosave or scene import/export. Only website preferences use localStorage; old scene saves are not loaded or deleted. This is a fresh, transient sandbox on every page load.
+Material menus contain no position/velocity inputs or geometry controls. Geometry, locks and belt drive controls are separate from material constants. Field menus separately expose shape, dimensions, angle and strength. There are no temperature placeholders, equation editor, graph panel, presets, arbitrary custom body shapes, inspector, scene autosave or scene import/export. Only website preferences use localStorage; old scene saves are not loaded or deleted. This is a fresh, transient sandbox on every page load.
 
 ## Physics implementation
 
@@ -178,3 +186,5 @@ The original regression coverage includes free fall, static floor, grab/throw ve
 Field regressions verify signed qE/m acceleration, neutral and stationary magnetic cases, magnetic speed conservation, crossed-field drift, region boundaries and superposition, locked bodies, atomic validation, and snapped editing. DOM checks cover field creation/shape/strength/rotation/resize/delete, global field settings, gravity detent and keyboard escape from zero.
 
 Additional tests cover independent gradient geometry and falloff, radial direction, pairwise charge momentum/polarity, softened overlaps, impulse units and locks, resizing through the centre, mixed field/body group moves, scene dimensions, tool options, camera-independent bounds and website preferences.
+
+Wedge regression tests cover triangular hit geometry, independent pins, asymmetric resize clearance, inertia, frictionless acceleration along the incline and live friction changes. UI checks cover wedge creation/materials and all three icon sets without losing playback state or controls. The uploaded Hyprland resize reference confirms the fixed-direction behaviour already implemented in the preceding update.

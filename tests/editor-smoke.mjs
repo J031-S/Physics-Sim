@@ -83,6 +83,7 @@ assert.deepEqual(
     "pan",
     "ball",
     "block",
+    "wedge",
     "spring",
     "rod",
     "belt",
@@ -93,7 +94,7 @@ assert.deepEqual(
 );
 assert.equal(document.querySelector("#graph"), null);
 assert.equal(document.querySelector("#properties"), null);
-assert.equal($("pause").textContent, "Ⅱ Pause");
+assert.equal($("pause").textContent, "Pause");
 tool("ball");
 click(500, 250);
 assert.equal($("selection").hidden, false);
@@ -122,7 +123,7 @@ assert.equal(mass.value, "2");
 mass.value = "-1";
 mass.dispatchEvent(new window.Event("change"));
 assert.equal(mass.value, "2");
-assert.equal($("pause").textContent, "Ⅱ Pause");
+assert.equal($("pause").textContent, "Pause");
 $("close-menu").click();
 assert.equal($("material-menu").hidden, true);
 const before = Number.parseFloat($("time").textContent);
@@ -132,7 +133,7 @@ for (let i = 0; i < 30; i++) {
   frames(1);
 }
 pointer("pointerup", 616, 250);
-assert.equal($("pause").textContent, "Ⅱ Pause");
+assert.equal($("pause").textContent, "Pause");
 assert.ok(Number.parseFloat($("time").textContent) > before);
 // Create a block and test lock controls and Ctrl-grab in a known view.
 tool("block");
@@ -156,7 +157,7 @@ pointer("pointerup", 350, 300);
 canvas.dispatchEvent(
   new window.KeyboardEvent("keydown", { key: "z", bubbles: true }),
 );
-assert.equal($("pause").textContent, "Ⅱ Pause");
+assert.equal($("pause").textContent, "Pause");
 // Connect the known snapped block to a fixed point, edit spring constants.
 tool("spring");
 click(350, 100);
@@ -208,11 +209,11 @@ const key = (k, type = "keydown", extra = {}) =>
 $("clear").click();
 canvas.focus();
 key(" ");
-assert.equal($("pause").textContent, "Ⅱ Pause");
+assert.equal($("pause").textContent, "Pause");
 key(" ", "keydown", { repeat: true });
-assert.equal($("pause").textContent, "Ⅱ Pause");
+assert.equal($("pause").textContent, "Pause");
 key(" ");
-assert.equal($("pause").textContent, "▶ Run");
+assert.equal($("pause").textContent, "Run");
 key("b");
 click(500, 350);
 key("z");
@@ -248,7 +249,7 @@ mass.dispatchEvent(
     cancelable: true,
   }),
 );
-assert.equal($("pause").textContent, "▶ Run");
+assert.equal($("pause").textContent, "Run");
 $("close-menu").click();
 $("clear").click();
 canvas.focus();
@@ -586,7 +587,7 @@ pointer("pointerdown", 650, 350);
 pointer("pointermove", 700, 350);
 frames(1);
 pointer("pointerup", 700, 350);
-assert.equal($("pause").textContent, "▶ Run");
+assert.equal($("pause").textContent, "Run");
 $("settings-toggle").click();
 const originalWidth = $("scene-width").value,
   originalHeight = $("scene-height").value;
@@ -634,6 +635,58 @@ assert.equal(document.documentElement.dataset.theme, "dark");
 change($("ui-theme"), "light");
 change($("ui-size"), "100", "input");
 $("close-settings").click();
+// Wedge creation and live icon previews retain controls, simulation and labels.
+$("clear").click();
+frames(1);
+canvas.focus();
+if ($("pause").textContent === "Pause") key(" ");
+key("w");
+click(500, 300);
+assert.equal($("selected-name").textContent, "Wedge");
+assert.equal($("lock-position").checked, true);
+assert.equal($("lock-rotation").checked, true);
+assert.match($("dimensions").textContent, /slope 26.6/);
+menu(500, 300);
+assert.match($("menu-title").textContent, /Wedge/);
+change(
+  $("constants").querySelector('[aria-label="Surface friction slider"]'),
+  ".7",
+  "input",
+);
+assert.equal(
+  $("constants").querySelector('[aria-label="Surface friction"]').value,
+  "0.7",
+);
+$("close-menu").click();
+$("settings-toggle").click();
+const wedgeButton = document.querySelector('[data-tool="wedge"]');
+const initialIcon = wedgeButton.querySelector("svg").innerHTML;
+for (const name of ["lucide", "tabler", "material"]) {
+  change($("ui-icons"), name);
+  assert.equal(wedgeButton.dataset.iconSet, name);
+  assert.equal(wedgeButton.textContent, "Wedge");
+  assert.equal($("pause").textContent, "Run");
+  assert.ok($("pause").querySelector("svg"));
+  assert.equal(
+    JSON.parse(window.localStorage.getItem("physics-sim-ui")).iconSet,
+    name,
+  );
+  for (const button of document.querySelectorAll("[data-icon]"))
+    assert.ok(
+      button.querySelector("svg"),
+      "missing icon " + button.dataset.icon,
+    );
+  if (name !== "material")
+    assert.notEqual(wedgeButton.querySelector("svg").innerHTML, initialIcon);
+}
+$("close-settings").click();
+key(" ");
+assert.equal($("pause").textContent, "Pause");
+assert.equal($("pause").dataset.icon, "pause");
+frames(2);
+key(" ");
+assert.equal($("pause").dataset.icon, "play");
+assert.equal($("selected-name").textContent, "Wedge");
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );

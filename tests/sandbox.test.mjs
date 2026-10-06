@@ -13,7 +13,7 @@ const finite = (s) => {
     for (const v of Object.values(s.state(id)))
       assert.ok(Number.isFinite(v), id);
 };
-test("only balls and blocks can be created; floor is static and not selectable", () => {
+test("unsupported shapes are rejected; floor is static and not selectable", () => {
   const s = new Sandbox();
   assert.throws(() => s.add("ring", { x: 0, y: 3 }));
   assert.equal(s.floor.isStatic, true);

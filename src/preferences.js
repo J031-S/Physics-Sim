@@ -1,10 +1,13 @@
+import { prepareIcons, renderIcons, iconSetNames } from "./icons.js";
 export function setupPreferences($) {
   let saved = {};
   try {
     saved = JSON.parse(window.localStorage.getItem("physics-sim-ui") || "{}");
   } catch {}
-  if(!saved || typeof saved!=="object") saved={};
+  if (!saved || typeof saved !== "object") saved = {};
+  prepareIcons();
   const prefs = {
+    iconSet: iconSetNames.includes(saved.iconSet) ? saved.iconSet : "material",
     theme: ["light", "dark", "system"].includes(saved.theme)
       ? saved.theme
       : "light",
@@ -22,6 +25,8 @@ export function setupPreferences($) {
           : "light"
         : prefs.theme;
     document.documentElement.style.setProperty("--ui-scale", prefs.size / 100);
+    $("ui-icons").value = prefs.iconSet;
+    renderIcons(prefs.iconSet);
     $("ui-theme").value = prefs.theme;
     $("ui-size").value = prefs.size;
     $("ui-size-value").textContent = prefs.size + "%";
@@ -29,6 +34,12 @@ export function setupPreferences($) {
     try {
       window.localStorage.setItem("physics-sim-ui", JSON.stringify(prefs));
     } catch {}
+  };
+  $("ui-icons").onchange = (e) => {
+    prefs.iconSet = iconSetNames.includes(e.target.value)
+      ? e.target.value
+      : "material";
+    apply();
   };
   $("ui-theme").onchange = (e) => {
     prefs.theme = e.target.value;

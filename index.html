@@ -18,7 +18,7 @@
         >
           Settings</button
         ><button id="shortcuts" title="Keyboard shortcuts (?)">Keys ?</button
-        ><button id="pause" title="Play / pause (Space)">Ⅱ Pause</button
+        ><button id="pause" title="Play / pause (Space)">Pause</button
         ><button id="clear">Clear scene</button>
       </div>
     </header>
@@ -32,35 +32,34 @@
         <div class="tool-group">
           <small>Edit</small>
           <div>
-            <button data-tool="grab" aria-pressed="true">↖ Grab</button
-            ><button data-tool="select" aria-pressed="false">⬚ Select</button
-            ><button data-tool="impulse" aria-pressed="false">↗ Impulse</button
-            ><button data-tool="pan" aria-pressed="false">✥ Pan</button>
+            <button data-tool="grab" aria-pressed="true">Grab</button
+            ><button data-tool="select" aria-pressed="false">Select</button
+            ><button data-tool="impulse" aria-pressed="false">Impulse</button
+            ><button data-tool="pan" aria-pressed="false">Pan</button>
           </div>
         </div>
         <div class="tool-group">
           <small>Bodies</small>
           <div>
-            <button data-tool="ball" aria-pressed="false">○ Ball</button
-            ><button data-tool="block" aria-pressed="false">□ Block</button>
+            <button data-tool="ball" aria-pressed="false">Ball</button
+            ><button data-tool="block" aria-pressed="false">Block</button
+            ><button data-tool="wedge" aria-pressed="false">Wedge</button>
           </div>
         </div>
         <div class="tool-group">
           <small>Connections</small>
           <div>
-            <button data-tool="spring" aria-pressed="false">∿ Spring</button
-            ><button data-tool="rod" aria-pressed="false">⊶ Rod</button
-            ><button data-tool="belt" aria-pressed="false">▱ Belt</button
-            ><button data-tool="pulley" aria-pressed="false">∩ Pulley</button>
+            <button data-tool="spring" aria-pressed="false">Spring</button
+            ><button data-tool="rod" aria-pressed="false">Rod</button
+            ><button data-tool="belt" aria-pressed="false">Belt</button
+            ><button data-tool="pulley" aria-pressed="false">Pulley</button>
           </div>
         </div>
         <div class="tool-group">
           <small>Fields</small>
           <div>
-            <button data-tool="electric" aria-pressed="false">⇢ Electric</button
-            ><button data-tool="magnetic" aria-pressed="false">
-              • Magnetic
-            </button>
+            <button data-tool="electric" aria-pressed="false">Electric</button
+            ><button data-tool="magnetic" aria-pressed="false">Magnetic</button>
           </div>
         </div>
         <label class="vectors"
@@ -376,6 +375,16 @@
         ><input id="ui-grid" type="checkbox" checked /> Show grid</label
       >
       <small>Website preferences are remembered on this browser.</small>
+      <details class="debug-settings">
+        <summary>Debug · icon preview</summary>
+        <label for="ui-icons">Icon set</label
+        ><select id="ui-icons">
+          <option value="material">Material Rounded</option>
+          <option value="lucide">Lucide</option>
+          <option value="tabler">Tabler</option>
+        </select>
+        <small>Changes immediately and is remembered in this browser.</small>
+      </details>
       <button id="reset-settings">Restore defaults</button>
     </section>
     <section id="keys-panel" hidden aria-label="Keyboard shortcuts">
@@ -388,8 +397,8 @@
         <dd>Play / pause</dd>
         <dt>Q · Shift</dt>
         <dd>Select tool · add to a selection box</dd>
-        <dt>G · B · N</dt>
-        <dd>Grab · Ball · Block</dd>
+        <dt>G · B · N · W</dt>
+        <dd>Grab · Ball · Block · Wedge</dd>
         <dt>S · D · T · U</dt>
         <dd>Spring · Rod · Belt · Pulley</dd>
         <dt>I · H</dt>

@@ -1,3 +1,4 @@
+import { setPlaybackIcon } from "./icons.js";
 import { Sandbox, DT, GRID, snap } from "./physics.js";
 import { setupPreferences } from "./preferences.js";
 import { drawFields, FieldDrag } from "./field-view.js";
@@ -80,6 +81,8 @@ function chooseTool(next) {
       "Click to place a magnetic field. Dots point out; crosses point in. Right-click to edit.",
     ball: "Click to add a ball. Z toggles grid snapping.",
     block: "Click to add a block. Z toggles grid snapping.",
+    wedge:
+      "Click to add a pinned ramp. Pause + Shift-drag to move; Ctrl rotates; R changes width and height. Right-click for friction.",
     spring:
       "Click two objects, or an empty anchor point and an object. Escape cancels.",
     rod: "Click two objects, or an empty anchor point and an object. Escape cancels.",
@@ -105,7 +108,9 @@ function select(id) {
     : o
       ? o.shape === "ball"
         ? "Ball"
-        : "Block"
+        : o.shape === "wedge"
+          ? "Wedge"
+          : "Block"
       : l
         ? l.type[0].toUpperCase() + l.type.slice(1)
         : "";
@@ -196,7 +201,7 @@ function showDimensions() {
     $("dimensions").textContent =
       o.shape === "ball"
         ? `Ø ${(o.radius * 2).toFixed(2)} m`
-        : `${o.width.toFixed(2)} × ${o.height.toFixed(2)} m`;
+        : `${o.width.toFixed(2)} × ${o.height.toFixed(2)} m${o.shape === "wedge" ? " · slope " + ((Math.atan2(o.height, o.width) * 180) / Math.PI).toFixed(1) + "°" : ""}`;
 }
 function linkPath(l) {
   if (l.type === "belt") return sim.mechanisms.beltGeometry(l).path;
@@ -254,7 +259,11 @@ function openMenu(id, x, y) {
       ? "Electric field"
       : "Magnetic field"
     : o
-      ? (o.shape === "ball" ? "Ball" : "Block") + " · material constants"
+      ? (o.shape === "ball"
+          ? "Ball"
+          : o.shape === "wedge"
+            ? "Wedge"
+            : "Block") + " · material constants"
       : l.type === "spring"
         ? "Spring constants"
         : l.type === "rod"
@@ -745,7 +754,7 @@ canvas.addEventListener("pointerdown", (e) => {
     }
     return;
   }
-  if (["ball", "block"].includes(tool)) {
+  if (["ball", "block", "wedge"].includes(tool)) {
     const p = sim.settings.snapping
       ? { x: snap(pointer.x), y: Math.max(GRID, snap(pointer.y)) }
       : pointer;
@@ -1085,7 +1094,7 @@ $("pause").onclick = () => {
   cancelDrag();
   running = !running;
   accumulator = 0;
-  $("pause").textContent = running ? "Ⅱ Pause" : "▶ Run";
+  setPlaybackIcon(running, prefs.iconSet);
   canvas.focus();
 };
 $("clear").onclick = () => {
@@ -1164,6 +1173,7 @@ document.addEventListener("keydown", (e) => {
     g: "grab",
     b: "ball",
     n: "block",
+    w: "wedge",
     s: "spring",
     d: "rod",
     t: "belt",
@@ -1460,7 +1470,12 @@ function draw() {
       i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y);
     }
     ctx.closePath();
-    ctx.fillStyle = o.shape === "ball" ? "#dba66be0" : "#8ca6bce0";
+    ctx.fillStyle =
+      o.shape === "ball"
+        ? "#dba66be0"
+        : o.shape === "wedge"
+          ? "#a2b889e0"
+          : "#8ca6bce0";
     ctx.fill();
     ctx.strokeStyle = highlighted(o.id)
       ? "#334e3c"
@@ -1640,6 +1655,7 @@ for (const [key, t] of Object.entries({
   G: "grab",
   B: "ball",
   N: "block",
+  W: "wedge",
   S: "spring",
   D: "rod",
   T: "belt",

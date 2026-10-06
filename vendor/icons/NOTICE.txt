@@ -1,0 +1,11 @@
+Material Symbols — @iconify-json/material-symbols 1.2.94
+Apache 2.0 — https://github.com/google/material-design-icons/blob/master/LICENSE
+Icons bundled via Iconify; selected original SVGs only.
+
+Lucide — @iconify-json/lucide 1.2.140
+ISC — https://github.com/lucide-icons/lucide/blob/main/LICENSE
+Icons bundled via Iconify; selected original SVGs only.
+
+Tabler Icons — @iconify-json/tabler 1.2.41
+MIT — https://github.com/tabler/tabler-icons/blob/master/LICENSE
+Icons bundled via Iconify; selected original SVGs only.

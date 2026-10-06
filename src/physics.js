@@ -147,14 +147,21 @@ export class Sandbox {
     this.group = null;
   }
   add(shape, point) {
-    if (!["ball", "block"].includes(shape))
-      throw new Error("Only balls and blocks are supported.");
+    if (!["ball", "block", "wedge"].includes(shape))
+      throw new Error("Only balls, blocks and wedges are supported.");
     const radius = 0.4,
-      width = 0.9,
-      height = 0.9,
+      width = shape === "wedge" ? 3 : 0.9,
+      height = shape === "wedge" ? 1.5 : 0.9,
       p = {
         x: point.x,
-        y: Math.max(shape === "ball" ? radius : height / 2, point.y),
+        y: Math.max(
+          shape === "ball"
+            ? radius
+            : shape === "wedge"
+              ? height / 3
+              : height / 2,
+          point.y,
+        ),
       };
     const options = {
       friction: 0.3,
@@ -165,13 +172,26 @@ export class Sandbox {
     const body =
       shape === "ball"
         ? Bodies.circle(p.x * SCALE, -p.y * SCALE, radius * SCALE, options, 64)
-        : Bodies.rectangle(
-            p.x * SCALE,
-            -p.y * SCALE,
-            width * SCALE,
-            height * SCALE,
-            options,
-          );
+        : shape === "wedge"
+          ? Bodies.fromVertices(
+              p.x * SCALE,
+              -p.y * SCALE,
+              [
+                [
+                  { x: (-2 * width * SCALE) / 3, y: (height * SCALE) / 3 },
+                  { x: (width * SCALE) / 3, y: (height * SCALE) / 3 },
+                  { x: (width * SCALE) / 3, y: (-2 * height * SCALE) / 3 },
+                ],
+              ],
+              options,
+            )
+          : Bodies.rectangle(
+              p.x * SCALE,
+              -p.y * SCALE,
+              width * SCALE,
+              height * SCALE,
+              options,
+            );
     Body.setMass(body, 1);
     const id = "body-" + ++this.serial,
       object = {
@@ -195,6 +215,10 @@ export class Sandbox {
       };
     this.objects.set(id, object);
     Composite.add(this.engine.world, body);
+    if (shape === "wedge") {
+      this.setLock(id, "position", true);
+      this.setLock(id, "rotation", true);
+    }
     return id;
   }
   state(id) {
@@ -338,6 +362,21 @@ export class Sandbox {
     }
     Object.assign(o, patch);
     o.body.friction = o.friction;
+    // Discard warm-start friction from the old material value. Otherwise a
+    // resting contact can stay stuck even after its coefficient becomes zero.
+    if (patch.friction !== undefined)
+      for (const pair of this.engine.pairs.list) {
+        if (
+          pair.collision.parentA === o.body ||
+          pair.collision.parentB === o.body
+        ) {
+          pair.friction = Math.min(
+            pair.collision.parentA.friction,
+            pair.collision.parentB.friction,
+          );
+          for (const contact of pair.contacts) contact.tangentImpulse = 0;
+        }
+      }
     o.body.restitution = o.restitution;
     o.body.inverseMass = o.lockPosition ? 0 : 1 / o.mass;
     Body.setInertia(o.body, o.lockRotation ? Infinity : o.freeInertia);
@@ -430,23 +469,41 @@ export class Sandbox {
       throw new Error("Dimensions must be between 0.1 and 10 m.");
     if (o.shape === "ball") height = width;
     const p = this.state(id),
-      c = Math.abs(Math.cos(p.angle)),
-      sn = Math.abs(Math.sin(p.angle));
-    const clearance =
-      o.shape === "ball" ? width / 2 : (width * sn + height * c) / 2;
-    if (p.y < clearance - 1e-5)
+      c = Math.cos(p.angle),
+      sn = Math.sin(p.angle);
+    const scaleX = width / (o.shape === "ball" ? o.radius * 2 : o.width),
+      scaleY = height / (o.shape === "ball" ? o.radius * 2 : o.height);
+    const vertices = o.body.vertices.map((v) => {
+      const dx = v.x / SCALE - p.x,
+        dy = -v.y / SCALE - p.y;
+      const x = (dx * c + dy * sn) * scaleX,
+        y = (-dx * sn + dy * c) * scaleY;
+      return { x: p.x + x * c - y * sn, y: p.y + x * sn + y * c };
+    });
+    const minX =
+      o.shape === "ball"
+        ? p.x - width / 2
+        : Math.min(...vertices.map((v) => v.x));
+    const maxX =
+      o.shape === "ball"
+        ? p.x + width / 2
+        : Math.max(...vertices.map((v) => v.x));
+    const minY =
+      o.shape === "ball"
+        ? p.y - height / 2
+        : Math.min(...vertices.map((v) => v.y));
+    const maxY =
+      o.shape === "ball"
+        ? p.y + height / 2
+        : Math.max(...vertices.map((v) => v.y));
+    if (minY < -1e-5)
       throw new Error(
         "There is not enough room above the floor. Move the object up first.",
       );
     if (this.settings.walls && this.viewport) {
-      const v = this.viewport,
-        halfX = o.shape === "ball" ? width / 2 : (width * c + height * sn) / 2;
-      if (
-        p.x - halfX < v.minX ||
-        p.x + halfX > v.maxX ||
-        p.y + clearance > v.maxY
-      )
-        throw new Error("There is not enough room inside the screen walls.");
+      const v = this.viewport;
+      if (minX < v.minX || maxX > v.maxX || minY < v.minY || maxY > v.maxY)
+        throw new Error("There is not enough room inside the scene walls.");
     }
     this.mechanisms.validateResize(id, width, height);
     const b = o.body,
