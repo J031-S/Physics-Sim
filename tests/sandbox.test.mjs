@@ -202,7 +202,9 @@ test("constants apply live without disturbing state; invalid and nonconstant edi
   for (const key of Object.keys(before)) close(s.state(id)[key], before[key]);
   assert.throws(() => s.updateConstants(id, { mass: -1 }));
   assert.throws(() => s.updateConstants(id, { vx: 10 }));
-  assert.throws(() => s.updateConstants(id, { charge: 1 }));
+  s.updateConstants(id, { charge: 1 });
+  close(s.objects.get(id).charge, 1);
+  assert.throws(() => s.updateConstants(id, { charge: NaN }));
   close(s.objects.get(id).mass, 2);
   s.dispose();
 });

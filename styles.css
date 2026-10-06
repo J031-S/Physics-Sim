@@ -450,3 +450,53 @@ input[type="checkbox"] {
   width: 14px;
   margin: 0;
 }
+
+/* Always-visible centre marker, independent of browser datalist rendering. */
+.zero-slider {
+  position: relative;
+  padding-bottom: 18px;
+  margin-top: 8px;
+}
+#settings-panel .zero-slider input {
+  position: relative;
+  z-index: 1;
+  margin-top: 0;
+}
+.zero-tick {
+  position: absolute;
+  left: 50%;
+  top: 1px;
+  width: 2px;
+  height: 22px;
+  background: #526c49;
+  pointer-events: none;
+}
+.zero-label {
+  position: absolute;
+  left: 50%;
+  top: 23px;
+  transform: translateX(-50%);
+  font:
+    11px ui-monospace,
+    monospace;
+  color: #526c49;
+  pointer-events: none;
+}
+#constants select {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #f8f9f2;
+}
+@media (max-width: 1250px) {
+  .tools {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .selection {
+    top: 138px;
+  }
+}

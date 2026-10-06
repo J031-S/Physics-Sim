@@ -76,7 +76,18 @@ const menu = (x, y) => {
 frames(1);
 assert.deepEqual(
   [...document.querySelectorAll("[data-tool]")].map((b) => b.dataset.tool),
-  ["grab", "select", "ball", "block", "spring", "rod", "belt", "pulley"],
+  [
+    "grab",
+    "select",
+    "ball",
+    "block",
+    "spring",
+    "rod",
+    "belt",
+    "pulley",
+    "electric",
+    "magnetic",
+  ],
 );
 assert.equal(document.querySelector("#graph"), null);
 assert.equal(document.querySelector("#properties"), null);
@@ -91,7 +102,14 @@ assert.deepEqual(
   [...$("constants").querySelectorAll("input[type=number]")].map(
     (i) => i.dataset.constant,
   ),
-  ["mass", "friction", "restitution", "linearDamping", "angularDamping"],
+  [
+    "mass",
+    "charge",
+    "friction",
+    "restitution",
+    "linearDamping",
+    "angularDamping",
+  ],
 );
 assert.equal($("constants").querySelector('[aria-label="Position x"]'), null);
 assert.equal($("constants").querySelector('[aria-label="Velocity x"]'), null);
@@ -434,6 +452,87 @@ key(" ");
 menu(500, 350);
 assert.ok($("constants").querySelector('[aria-label="Mass"]'));
 $("close-menu").click();
+// Fields can be edited, moved, rotated, resized and removed without pausing.
+$("clear").click();
+canvas.focus();
+key("e");
+click(500, 300);
+assert.equal($("selected-name").textContent, "Electric field");
+menu(500, 300);
+const change = (node, value, event = "change") => {
+  node.value = value;
+  node.dispatchEvent(new window.Event(event));
+};
+change($("constants").querySelector('[aria-label="Field shape"]'), "ellipse");
+change(
+  $("constants").querySelector('[aria-label="Strength slider"]'),
+  "-8",
+  "input",
+);
+assert.equal(
+  $("constants").querySelector('[aria-label="Strength"]').value,
+  "-8",
+);
+$("close-menu").click();
+pointer("pointerdown", 500, 300);
+pointer("pointermove", 550, 350);
+pointer("pointerup", 550, 350);
+key("r");
+pointer("pointerdown", 620, 350);
+pointer("pointermove", 650, 350);
+pointer("pointerup", 650, 350);
+key("r", "keyup");
+menu(550, 350);
+assert.ok(
+  Number($("constants").querySelector('[aria-label="Width"]').value) > 4,
+);
+$("close-menu").click();
+pointer("pointerdown", 600, 350, true);
+pointer("pointermove", 550, 300, true);
+pointer("pointerup", 550, 300, true);
+menu(550, 350);
+assert.ok(
+  Math.abs(
+    Number($("constants").querySelector('[aria-label="Angle"]').value) - 90,
+  ) < 0.01,
+);
+change($("constants").querySelector('[aria-label="Field shape"]'), "circle");
+assert.ok($("constants").querySelector('[aria-label="Diameter"]'));
+assert.equal($("constants").querySelector('[aria-label="Height"]'), null);
+$("close-menu").click();
+key("Delete");
+assert.equal(menu(550, 350).defaultPrevented, false);
+key("m");
+click(500, 300);
+menu(500, 300);
+assert.equal(
+  $("constants").querySelector('[aria-label="Field shape"]').value,
+  "circle",
+);
+$("close-menu").click();
+frames(1);
+$("settings-toggle").click();
+change($("range-electricX"), "3", "input");
+assert.equal($("setting-electricX").value, "3");
+change($("setting-magneticZ"), "-2");
+assert.equal($("range-magneticZ").value, "-2");
+change($("range-gravity"), "2.4", "input");
+assert.equal($("setting-gravity").value, "0");
+change($("range-gravity"), "-2.4", "input");
+assert.equal($("setting-gravity").value, "0");
+assert.ok(document.querySelector(".zero-tick"));
+$("range-gravity").dispatchEvent(
+  new window.KeyboardEvent("keydown", {
+    key: "ArrowRight",
+    bubbles: true,
+    cancelable: true,
+  }),
+);
+assert.equal($("setting-gravity").value, "0.1");
+$("reset-settings").click();
+assert.equal($("setting-electricX").value, "0");
+assert.equal($("setting-magneticZ").value, "0");
+$("close-settings").click();
 console.log(
   "PASS: creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );

@@ -9,7 +9,7 @@
   <body>
     <header>
       <a class="brand" href="./"><span>φ</span> Physics Sim</a
-      ><span class="subtitle">A simple mechanics sandbox</span>
+      ><span class="subtitle">Mechanics &amp; fields sandbox</span>
       <div class="playback">
         <button
           id="settings-toggle"
@@ -39,6 +39,10 @@
         ><button data-tool="rod" aria-pressed="false"><b>⊶</b> Rod</button
         ><button data-tool="belt" aria-pressed="false"><b>▱</b> Belt</button
         ><button data-tool="pulley" aria-pressed="false"><b>∩</b> Pulley</button
+        ><button data-tool="electric" aria-pressed="false">
+          <b>⇢</b> Electric</button
+        ><button data-tool="magnetic" aria-pressed="false">
+          <b>⊙</b> Magnetic</button
         ><label class="vectors"
           ><input type="checkbox" id="vectors" /> Velocity vectors</label
         >
@@ -126,18 +130,22 @@
         step="any"
         value="9.81"
       />
-      <input
-        id="range-gravity"
-        type="range"
-        min="-50"
-        max="50"
-        step="0.01"
-        value="9.81"
-        aria-label="Gravity slider"
-        list="gravity-stops"
-      />
+      <div class="zero-slider">
+        <span class="zero-tick" aria-hidden="true"></span>
+        <input
+          id="range-gravity"
+          type="range"
+          min="-50"
+          max="50"
+          step="0.01"
+          value="9.81"
+          aria-label="Gravity slider"
+        />
+        <span class="zero-label" aria-hidden="true">0</span>
+      </div>
       <small
-        >Positive pulls down; zero disables gravity; negative pulls up.</small
+        >Positive pulls down; negative pulls up. Slider snaps near the centre
+        mark. Type a value for fine control.</small
       >
       <label for="setting-airResistance">Air resistance <span>s⁻¹</span></label>
       <input
@@ -161,6 +169,78 @@
         >Global linear drag and spin damping, added to each object's own
         damping. Zero means no air resistance.</small
       >
+      <label for="setting-electricX"
+        >Global electric field → <span>N/C</span></label
+      >
+      <input
+        id="setting-electricX"
+        type="number"
+        min="-100"
+        max="100"
+        step="any"
+        value="0"
+      />
+      <input
+        id="range-electricX"
+        type="range"
+        min="-100"
+        max="100"
+        step=".1"
+        value="0"
+        aria-label="Global electric field → slider"
+      />
+      <small
+        >Positive points right; negative points left. Global and local fields
+        add together.</small
+      >
+      <label for="setting-electricY"
+        >Global electric field ↑ <span>N/C</span></label
+      >
+      <input
+        id="setting-electricY"
+        type="number"
+        min="-100"
+        max="100"
+        step="any"
+        value="0"
+      />
+      <input
+        id="range-electricY"
+        type="range"
+        min="-100"
+        max="100"
+        step=".1"
+        value="0"
+        aria-label="Global electric field ↑ slider"
+      />
+      <small
+        >Positive points up; negative points down. Global and local fields add
+        together.</small
+      >
+      <label for="setting-magneticZ"
+        >Global magnetic field ⊙ <span>T</span></label
+      >
+      <input
+        id="setting-magneticZ"
+        type="number"
+        min="-100"
+        max="100"
+        step="any"
+        value="0"
+      />
+      <input
+        id="range-magneticZ"
+        type="range"
+        min="-100"
+        max="100"
+        step=".1"
+        value="0"
+        aria-label="Global magnetic field ⊙ slider"
+      />
+      <small
+        >Positive points out of the screen (⊙); negative into it (⊗). Global and
+        local fields add together.</small
+      >
       <button id="reset-settings">Restore defaults</button>
     </section>
     <section id="keys-panel" hidden aria-label="Keyboard shortcuts">
@@ -177,6 +257,11 @@
         <dd>Grab · Ball · Block</dd>
         <dt>S · D · T · U</dt>
         <dd>Spring · Rod · Belt · Pulley</dd>
+        <dt>E · M</dt>
+        <dd>
+          Electric · Magnetic field. Right-click for shape, size and strength;
+          drag to move, Ctrl to rotate, R to resize.
+        </dd>
         <dt>V</dt>
         <dd>Toggle velocity vectors</dd>
         <dt>R + drag</dt>

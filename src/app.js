@@ -1,4 +1,13 @@
 import { Sandbox, DT, GRID, snap } from "./physics.js";
+import { drawFields, FieldDrag } from "./field-view.js";
+let fieldDrag = null;
+const settingKeys = [
+  "gravity",
+  "airResistance",
+  "electricX",
+  "electricY",
+  "magneticZ",
+];
 const $ = (id) => document.getElementById(id),
   canvas = $("canvas"),
   ctx = canvas.getContext("2d");
@@ -37,6 +46,7 @@ function locate(e) {
   return world({ x: e.clientX - r.left, y: e.clientY - r.top });
 }
 function chooseTool(next) {
+  fieldDrag = null;
   sim.endResize();
   sim.endGroup();
   marquee = null;
@@ -51,10 +61,14 @@ function chooseTool(next) {
       "Drag a box to select · Shift-box adds · drag a selected body to move its assembly · Z toggles snapping",
     grab: "Drag to move · Shift moves · Ctrl rotates · R resizes · Alt refits · Z snaps · ? shortcuts",
     resize:
-      "Drag a ball or block to resize around its centre. Z toggles dimension snapping. G returns to Grab.",
+      "Drag a body or field to resize around its centre. Z toggles dimension snapping. G returns to Grab.",
     belt: "Click two balls to wrap a belt around them. Their centres will be pinned. Escape cancels.",
     pulley:
       "Click endpoint → wheel ball → endpoint. Any angle; springs can share endpoints. Alt-drag refits cable length.",
+    electric:
+      "Click to place an electric field. Drag to move · Ctrl rotates · R resizes · right-click to edit.",
+    magnetic:
+      "Click to place a magnetic field. ⊙ out of screen · ⊗ into screen · right-click to edit.",
     ball: "Click to add a ball. Z toggles grid snapping.",
     block: "Click to add a block. Z toggles grid snapping.",
     spring:
@@ -67,15 +81,20 @@ function select(id) {
   selectionSet = new Set(id ? [id] : []);
   selected = id;
   const o = sim.objects.get(id),
-    l = sim.links.get(id);
-  $("selection").hidden = !o && !l;
-  $("selected-name").textContent = o
-    ? o.shape === "ball"
-      ? "Ball"
-      : "Block"
-    : l
-      ? l.type[0].toUpperCase() + l.type.slice(1)
-      : "";
+    l = sim.links.get(id),
+    f = sim.fields.regions.get(id);
+  $("selection").hidden = !o && !l && !f;
+  $("selected-name").textContent = f
+    ? f.type === "electric"
+      ? "Electric field"
+      : "Magnetic field"
+    : o
+      ? o.shape === "ball"
+        ? "Ball"
+        : "Block"
+      : l
+        ? l.type[0].toUpperCase() + l.type.slice(1)
+        : "";
   $("lock-angle").parentElement.hidden = l?.type !== "spring";
   $("lock-angle").checked = !!l?.lockAngle;
   $("reverse-wrap").parentElement.hidden = l?.type !== "pulley";
@@ -86,8 +105,8 @@ function select(id) {
   $("belt-motor").checked = !!l?.motor;
   $("belt-speed-label").hidden = l?.type !== "belt";
   $("belt-speed").value = l?.speed ?? 1;
-  $("resize-object").hidden = !o;
-  $("dimensions").hidden = !o;
+  $("resize-object").hidden = !o && !f;
+  $("dimensions").hidden = !o && !f;
   showDimensions();
   for (const [id, key] of [
     ["lock-position", "lockPosition"],
@@ -99,7 +118,8 @@ function select(id) {
 }
 function selectMany(ids) {
   const list = [...new Set(ids)].filter(
-    (id) => sim.objects.has(id) || sim.links.has(id),
+    (id) =>
+      sim.objects.has(id) || sim.links.has(id) || sim.fields.regions.has(id),
   );
   select(list.length === 1 ? list[0] : null);
   selectionSet = new Set(list);
@@ -136,6 +156,10 @@ function highlighted(id) {
 }
 function showDimensions() {
   const o = sim.objects.get(selected);
+  const f = sim.fields.regions.get(selected);
+  if (f)
+    $("dimensions").textContent =
+      `${f.width.toFixed(2)} × ${f.height.toFixed(2)} m`;
   if (o)
     $("dimensions").textContent =
       o.shape === "ball"
@@ -183,104 +207,189 @@ function positionMenu() {
 }
 function openMenu(id, x, y) {
   const o = sim.objects.get(id),
-    l = sim.links.get(id);
-  if (!o && !l) return;
+    l = sim.links.get(id),
+    f = sim.fields.regions.get(id);
+  if (!o && !l && !f) return;
   menuId = id;
   menuPoint = { x, y };
   select(id);
-  $("menu-title").textContent = o
-    ? (o.shape === "ball" ? "Ball" : "Block") + " · material constants"
-    : l.type === "spring"
-      ? "Spring constants"
-      : l.type === "rod"
-        ? "Rod constant"
-        : l.type === "belt"
-          ? "Belt"
-          : "Pulley cable";
-  $("menu-note").textContent =
-    l?.type === "belt"
+  $("menu-title").textContent = f
+    ? f.type === "electric"
+      ? "Electric field"
+      : "Magnetic field"
+    : o
+      ? (o.shape === "ball" ? "Ball" : "Block") + " · material constants"
+      : l.type === "spring"
+        ? "Spring constants"
+        : l.type === "rod"
+          ? "Rod constant"
+          : l.type === "belt"
+            ? "Belt"
+            : "Pulley cable";
+  $("menu-note").textContent = f
+    ? "Uniform field inside this region; overlaps add. B is perpendicular to the screen: positive out, negative in. Electric direction follows the region angle."
+    : l?.type === "belt"
       ? "Ideal no-slip belt. Crossed / drive controls are in the selection bar. Wheel mass and damping are edited on each ball."
       : l?.type === "pulley"
         ? "Taut cable with freely angled ends. Wheel mass and radius determine inertia. Alt-drag refits length; select the wheel to unlock its axle."
         : "Changes apply while the simulation runs.";
-  const fields = o
+  const fields = f
     ? [
-        ["mass", "Mass", "kg", 0.05, 100, 0.1, "Inertial mass."],
         [
-          "friction",
-          "Surface friction",
-          "μ",
-          0,
-          1,
-          0.05,
-          "Contact friction, not internal material hysteresis.",
-        ],
-        [
-          "restitution",
-          "Restitution",
-          "e",
-          0,
-          1,
-          0.05,
-          "0: no bounce · 1: ideally elastic contact.",
-        ],
-        [
-          "linearDamping",
-          "Linear damping",
-          "s⁻¹",
-          0,
-          20,
+          "strength",
+          "Strength",
+          f.type === "electric" ? "N/C" : "T",
+          -100,
+          100,
           0.1,
-          "Velocity decays as exp(−damping × time).",
+          "Negative reverses the field direction.",
         ],
         [
-          "angularDamping",
-          "Angular damping",
-          "s⁻¹",
-          0,
-          20,
+          "width",
+          f.shape === "circle" ? "Diameter" : "Width",
+          "m",
           0.1,
-          "Spin damping is independent of linear damping.",
+          50,
+          0.1,
+          "Resize with R + drag; Z snaps dimensions.",
+        ],
+        ...(f.shape === "circle"
+          ? []
+          : [
+              [
+                "height",
+                "Height",
+                "m",
+                0.1,
+                50,
+                0.1,
+                "Height of the field region.",
+              ],
+            ]),
+        [
+          "angle",
+          "Angle",
+          "°",
+          -180,
+          180,
+          1,
+          "Counterclockwise from right. Ctrl-drag to rotate.",
         ],
       ]
-    : l.type === "spring"
+    : o
       ? [
+          ["mass", "Mass", "kg", 0.05, 100, 0.1, "Inertial mass."],
           [
-            "k",
-            "Spring stiffness",
-            "N/m",
-            0.1,
+            "charge",
+            "Charge",
+            "C",
+            -100,
             100,
             0.1,
-            "Hooke’s law: F = −k × extension.",
+            "Signed point charge at the centre. Zero is neutral.",
           ],
           [
-            "damping",
-            "Spring damping",
-            "N·s/m",
+            "friction",
+            "Surface friction",
+            "μ",
             0,
-            5,
-            0.1,
-            "Damps relative motion along the spring.",
+            1,
+            0.05,
+            "Contact friction, not internal material hysteresis.",
           ],
-          ["length", "Rest length", "m", 0.05, 50, 0.1, "Unstretched length."],
+          [
+            "restitution",
+            "Restitution",
+            "e",
+            0,
+            1,
+            0.05,
+            "0: no bounce · 1: ideally elastic contact.",
+          ],
+          [
+            "linearDamping",
+            "Linear damping",
+            "s⁻¹",
+            0,
+            20,
+            0.1,
+            "Velocity decays as exp(−damping × time).",
+          ],
+          [
+            "angularDamping",
+            "Angular damping",
+            "s⁻¹",
+            0,
+            20,
+            0.1,
+            "Spin damping is independent of linear damping.",
+          ],
         ]
-      : ["belt", "pulley"].includes(l.type)
-        ? []
-        : [
+      : l.type === "spring"
+        ? [
+            [
+              "k",
+              "Spring stiffness",
+              "N/m",
+              0.1,
+              100,
+              0.1,
+              "Hooke’s law: F = −k × extension.",
+            ],
+            [
+              "damping",
+              "Spring damping",
+              "N·s/m",
+              0,
+              5,
+              0.1,
+              "Damps relative motion along the spring.",
+            ],
             [
               "length",
-              "Length",
+              "Rest length",
               "m",
               0.05,
               50,
               0.1,
-              "The distance held by the rod.",
+              "Unstretched length.",
             ],
-          ];
+          ]
+        : ["belt", "pulley"].includes(l.type)
+          ? []
+          : [
+              [
+                "length",
+                "Length",
+                "m",
+                0.05,
+                50,
+                0.1,
+                "The distance held by the rod.",
+              ],
+            ];
   const form = $("constants");
   form.replaceChildren();
   form.onsubmit = (e) => e.preventDefault();
+  if (f) {
+    const label = document.createElement("label"),
+      shape = document.createElement("select");
+    label.textContent = "Shape";
+    shape.setAttribute("aria-label", "Field shape");
+    for (const value of ["rectangle", "ellipse", "circle"]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value[0].toUpperCase() + value.slice(1);
+      shape.append(option);
+    }
+    shape.value = f.shape;
+    shape.onchange = () => {
+      sim.fields.update(id, { shape: shape.value });
+      openMenu(id, x, y);
+    };
+    label.append(shape);
+    form.append(label);
+  }
   for (const [key, name, unit, min, max, step, help] of fields) {
     const label = document.createElement("label");
     label.append(document.createTextNode(name));
@@ -292,7 +401,7 @@ function openMenu(id, x, y) {
     input.min = min;
     input.max = max;
     input.step = "any";
-    input.value = (o || l)[key];
+    input.value = (o || l || f)[key];
     input.setAttribute("aria-label", name);
     input.dataset.constant = key;
     const range = document.createElement("input");
@@ -304,7 +413,8 @@ function openMenu(id, x, y) {
     range.dataset.slider = key;
     range.setAttribute("aria-label", name + " slider");
     input.onchange = () => {
-      const current = sim.objects.get(id) || sim.links.get(id);
+      const current =
+        sim.objects.get(id) || sim.links.get(id) || sim.fields.regions.get(id);
       if (!current) {
         closeMenu();
         return;
@@ -314,7 +424,10 @@ function openMenu(id, x, y) {
           throw new Error(
             `Enter ${name.toLowerCase()} between ${min} and ${max}.`,
           );
-        if (o) sim.updateConstants(id, { [key]: Number(input.value) });
+        if (f) {
+          sim.fields.update(id, { [key]: Number(input.value) });
+          showDimensions();
+        } else if (o) sim.updateConstants(id, { [key]: Number(input.value) });
         else sim.updateLink(id, { [key]: Number(input.value) });
       } catch (error) {
         toast(error.message);
@@ -382,6 +495,10 @@ function snapStatus() {
 }
 function updateInteraction() {
   if (!pointer) return;
+  if (fieldDrag) {
+    fieldDrag.move(pointer, fieldMode(), sim.settings.snapping);
+    showDimensions();
+  }
   if (sim.grab)
     sim.moveGrab(
       pointer,
@@ -408,12 +525,39 @@ function updateInteraction() {
     }
   }
 }
+function fieldMode() {
+  return resizeHeld || tool === "resize"
+    ? "resize"
+    : ctrl && !shift
+      ? "rotate"
+      : "move";
+}
 canvas.addEventListener("pointerdown", (e) => {
   if (e.button !== 0) return;
   canvas.focus();
   pointer = locate(e);
   syncModifiers(e);
   canvas.setPointerCapture(e.pointerId);
+  if (["electric", "magnetic"].includes(tool)) {
+    const p = sim.settings.snapping
+      ? { x: snap(pointer.x), y: snap(pointer.y) }
+      : pointer;
+    select(sim.fields.add(tool, p));
+    chooseTool("grab");
+    return;
+  }
+  if (
+    ["grab", "resize"].includes(tool) &&
+    !sim.hit(pointer) &&
+    !linkAt(pointer)
+  ) {
+    const id = sim.fields.hit(pointer);
+    if (id) {
+      select(id);
+      fieldDrag = new FieldDrag(sim.fields, id, pointer, fieldMode());
+      return;
+    }
+  }
   if (tool === "select") {
     const id = sim.hit(pointer);
     if (id) {
@@ -527,6 +671,11 @@ canvas.addEventListener("pointerup", (e) => {
   if (e.button !== 0) return;
   syncModifiers(e);
   pointer = locate(e);
+  if (fieldDrag) {
+    fieldDrag.move(pointer, fieldMode(), sim.settings.snapping);
+    fieldDrag = null;
+    showDimensions();
+  }
   if (marquee) finishMarquee(locate(e));
   if (sim.group) {
     sim.moveGroup(locate(e), sim.settings.snapping);
@@ -558,6 +707,7 @@ canvas.addEventListener("pointerup", (e) => {
 canvas.addEventListener("pointercancel", cancelDrag);
 canvas.addEventListener("lostpointercapture", cancelDrag);
 function cancelDrag() {
+  fieldDrag = null;
   marquee = null;
   sim.endGroup();
   sim.endGrab(false);
@@ -565,7 +715,7 @@ function cancelDrag() {
 }
 canvas.addEventListener("contextmenu", (e) => {
   const p = locate(e),
-    id = sim.hit(p) || linkAt(p);
+    id = sim.hit(p) || linkAt(p) || sim.fields.hit(p);
   if (!id) {
     closeMenu();
     return;
@@ -582,7 +732,11 @@ canvas.addEventListener("keydown", (e) => {
   ) {
     const o = sim.objects.get(selected),
       l = sim.links.get(selected),
-      p = o ? sim.state(selected) : l ? sim.endpoint(l, "a") : null;
+      p = o
+        ? sim.state(selected)
+        : l
+          ? sim.endpoint(l, "a")
+          : sim.fields.regions.get(selected);
     if (!p) return;
     e.preventDefault();
     e.stopPropagation();
@@ -642,7 +796,7 @@ $("close-keys").onclick = () => {
 function syncSettings() {
   $("setting-walls").checked = sim.settings.walls;
   snapStatus();
-  for (const key of ["gravity", "airResistance"]) {
+  for (const key of settingKeys) {
     $("setting-" + key).value = sim.settings[key];
     $("range-" + key).value = sim.settings[key];
   }
@@ -668,7 +822,7 @@ $("settings-panel").addEventListener("keydown", (e) => {
     canvas.focus();
   }
 });
-for (const key of ["gravity", "airResistance"]) {
+for (const key of settingKeys) {
   const input = $("setting-" + key),
     range = $("range-" + key);
   input.onchange = () => {
@@ -681,9 +835,26 @@ for (const key of ["gravity", "airResistance"]) {
     }
     syncSettings();
   };
+  range.onkeydown = (e) => {
+    // Keyboard nudges use exact values and must be able to leave the detent.
+    if (
+      key !== "gravity" ||
+      !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)
+    )
+      return;
+    e.preventDefault();
+    const delta = ["ArrowRight", "ArrowUp"].includes(e.key) ? 0.1 : -0.1;
+    sim.updateSettings({
+      gravity: Math.max(
+        -50,
+        Math.min(50, Number((sim.settings.gravity + delta).toFixed(2))),
+      ),
+    });
+    syncSettings();
+  };
   range.oninput = () => {
     const value =
-      key === "gravity" && Math.abs(Number(range.value)) <= 0.5
+      key === "gravity" && Math.abs(Number(range.value)) <= 2.5
         ? 0
         : Number(range.value);
     sim.updateSettings({ [key]: value });
@@ -701,6 +872,9 @@ $("reset-settings").onclick = () => {
   sim.updateSettings({
     gravity: 9.81,
     airResistance: 0,
+    electricX: 0,
+    electricY: 0,
+    magneticZ: 0,
     snapping: false,
     walls: false,
   });
@@ -800,6 +974,8 @@ document.addEventListener("keydown", (e) => {
     d: "rod",
     t: "belt",
     u: "pulley",
+    e: "electric",
+    m: "magnetic",
   };
   if (keys[key]) {
     e.preventDefault();
@@ -904,6 +1080,7 @@ function draw() {
   ctx.fillStyle = "#819078";
   for (let x = Math.ceil(min.x); x <= max.x; x++)
     ctx.fillText(x + " m", screen({ x, y: 0 }).x + 4, view.y + 16);
+  drawFields(ctx, sim.fields, screen, view.scale, highlighted);
   for (const l of sim.links.values()) {
     if (["belt", "pulley"].includes(l.type)) {
       const path = linkPath(l).map(screen);
@@ -977,17 +1154,28 @@ function draw() {
         : "#658199";
     ctx.lineWidth = highlighted(o.id) ? 2.5 : 1.5;
     ctx.stroke();
-    // A radial stripe makes ball rotation visible, including with a pinned centre.
-    if (o.shape === "ball")
-      line(
-        p,
-        screen({
-          x: s.x + o.radius * 0.8 * Math.cos(s.angle),
-          y: s.y + o.radius * 0.8 * Math.sin(s.angle),
-        }),
-        "#fff7e9",
-        2,
-      );
+    // Degree ticks rotate with the body; a longer zero mark gives a clear reference.
+    if (o.shape === "ball") {
+      for (let degrees = 0; degrees < 360; degrees += 10) {
+        const angle = s.angle + (degrees * Math.PI) / 180;
+        const outer = o.radius * 0.95,
+          inner =
+            o.radius *
+            (degrees === 0 ? 0.64 : degrees % 30 === 0 ? 0.74 : 0.85);
+        line(
+          screen({
+            x: s.x + inner * Math.cos(angle),
+            y: s.y + inner * Math.sin(angle),
+          }),
+          screen({
+            x: s.x + outer * Math.cos(angle),
+            y: s.y + outer * Math.sin(angle),
+          }),
+          degrees === 0 ? "#775126" : "#fff7e9",
+          degrees % 30 === 0 ? 2 : 1,
+        );
+      }
+    }
     if (o.lockPosition) {
       ctx.beginPath();
       ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
@@ -1092,6 +1280,8 @@ for (const [key, t] of Object.entries({
   D: "rod",
   T: "belt",
   U: "pulley",
+  E: "electric",
+  M: "magnetic",
 }))
   document.querySelector(`[data-tool="${t}"]`).title =
     `${t[0].toUpperCase() + t.slice(1)} (${key})`;

@@ -1,3 +1,4 @@
+import { Fields } from "./fields.js";
 import { GroupMove } from "./group-move.js";
 import { Mechanisms } from "./mechanisms.js";
 // The sandbox exposes SI units; Matter uses px, ms and 60 Hz-normalised velocity.
@@ -19,8 +20,12 @@ export class Sandbox {
     this.engine.gravity.scale = 0; // Gravity and damping are explicit SI forces.
     this.objects = new Map();
     this.links = new Map();
+    this.fields = new Fields(this);
     this.settings = {
       gravity: 9.81,
+      electricX: 0,
+      electricY: 0,
+      magneticZ: 0,
       airResistance: 0,
       snapping: false,
       walls: false,
@@ -58,7 +63,13 @@ export class Sandbox {
     );
   }
   updateSettings(patch) {
-    const ranges = { gravity: [-50, 50], airResistance: [0, 10] };
+    const ranges = {
+      gravity: [-50, 50],
+      airResistance: [0, 10],
+      electricX: [-100, 100],
+      electricY: [-100, 100],
+      magneticZ: [-100, 100],
+    };
     for (const [key, v] of Object.entries(patch))
       if (
         ["walls", "snapping"].includes(key)
@@ -166,6 +177,7 @@ export class Sandbox {
         width,
         height,
         mass: 1,
+        charge: 0,
         friction: 0.3,
         restitution: 0.6,
         linearDamping: 0,
@@ -298,6 +310,7 @@ export class Sandbox {
     const o = this.objects.get(id);
     const ranges = {
       mass: [0.05, 100],
+      charge: [-100, 100],
       friction: [0, 1],
       restitution: [0, 1],
       linearDamping: [0, 20],
@@ -944,6 +957,7 @@ export class Sandbox {
       const s = this.state(o.id),
         b = o.body;
       if (!o.lockPosition) {
+        this.fields.advance(o, s, DT);
         this.applyForce(o.id, s, { x: 0, y: -this.settings.gravity * o.mass });
         Body.setVelocity(b, {
           x:
@@ -994,6 +1008,7 @@ export class Sandbox {
     this.time += DT;
   }
   remove(id) {
+    this.fields.regions.delete(id);
     if (this.group?.ids.has(id)) this.endGroup();
     if (this.grab?.id === id) this.endGrab(false);
     if (this.sizing?.id === id) this.endResize();

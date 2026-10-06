@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check src/app.js && node --check src/physics.js && node --check src/mechanisms.js && node --check src/pulley.js && node --check src/group-move.js",
+    "check": "node --check src/app.js && node --check src/physics.js && node --check src/mechanisms.js && node --check src/pulley.js && node --check src/group-move.js && node --check src/fields.js && node --check src/field-view.js",
     "test:ui": "node tests/editor-smoke.mjs"
   },
   "devDependencies": {
