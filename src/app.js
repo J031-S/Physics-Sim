@@ -32,8 +32,8 @@ let sim = new Sandbox(),
   last = 0,
   menuId = null,
   menuPoint = null,
-  // exportScene() snapshot that Reset restores: taken when a preset or file
-  // is loaded and whenever the simulation goes from paused to running.
+  // exportScene() snapshot that Reset restores: the scene as loaded from a
+  // preset or file, or a hand-built scene as it was at its first Run.
   startScene = null,
   toastTimer;
 sim.updateSettings({ walls: true });
@@ -715,6 +715,7 @@ document.addEventListener(
         ["settings-panel", closeSettings],
         ["keys-panel", () => ($("keys-panel").hidden = true)],
         ["presets-panel", closePresets],
+        ["clear-confirm", closeClearConfirm],
       ])
         if (!$(panel).hidden) {
           close();
@@ -1219,7 +1220,8 @@ function removeSelected() {
 }
 $("delete").onclick = removeSelected;
 function setRunning(next) {
-  if (next && !running) {
+  // A hand-built scene's starting point is its state at the first Run.
+  if (next && !running && !startScene) {
     startScene = sim.exportScene();
     $("reset").disabled = false;
   }
@@ -1381,11 +1383,34 @@ $("scene-file").onchange = async () => {
   replaceScene(next);
   toast("Scene loaded · press Run to start");
 };
+function closeClearConfirm() {
+  $("clear-confirm").hidden = true;
+  $("clear").setAttribute("aria-expanded", "false");
+}
 $("clear").onclick = () => {
-  const settings = { ...sim.settings };
+  const open = $("clear-confirm").hidden;
+  $("clear-confirm").hidden = !open;
+  $("clear").setAttribute("aria-expanded", String(open));
+  if (open) $("clear-no").focus();
+};
+$("clear-no").onclick = () => {
+  closeClearConfirm();
+  $("clear").focus();
+};
+$("clear-confirm").addEventListener("keydown", (e) => {
+  e.stopPropagation();
+  if (e.key === "Escape") $("clear-no").click();
+});
+// Clear starts over: an empty scene with default settings and floor, as on
+// page load. Only the snapping editing aid is kept.
+$("clear-yes").onclick = () => {
+  closeClearConfirm();
+  const snapping = sim.settings.snapping;
   sim.dispose();
   sim = new Sandbox();
-  sim.updateSettings({ ...settings, walls: true });
+  sim.updateSettings({ walls: true, snapping });
+  syncSettings();
+  canvas.focus();
   view.width = 0;
   view.height = 0;
   selected = null;
@@ -1497,6 +1522,7 @@ document.addEventListener("keydown", (e) => {
     $("keys-panel").hidden = true;
     closeSettings();
     closePresets();
+    closeClearConfirm();
   }
   if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.code === "Space" || e.key === " ") {

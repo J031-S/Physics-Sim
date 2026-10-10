@@ -43,7 +43,14 @@
           type="file"
           accept="application/json,.json"
           hidden
-        /><button id="clear" title="Clear scene">Clear scene</button>
+        /><button
+          id="clear"
+          title="Clear scene"
+          aria-expanded="false"
+          aria-controls="clear-confirm"
+        >
+          Clear scene
+        </button>
       </div>
     </header>
     <main>
@@ -587,6 +594,24 @@
         </details>
       </details>
       <button id="reset-settings">Restore defaults</button>
+    </section>
+    <section
+      id="clear-confirm"
+      role="alertdialog"
+      aria-labelledby="clear-confirm-title"
+      aria-describedby="clear-confirm-text"
+      hidden
+    >
+      <strong id="clear-confirm-title">Clear the scene?</strong>
+      <p id="clear-confirm-text">
+        Every object, connection and field is removed, and all settings return
+        to their defaults (gravity 9.81 m/s², no global fields, default floor).
+        This cannot be undone.
+      </p>
+      <div class="button-row">
+        <button id="clear-no">Cancel</button
+        ><button id="clear-yes" class="danger">Clear scene</button>
+      </div>
     </section>
     <section id="presets-panel" hidden aria-labelledby="presets-title">
       <div class="menu-header">

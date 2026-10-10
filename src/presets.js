@@ -283,10 +283,18 @@ export const presets = [
     group: "Electricity and magnetism",
     title: "Circular motion in a magnetic field",
     description:
-      "A 1 C, 1 kg charge moves at 4 m/s through a uniform 2 T field pointing out of the screen, with gravity off. The magnetic force is always perpendicular to the velocity, so the speed never changes.",
+      "A 1 C, 1 kg charge moves at 4 m/s inside a circular region of uniform 2 T field pointing out of the screen, with gravity off. The magnetic force is always perpendicular to the velocity, so the speed never changes.",
     expect: "Radius mv/qB = 2 m; period 2πm/qB ≈ 3.14 s.",
     setup(sim) {
-      scene(sim, { gravity: 0, magneticZ: 2 });
+      scene(sim, { gravity: 0 });
+      // A 6 m circle centred on the orbit, so the charge never leaves it.
+      const field = sim.fields.add("magnetic", { x: 0, y: 4.5 });
+      sim.fields.update(field, {
+        shape: "circle",
+        width: 6,
+        height: 6,
+        strength: 2,
+      });
       const id = body(sim, "ball", { x: 0, y: 6.5, size: 0.3, charge: 1 });
       sim.setVelocity(id, { vx: 4 });
     },
@@ -297,7 +305,8 @@ export const presets = [
     title: "Velocity selector",
     description:
       "Three identical charges enter crossed fields (E = 6 N/C up, B = 2 T out of the screen) at 2, 3 and 4 m/s. Only the one whose speed equals E/B feels no net force.",
-    expect: "The 3 m/s charge travels straight; the slower curves up, the faster down.",
+    expect:
+      "The 3 m/s charge travels straight; the slower curves up, the faster down.",
     setup(sim) {
       scene(sim, { gravity: 0, walls: false });
       // An electric region points along its own angle, so the upward field

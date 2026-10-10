@@ -39,6 +39,10 @@ const frames = (n) => {
   }
 };
 const tool = (name) => document.querySelector(`[data-tool=${name}]`).click();
+const clearScene = () => {
+  $("clear").click();
+  $("clear-yes").click();
+};
 const pointer = (
   type,
   x,
@@ -200,7 +204,7 @@ assert.equal(
 $("close-menu").click();
 $("delete").click();
 assert.equal($("selection").hidden, true);
-$("clear").click();
+clearScene();
 assert.equal($("time").textContent === "NaN", false);
 assert.equal($("selection").hidden, true);
 assert.equal(menu(500, 250).defaultPrevented, false);
@@ -278,7 +282,7 @@ assert.ok(
 assert.equal($("menu-connections").hidden, true);
 assert.ok(!$("category-fields").classList.contains("active"));
 key("g");
-$("clear").click();
+clearScene();
 canvas.focus();
 key(" ");
 assert.equal($("pause").textContent, "Pause");
@@ -323,7 +327,7 @@ mass.dispatchEvent(
 );
 assert.equal($("pause").textContent, "Run");
 $("close-menu").click();
-$("clear").click();
+clearScene();
 canvas.focus();
 key("b");
 click(350, 350);
@@ -345,7 +349,7 @@ key(" ");
 key("Delete");
 assert.equal($("selection").hidden, true);
 // Resize a wheel and create a guided pulley through three actual clicks.
-$("clear").click();
+clearScene();
 key("b");
 click(500, 180);
 key("r");
@@ -365,7 +369,7 @@ assert.equal($("selected-name").textContent, "Pulley");
 frames(1);
 // Build the reference layout: spring-guided horizontal block, angled cable,
 // wheel, hanging block. Existing spring connections must remain acceptable.
-$("clear").click();
+clearScene();
 canvas.focus();
 key("n");
 click(300, 260);
@@ -406,7 +410,7 @@ key(" ");
 frames(10);
 key(" ");
 // Marquee selects only enclosed/intersecting bodies; group movement and deletion.
-$("clear").click();
+clearScene();
 canvas.focus();
 key("b");
 click(300, 300);
@@ -457,10 +461,13 @@ assert.equal($("range-airResistance").value, "2");
 $("setting-gravity").value = "-500";
 $("setting-gravity").dispatchEvent(new window.Event("change"));
 assert.equal($("setting-gravity").value, "0");
-$("clear").click();
+// Clear restores default settings as well as emptying the scene.
+clearScene();
 $("settings-toggle").click();
 $("settings-toggle").click();
-assert.equal($("setting-airResistance").value, "2");
+assert.equal($("setting-airResistance").value, "0");
+$("setting-airResistance").value = "2";
+$("setting-airResistance").dispatchEvent(new window.Event("change"));
 $("reset-settings").click();
 assert.equal($("setting-gravity").value, "9.81");
 assert.equal($("setting-airResistance").value, "0");
@@ -509,7 +516,7 @@ assert.match($("snap-status").textContent, /SNAP ON/);
 $("reset-settings").click();
 $("close-settings").click();
 // Shift manually repositions a paused pin; Ctrl rotates without translating.
-$("clear").click();
+clearScene();
 canvas.focus();
 key("b");
 click(400, 350);
@@ -538,7 +545,7 @@ menu(500, 350);
 assert.ok($("constants").querySelector('[aria-label="Mass"]'));
 $("close-menu").click();
 // Fields can be edited, moved, rotated, resized and removed without pausing.
-$("clear").click();
+clearScene();
 canvas.focus();
 key("e");
 click(500, 300);
@@ -647,7 +654,7 @@ assert.equal($("setting-electricX").value, "0");
 assert.equal($("setting-magneticZ").value, "0");
 $("close-settings").click();
 // Gradient controls, mixed selection, impulse options, camera and website preferences.
-$("clear").click();
+clearScene();
 frames(1);
 canvas.focus();
 if ($("pause").textContent.includes("Pause")) key(" ");
@@ -736,7 +743,7 @@ $("fit-scene").click();
 frames(1);
 assert.ok(Number.parseInt($("zoom-level").textContent) > 0);
 // Each new scene fits initial screen bounds but retains website preferences.
-$("clear").click();
+clearScene();
 frames(1);
 $("settings-toggle").click();
 assert.equal($("setting-walls").checked, true);
@@ -746,7 +753,7 @@ change($("ui-theme"), "light");
 change($("ui-size"), "100", "input");
 $("close-settings").click();
 // Wedge creation and live icon previews retain controls, simulation and labels.
-$("clear").click();
+clearScene();
 frames(1);
 canvas.focus();
 if ($("pause").textContent === "Pause") key(" ");
@@ -803,7 +810,7 @@ for (const open of [
   () => $("shortcuts").click(),
   () => $("category-bodies").click(),
 ]) {
-  $("clear").click();
+  clearScene();
   key("b");
   open();
   click(500, 250);
@@ -887,9 +894,29 @@ for (const open of [
       new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
     );
   assert.equal($("presets-panel").hidden, true);
-  // Clear forgets the reset point.
+  // Reset returns to the scene as loaded, not to the last Run.
+  key(" ");
+  frames(30);
+  key(" ");
+  key(" ");
+  frames(30);
+  key(" ");
+  $("reset").click();
+  frames(1);
+  assert.equal($("time").textContent, "0.00 s");
+  // Clear asks first; Cancel keeps the scene.
+  document.querySelector('[data-preset="cyclotron"]').click();
   $("clear").click();
+  assert.equal($("clear-confirm").hidden, false);
+  $("clear-no").click();
+  assert.equal($("clear-confirm").hidden, true);
+  assert.equal($("reset").disabled, false, "cancel kept the scene");
+  // Clear forgets the reset point and restores default settings.
+  assert.equal($("setting-gravity").value, "0");
+  clearScene();
   assert.equal($("reset").disabled, true);
+  assert.equal($("setting-gravity").value, "9.81");
+  assert.equal($("setting-walls").checked, true);
 }
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",

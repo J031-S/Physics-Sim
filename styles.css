@@ -558,6 +558,7 @@ select {
 #settings-panel,
 #keys-panel,
 #presets-panel,
+#clear-confirm,
 #material-menu {
   background: var(--panel);
   color: var(--ink);
@@ -1017,4 +1018,39 @@ button:disabled {
   .playback {
     gap: 4px;
   }
+}
+#clear-confirm {
+  position: fixed;
+  z-index: 16;
+  right: 16px;
+  top: 76px;
+  width: min(300px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px #34473125;
+  font-size: 12px;
+}
+#clear-confirm p {
+  margin: 6px 0 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+#clear-confirm .button-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+#clear-confirm button {
+  padding: 6px 12px;
+  font-size: 11px;
+}
+#clear-confirm .danger {
+  background: #a5544a;
+  border-color: #a5544a;
+  color: white;
+}
+#clear-confirm .danger:hover {
+  background: #8e463d;
 }

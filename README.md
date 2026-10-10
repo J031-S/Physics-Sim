@@ -51,7 +51,9 @@ In the constants menu each property is one row: name, slider, then the number wi
 
 **Save scene** (download icon) downloads the whole scene, including settings, floor material, bodies, connections and fields, as `physics-sim-scene.json`. **Load scene** (folder icon) opens such a file. A file that is not a valid scene shows a message and leaves the current scene untouched. Loaded scenes also start paused.
 
-**Reset** (beside Run/Pause) returns to the scene as it was when it was loaded, or when you last pressed Run after pausing, so you can repeat a run exactly. It is unavailable after Clear scene until you load something or press Run from paused.
+**Reset** (beside Run/Pause) returns to the scene exactly as it was loaded from a preset or file, however many times you have paused and run since, so you can repeat an experiment. For a scene you built yourself, the starting point is its state the first time you pressed Run from paused. Clear scene forgets the starting point.
+
+**Clear scene** asks for confirmation, then removes everything and restores every setting (gravity, air resistance, global fields, charge interactions, scene bounds, walls and floor material) to its default, as on page load. Only the snapping toggle is kept.
 
 ### Wedge / inclined plane
 
@@ -77,7 +79,7 @@ Click **Settings** in the header to open the side panel. It is split into collap
 - **Snapping (Z):** one persistent toggle for position and group translations (0.5 m), rotation (15°), dimensions (0.5 m), and Alt-refitted connection lengths (0.5 m). The active operation determines what is snapped; physical constraints and walls take priority when exact grid placement is impossible. Shift/Ctrl/Alt can be changed during a drag; Shift wins if Shift and Ctrl are held together. R chooses resizing and works with the snapping toggle, but Ctrl+R and Cmd+R retain browser reload.
 - **Scene boundary walls:** enables four nonselectable static colliders at the world-space scene bounds. New scenes start with walls at the initial visible edges. Panning, zooming and browser resizing do not move them. The ground remains at y = 0.
 
-Changes preserve the current scene, velocities and simulation time. **Restore defaults** resets just these settings. Clear scene retains force settings but resets the scene bounds and enables walls; reloading the page restores simulation defaults. Website preferences are stored separately and persist. Global electric X/Y fields (N/C) and magnetic Z field (T) each range from −100 to +100 and default to zero. Positive X points right, positive Y up, and positive magnetic Z out of the screen.
+Changes preserve the current scene, velocities and simulation time. **Restore defaults** resets just these settings. Clear scene restores all of these to their defaults (except snapping), as reloading the page does. Website preferences are stored separately and persist. Global electric X/Y fields (N/C) and magnetic Z field (T) each range from −100 to +100 and default to zero. Positive X points right, positive Y up, and positive magnetic Z out of the screen.
 
 ### Electric and magnetic fields
 

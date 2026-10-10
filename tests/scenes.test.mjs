@@ -400,6 +400,9 @@ test("presets show the results they claim", () => {
   }
   {
     const { s, ids } = load("cyclotron");
+    // The field is a placed region, not the global field.
+    assert.equal(s.settings.magneticZ, 0);
+    assert.equal(s.fields.regions.size, 1);
     let minX = 9,
       maxX = -9,
       minY = 99,
