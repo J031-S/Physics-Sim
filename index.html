@@ -110,9 +110,6 @@
             ><button data-tool="magnetic" aria-pressed="false">Magnetic</button>
           </div>
         </div>
-        <label class="vectors"
-          ><input type="checkbox" id="vectors" /> Velocity vectors</label
-        >
       </div>
       <div id="tool-settings" class="tool-settings">
         <strong id="tool-name">Grab</strong>
@@ -143,11 +140,31 @@
           ><span>Drag from a body towards the desired kick.</span>
         </div>
       </div>
-      <div class="camera-controls">
-        <button id="zoom-out" aria-label="Zoom out">−</button
+      <div class="camera-controls" role="toolbar" aria-label="View">
+        <button id="zoom-out" aria-label="Zoom out" title="Zoom out">−</button
         ><span id="zoom-level">100%</span
-        ><button id="zoom-in" aria-label="Zoom in">+</button
-        ><button id="fit-scene">Fit scene</button>
+        ><button id="zoom-in" aria-label="Zoom in" title="Zoom in">+</button
+        ><button id="fit-scene" title="Fit scene">Fit scene</button
+        ><span class="cluster-divider" aria-hidden="true"></span
+        ><label class="icon-toggle" title="Velocity vectors (V)"
+          ><input type="checkbox" id="vectors" /><span
+            data-icon="velocity"
+            data-icon-label="Velocity vectors"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="Net force vectors"
+          ><input type="checkbox" id="force-vectors" /><span
+            data-icon="force"
+            data-icon-label="Net force vectors"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="Snapping (Z) — 0.5 m / 15°"
+          ><input type="checkbox" id="snap-toggle" /><span
+            data-icon="snap"
+            data-icon-label="Snapping"
+            data-icon-only="true"
+          ></span
+        ></label>
       </div>
       <div id="selection" class="selection" hidden>
         <strong id="selected-name"></strong

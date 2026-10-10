@@ -40,7 +40,7 @@ export function prepareIcons() {
     "resize-object": ["resize", "Resize (R)"],
     "zoom-in": ["zoomIn", "Zoom in", true],
     "zoom-out": ["zoomOut", "Zoom out", true],
-    "fit-scene": ["fit", "Fit scene"],
+    "fit-scene": ["fit", "Fit scene", true],
     "close-menu": ["close", "Close material constants", true],
     "close-settings": ["close", "Close simulation settings", true],
     "close-keys": ["close", "Close shortcuts", true],

@@ -172,7 +172,7 @@ input[type="checkbox"] {
 }
 .hint {
   position: absolute;
-  bottom: 45px;
+  bottom: 34px;
   left: 20px;
   right: 20px;
   text-align: center;
@@ -296,7 +296,7 @@ input[type="checkbox"] {
   }
   .hint {
     font-size: 10px;
-    bottom: 42px;
+    bottom: 32px;
   }
   .status {
     left: 14px;
@@ -582,12 +582,74 @@ select {
   left: 16px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px;
+  gap: 2px;
+  padding: 3px;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 9px;
   zoom: var(--ui-scale);
+}
+.camera-controls button {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  border-color: transparent;
+  background: transparent;
+}
+.camera-controls .ui-icon {
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
+}
+.cluster-divider {
+  align-self: stretch;
+  margin: 3px 4px;
+  border-left: 1px solid var(--line);
+}
+/* Checkbox kept focusable for keyboard and tests; the label is the toggle. */
+.icon-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.icon-toggle input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.icon-toggle:hover {
+  background: color-mix(in srgb, var(--panel), #8aa17c 18%);
+}
+.icon-toggle:has(input:checked) {
+  opacity: 1;
+  background: #e5eedf;
+  border-color: #b6c9ad;
+  color: #3e6237;
+}
+:root[data-theme="dark"] .icon-toggle:has(input:checked) {
+  background: #3b4c3f;
+  color: #ecf5e8;
+  border-color: #768d70;
+}
+.icon-toggle:has(input:focus-visible) {
+  outline: 2px solid #63876a;
+  outline-offset: 1px;
+}
+.icon-toggle .ui-icon {
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
 }
 #zoom-level {
   min-width: 42px;

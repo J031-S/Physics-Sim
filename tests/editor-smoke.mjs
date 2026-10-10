@@ -444,6 +444,16 @@ key("z", "keydown", { repeat: true });
 assert.equal($("setting-snapping").checked, true);
 key("z", "keydown", { ctrlKey: true });
 assert.equal($("setting-snapping").checked, false);
+assert.equal($("snap-toggle").checked, false);
+// The view-cluster snapping toggle drives the same setting as Z.
+$("snap-toggle").checked = true;
+$("snap-toggle").dispatchEvent(new window.Event("change"));
+assert.equal($("setting-snapping").checked, true);
+assert.match($("snap-status").textContent, /SNAP ON/);
+key("z");
+assert.equal($("snap-toggle").checked, false);
+assert.ok($("vectors").closest(".camera-controls"));
+assert.ok($("force-vectors").closest(".camera-controls"));
 const reload = new window.KeyboardEvent("keydown", {
   key: "r",
   ctrlKey: true,

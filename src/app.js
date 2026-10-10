@@ -641,6 +641,7 @@ function snapStatus() {
     : "Snap off · Z toggles 0.5 m / 15°";
   $("snap-status").classList.toggle("snapping", on);
   $("setting-snapping").checked = on;
+  $("snap-toggle").checked = on;
 }
 function updateInteraction() {
   if (!pointer) return;
@@ -1061,6 +1062,11 @@ for (const key of settingKeys) {
     input.value = sim.settings[key];
   };
 }
+$("snap-toggle").onchange = (e) => {
+  sim.updateSettings({ snapping: e.target.checked });
+  snapStatus();
+  updateInteraction();
+};
 for (const key of ["snapping", "walls", "chargeInteractions"])
   $("setting-" + key).onchange = (e) => {
     sim.updateSettings({ [key]: e.target.checked });
