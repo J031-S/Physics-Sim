@@ -58,7 +58,8 @@ These exist on `Sandbox` and are covered by tests; the UI should call them rathe
 - `exportScene()` → plain JSON; `Sandbox.fromScene(json)` → new sandbox (throws a readable `Error` on a bad file). Use this pair for save/load, presets and reset-to-start.
 - `setPose(id, { x, y, angle })`, `setVelocity(id, { vx, vy, omega })`: exact placement for building scenes.
 - `netForce(id)` → `{ x, y }` in newtons over the last step, including contact, friction, rod and cable forces.
-- `measure(id)` → speed, momentum, kinetic (translational + rotational) and gravitational energy; `energy()` → scene totals including springs.
+- `measure(id)` → speed, momentum, kinetic (translational + rotational), gravitational and electric energy; `energy()` → scene totals `{ kinetic, gravitational, elastic, electric, total, fieldWork }`.
+- Electric energy covers the conservative electric forces only: the global uniform field (`−qE·r`, zero at the origin) and mutual Coulomb pairs. Field **regions** have sharp edges and therefore no potential energy; the work they do on charges accumulates in `fieldWork`. `total − fieldWork` is the quantity that stays constant in a lossless scene. Electric energy and `fieldWork` can both be negative.
 - `step()` advances exactly one 1/120 s step and can be called while paused.
 
 ## Order of operations in `step()`

@@ -123,6 +123,18 @@ Beside Pause: **Step** (calls `sim.step()` once while paused; shortcut `.`) and 
 - The ball's constants menu should say that a ball is modelled as a uniform **disc** (rolling acceleration `(2/3) g sin θ`, not the `5/7` of a solid sphere).
 - Update tool hints, the Keys panel and `README.md` for the lock behaviour that is already implemented: an object with both locks on ignores all dragging while running; paused, a plain drag moves it and Ctrl-drag rotates it. Show a toast ("Pause to move a locked object") when a running drag is refused. The Wedge hint still says "Pause + Shift-drag to move".
 
+### 15. Electric energy in the readouts, energy bar and graphs
+
+The engine now reports electric energy; nothing needs changing in the physics files.
+
+- `sim.energy()` returns `electric` and `fieldWork` alongside `kinetic`, `gravitational`, `elastic` and `total` (which now includes `electric`). `sim.measure(id)` returns `electric` for one body.
+- `electric` is potential energy in the global uniform field plus mutual Coulomb energy. It is often **negative** (opposite charges, or a charge downfield of the origin).
+- Field **regions** have no potential energy. The work they have done on charges so far is `fieldWork`, also signed.
+- Add an **Electric** segment to the stacked bar and an "Electric PE" row to the selected-body readout, using the existing negative-value styling.
+- Under the total, show **"Supplied by field regions: … J"** whenever `fieldWork` is non-zero, and a second line **"Total − supplied: … J"**. That second number is the one that stays constant, which is what students should watch.
+- Offer `electric` and `total − fieldWork` as graph quantities.
+- Hide the electric rows when the scene has no charged body, so mechanics scenes stay uncluttered.
+
 ## Not in this list
 
 These need engine work and will be handled separately; do not attempt them here: separate free-body arrows (weight, normal, friction, tension), a sphere/disc choice for balls, an "ideal" no-damping default, recovering bodies that leave the scene, conveyor grip, rod energy loss, mass-dependent air resistance, and slack pulley cables.

@@ -3,6 +3,10 @@ export class Fields {
   constructor(sim) {
     this.sim = sim;
     this.regions = new Map();
+    // Cumulative work done on charges by field regions (J). A region has
+    // sharp edges, so its field is not conservative and has no potential
+    // energy; its work is tracked as energy supplied from outside instead.
+    this.work = 0;
   }
   add(type, p) {
     if (!["electric", "magnetic"].includes(type))
@@ -159,17 +163,48 @@ export class Fields {
     let ex = settings.electricX,
       ey = settings.electricY,
       bz = settings.magneticZ;
+    let regionX = 0,
+      regionY = 0;
     for (const f of this.regions.values()) {
       const sample = this.sample(f, p);
-      ex += sample.ex;
-      ey += sample.ey;
+      regionX += sample.ex;
+      regionY += sample.ey;
       bz += sample.bz;
     }
-    return { ex, ey, bz };
+    return { ex: ex + regionX, ey: ey + regionY, bz, regionX, regionY };
+  }
+  // Potential energy of charge `o` in the global uniform field, taking the
+  // origin as zero: U = −q E·r.
+  uniformEnergy(o, state) {
+    const { electricX, electricY } = this.sim.settings;
+    return -o.charge * (electricX * state.x + electricY * state.y);
+  }
+  // Mutual potential energy of each interacting pair, matching the softened
+  // force in interact(): U = k q₁ q₂ / √(r² + ε²).
+  pairEnergies() {
+    const sim = this.sim,
+      pairs = [];
+    if (!sim.settings.chargeInteractions) return pairs;
+    const charged = [...sim.objects.values()].filter((o) => o.charge);
+    for (let i = 0; i < charged.length; i++)
+      for (let j = i + 1; j < charged.length; j++) {
+        const a = charged[i],
+          b = charged[j],
+          pa = sim.state(a.id),
+          pb = sim.state(b.id);
+        pairs.push({
+          a: a.id,
+          b: b.id,
+          energy:
+            (sim.settings.coulombConstant * a.charge * b.charge) /
+            Math.hypot(pb.x - pa.x, pb.y - pa.y, sim.settings.chargeSoftening),
+        });
+      }
+    return pairs;
   }
   advance(o, state, dt) {
     if (o.lockPosition || !o.charge) return;
-    const { ex, ey, bz } = this.at(state),
+    const { ex, ey, bz, regionX, regionY } = this.at(state),
       qm = o.charge / o.mass,
       ax = qm * ex,
       ay = qm * ey,
@@ -185,6 +220,13 @@ export class Fields {
       Math.abs(theta) < 1e-5 ? theta / 2 - theta ** 3 / 24 : (1 - c) / theta;
     const vx = c * state.vx + s * state.vy + dt * (sinc * ax + cosc * ay);
     const vy = -s * state.vx + c * state.vy + dt * (sinc * ay - cosc * ax);
+    // Work = force · displacement, using the mean velocity over the step
+    // (exact for a pure electric field).
+    this.work +=
+      (o.charge *
+        dt *
+        (regionX * (state.vx + vx) + regionY * (state.vy + vy))) /
+      2;
     globalThis.Matter.Body.setVelocity(o.body, {
       x: (vx * 100) / 60,
       y: (-vy * 100) / 60,

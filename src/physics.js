@@ -1158,7 +1158,9 @@ export class Sandbox {
     return o ? { ...(o.netForce || { x: 0, y: 0 }) } : null;
   }
   // Momentum and energies of one body (SI). Gravitational energy is measured
-  // from the floor; positive gravity points down.
+  // from the floor; positive gravity points down. Electric energy is the
+  // body's energy in the global uniform field plus half of each mutual
+  // Coulomb pair it belongs to, so the bodies' shares add up to the scene's.
   measure(id) {
     const o = this.objects.get(id);
     if (!o) return null;
@@ -1174,19 +1176,33 @@ export class Sandbox {
       rotational,
       kinetic: translational + rotational,
       gravitational: o.mass * this.settings.gravity * s.y,
+      electric:
+        this.fields.uniformEnergy(o, s) +
+        this.fields
+          .pairEnergies()
+          .reduce(
+            (sum, p) => sum + (p.a === id || p.b === id ? p.energy / 2 : 0),
+            0,
+          ),
     };
   }
-  // Mechanical energy of the whole scene. Electric potential energy is not
-  // included.
+  // Energy of the whole scene. `electric` covers the conservative electric
+  // forces: the global uniform field and mutual Coulomb interaction. Field
+  // regions have no potential energy (see Fields.work); `fieldWork` is the
+  // energy they have supplied so far, so `total − fieldWork` is what stays
+  // constant in a scene without friction, damping or inelastic impacts.
   energy() {
     let kinetic = 0,
       gravitational = 0,
-      elastic = 0;
-    for (const id of this.objects.keys()) {
+      elastic = 0,
+      electric = 0;
+    for (const [id, o] of this.objects) {
       const m = this.measure(id);
       kinetic += m.kinetic;
       gravitational += m.gravitational;
+      electric += this.fields.uniformEnergy(o, this.state(id));
     }
+    for (const pair of this.fields.pairEnergies()) electric += pair.energy;
     for (const l of this.links.values())
       if (l.type === "spring") {
         const a = this.endpoint(l, "a"),
@@ -1202,7 +1218,9 @@ export class Sandbox {
       kinetic,
       gravitational,
       elastic,
-      total: kinetic + gravitational + elastic,
+      electric,
+      total: kinetic + gravitational + elastic + electric,
+      fieldWork: this.fields.work,
     };
   }
   // Place a body exactly, without the floor clamp that `add` applies. This is
@@ -1240,6 +1258,7 @@ export class Sandbox {
       format: "physics-sim-scene",
       version: 1,
       time: this.time,
+      fieldWork: this.fields.work,
       settings: { ...this.settings },
       bounds: this.viewport ? { ...this.viewport } : null,
       floor: { ...this.floorMaterial },
@@ -1408,6 +1427,7 @@ export class Sandbox {
     }
     if (data.settings) this.updateSettings(data.settings);
     if (Number.isFinite(data.time)) this.time = data.time;
+    if (Number.isFinite(data.fieldWork)) this.fields.work = data.fieldWork;
     return this;
   }
   remove(id) {

@@ -446,3 +446,87 @@ test("presets show the results they claim", () => {
     s.dispose();
   }
 });
+test("electric potential energy balances the books for uniform fields and Coulomb pairs", () => {
+  // Uniform global field: K + U stays constant, with U = −qE·r.
+  const s = new Sandbox();
+  s.updateSettings({ gravity: 0, electricX: 4, electricY: -3 });
+  const id = s.add("ball", { x: -2, y: 6 });
+  s.updateConstants(id, { charge: 0.5, mass: 2, angularDamping: 0 });
+  s.setVelocity(id, { vx: 1, vy: 2 });
+  const p0 = s.state(id),
+    before = s.energy();
+  near(before.electric, -0.5 * (4 * p0.x - 3 * p0.y), 1e-9);
+  near(s.measure(id).electric, before.electric, 1e-9);
+  run(s, 2);
+  const after = s.energy();
+  assert.ok(Math.abs(after.kinetic - before.kinetic) > 1); // energy moved
+  near(after.total, before.total, 0.03);
+  near(after.fieldWork, 0, 1e-12); // no regions: nothing supplied from outside
+  s.dispose();
+  // Two repelling charges released from rest: U = kq₁q₂/√(r² + ε²) → K.
+  const c = new Sandbox();
+  c.updateSettings({
+    gravity: 0,
+    chargeInteractions: true,
+    coulombConstant: 2,
+    chargeSoftening: 0.1,
+  });
+  const a = c.add("ball", { x: -1.5, y: 50 }),
+    b = c.add("ball", { x: 1.5, y: 50 });
+  c.updateConstants(a, { charge: 2, angularDamping: 0 });
+  c.updateConstants(b, { charge: 3, mass: 4, angularDamping: 0 });
+  const start = c.energy();
+  near(start.electric, (2 * 2 * 3) / Math.hypot(3, 0.1), 1e-9);
+  near(start.kinetic, 0, 1e-12);
+  // Each body holds half of the pair's energy.
+  near(c.measure(a).electric + c.measure(b).electric, start.electric, 1e-9);
+  run(c, 5);
+  const end = c.energy();
+  assert.ok(end.kinetic > 1);
+  near(end.total, start.total, 0.01);
+  // With interactions switched off there is no mutual energy to report.
+  c.updateSettings({ chargeInteractions: false });
+  near(c.energy().electric, 0, 1e-12);
+  c.dispose();
+});
+test("work done by field regions is reported, so total minus that work is conserved", () => {
+  const s = new Sandbox();
+  s.updateSettings({ gravity: 0 });
+  const region = s.fields.add("electric", { x: 0, y: 20 });
+  s.fields.update(region, { width: 4, height: 6, strength: 5 }); // +x, 5 N/C
+  const id = s.add("ball", { x: -4, y: 20 });
+  s.resizeBody(id, 0.2);
+  s.updateConstants(id, { charge: 0.4, angularDamping: 0 });
+  s.setVelocity(id, { vx: 2 });
+  const before = s.energy();
+  run(s, 3); // crosses the whole 4 m region
+  const after = s.energy();
+  assert.ok(s.state(id).x > 2);
+  // W = qEd = 0.4 × 5 × 4 = 8 J, all of it appearing as kinetic energy.
+  near(after.fieldWork, 8, 0.1);
+  near(after.kinetic - before.kinetic, after.fieldWork, 1e-9);
+  near(after.electric, 0, 1e-12); // regions carry no potential energy
+  near(after.total - after.fieldWork, before.total, 1e-9);
+  // The running total survives save and reload.
+  const copy = Sandbox.fromScene(JSON.parse(JSON.stringify(s.exportScene())));
+  near(copy.energy().fieldWork, after.fieldWork, 1e-12);
+  copy.dispose();
+  s.dispose();
+  // A magnetic region does no work, alone or crossed with an electric one.
+  const { s: v, ids } = load("velocity-selector");
+  const start = v.energy();
+  run(v, 3);
+  const finish = v.energy();
+  near(finish.total - finish.fieldWork, start.total, 0.02);
+  near(v.measure(ids[1]).kinetic, 0.5 * 9, 1e-6); // the matched charge
+  v.dispose();
+  const m = new Sandbox();
+  m.updateSettings({ gravity: 0, magneticZ: 3 });
+  const q = m.add("ball", { x: 0, y: 30 });
+  m.updateConstants(q, { charge: 1, angularDamping: 0 });
+  m.setVelocity(q, { vx: 2 });
+  run(m, 3);
+  near(m.energy().fieldWork, 0, 1e-12);
+  near(m.energy().kinetic, 2, 1e-9);
+  m.dispose();
+});
