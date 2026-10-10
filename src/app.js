@@ -339,218 +339,246 @@ function propertyRow({ id, name, unit, min, max, help, value }) {
   row.append(label, range, box, info);
   return { row, input, range };
 }
+// Menu id for the ground (and walls), which is not a selectable object.
+const FLOOR = "floor";
 function openMenu(id, x, y) {
   const o = sim.objects.get(id),
     l = sim.links.get(id),
-    f = sim.fields.regions.get(id);
-  if (!o && !l && !f) return;
+    f = sim.fields.regions.get(id),
+    floor = id === FLOOR;
+  if (!o && !l && !f && !floor) return;
   menuId = id;
   menuPoint = { x, y };
-  select(id);
-  $("menu-title").textContent = f
-    ? f.type === "electric"
-      ? "Electric field"
-      : "Magnetic field"
-    : o
-      ? (o.shape === "ball"
-          ? "Ball"
-          : o.shape === "wedge"
-            ? "Wedge"
-            : "Block") + " · material constants"
-      : l.type === "spring"
-        ? "Spring constants"
-        : l.type === "rod"
-          ? "Rod constant"
-          : l.type === "belt"
-            ? "Belt"
-            : "Pulley cable";
-  $("menu-note").textContent = f
-    ? "Uniform field inside this region; overlaps add. B is perpendicular to the screen: positive out, negative in. Electric direction follows the region angle."
-    : l?.type === "belt"
-      ? "Ideal no-slip belt. Crossed / drive controls are in the selected-item panel. Wheel mass and damping are edited on each ball."
-      : l?.type === "pulley"
-        ? "Taut cable with freely angled ends. Wheel mass and radius determine inertia. Alt-drag refits length; select the wheel to unlock its axle."
-        : "Changes apply while the simulation runs.";
-  const fields = f
+  select(floor ? null : id);
+  $("menu-title").textContent = floor
+    ? "Floor"
+    : f
+      ? f.type === "electric"
+        ? "Electric field"
+        : "Magnetic field"
+      : o
+        ? (o.shape === "ball"
+            ? "Ball"
+            : o.shape === "wedge"
+              ? "Wedge"
+              : "Block") + " · material constants"
+        : l.type === "spring"
+          ? "Spring constants"
+          : l.type === "rod"
+            ? "Rod constant"
+            : l.type === "belt"
+              ? "Belt"
+              : "Pulley cable";
+  $("menu-note").textContent = floor
+    ? "The scene walls share the floor's material. Where two surfaces touch, the contact uses the lower friction and the higher restitution of the two."
+    : f
+      ? "Uniform field inside this region; overlaps add. B is perpendicular to the screen: positive out, negative in. Electric direction follows the region angle."
+      : l?.type === "belt"
+        ? "Ideal no-slip belt. Crossed / drive controls are in the selected-item panel. Wheel mass and damping are edited on each ball."
+        : l?.type === "pulley"
+          ? "Taut cable with freely angled ends. Wheel mass and radius determine inertia. Alt-drag refits length; select the wheel to unlock its axle."
+          : "Changes apply while the simulation runs.";
+  const fields = floor
     ? [
         [
-          "strength",
-          "Strength",
-          f.type === "electric" ? "N/C" : "T",
-          -100,
-          100,
-          0.1,
-          "Negative reverses the field direction.",
-        ],
-        [
-          "width",
-          f.shape === "circle" ? "Diameter" : "Width",
-          "m",
-          0.1,
-          50,
-          0.1,
-          "Resize with R + drag; Z snaps dimensions.",
-        ],
-        ...(f.shape === "circle"
-          ? []
-          : [
-              [
-                "height",
-                "Height",
-                "m",
-                0.1,
-                50,
-                0.1,
-                "Height of the field region.",
-              ],
-            ]),
-        [
-          "angle",
-          "Angle",
-          "°",
-          -180,
-          180,
+          "friction",
+          "Surface friction",
+          "μ",
+          0,
           1,
-          "Counterclockwise from right. Ctrl-drag to rotate.",
+          0.05,
+          "Friction coefficient of the floor and walls.",
         ],
         [
-          "gradientX",
-          "Gradient origin X",
-          "m",
-          -50,
-          50,
-          0.1,
-          "Offset from the region centre in world axes.",
-        ],
-        [
-          "gradientY",
-          "Gradient origin Y",
-          "m",
-          -50,
-          50,
-          0.1,
-          "Offset from the region centre in world axes.",
-        ],
-        [
-          "gradientAngle",
-          "Gradient angle",
-          "°",
-          -180,
-          180,
+          "restitution",
+          "Restitution",
+          "e",
+          0,
           1,
-          "Independent of the region angle.",
-        ],
-        [
-          "gradientScaleX",
-          "Gradient X scale",
-          "m",
           0.05,
-          100,
-          0.1,
-          "Reference distance for falloff; circular profiles use this scale.",
-        ],
-        [
-          "gradientScaleY",
-          "Gradient Y scale",
-          "m",
-          0.05,
-          100,
-          0.1,
-          "Second axis for ellipse and box profiles.",
+          "Bounciness of the floor and walls. 0: no bounce · 1: ideally elastic.",
         ],
       ]
-    : o
+    : f
       ? [
-          ["mass", "Mass", "kg", 0.05, 100, 0.1, "Inertial mass."],
           [
-            "charge",
-            "Charge",
-            "C",
+            "strength",
+            "Strength",
+            f.type === "electric" ? "N/C" : "T",
             -100,
             100,
             0.1,
-            "Signed point charge at the centre. Zero is neutral.",
+            "Negative reverses the field direction.",
           ],
           [
-            "friction",
-            "Surface friction",
-            "μ",
-            0,
-            1,
-            0.05,
-            "Contact friction, not internal material hysteresis.",
-          ],
-          [
-            "restitution",
-            "Restitution",
-            "e",
-            0,
-            1,
-            0.05,
-            "0: no bounce · 1: ideally elastic contact.",
-          ],
-          [
-            "linearDamping",
-            "Linear damping",
-            "s⁻¹",
-            0,
-            20,
+            "width",
+            f.shape === "circle" ? "Diameter" : "Width",
+            "m",
             0.1,
-            "Velocity decays as exp(−damping × time).",
+            50,
+            0.1,
+            "Resize with R + drag; Z snaps dimensions.",
+          ],
+          ...(f.shape === "circle"
+            ? []
+            : [
+                [
+                  "height",
+                  "Height",
+                  "m",
+                  0.1,
+                  50,
+                  0.1,
+                  "Height of the field region.",
+                ],
+              ]),
+          [
+            "angle",
+            "Angle",
+            "°",
+            -180,
+            180,
+            1,
+            "Counterclockwise from right. Ctrl-drag to rotate.",
           ],
           [
-            "angularDamping",
-            "Angular damping",
-            "s⁻¹",
-            0,
-            20,
+            "gradientX",
+            "Gradient origin X",
+            "m",
+            -50,
+            50,
             0.1,
-            "Spin damping is independent of linear damping.",
+            "Offset from the region centre in world axes.",
+          ],
+          [
+            "gradientY",
+            "Gradient origin Y",
+            "m",
+            -50,
+            50,
+            0.1,
+            "Offset from the region centre in world axes.",
+          ],
+          [
+            "gradientAngle",
+            "Gradient angle",
+            "°",
+            -180,
+            180,
+            1,
+            "Independent of the region angle.",
+          ],
+          [
+            "gradientScaleX",
+            "Gradient X scale",
+            "m",
+            0.05,
+            100,
+            0.1,
+            "Reference distance for falloff; circular profiles use this scale.",
+          ],
+          [
+            "gradientScaleY",
+            "Gradient Y scale",
+            "m",
+            0.05,
+            100,
+            0.1,
+            "Second axis for ellipse and box profiles.",
           ],
         ]
-      : l.type === "spring"
+      : o
         ? [
+            ["mass", "Mass", "kg", 0.05, 100, 0.1, "Inertial mass."],
             [
-              "k",
-              "Spring stiffness",
-              "N/m",
-              0.1,
+              "charge",
+              "Charge",
+              "C",
+              -100,
               100,
               0.1,
-              "Hooke’s law: F = −k × extension.",
+              "Signed point charge at the centre. Zero is neutral.",
             ],
             [
-              "damping",
-              "Spring damping",
-              "N·s/m",
+              "friction",
+              "Surface friction",
+              "μ",
               0,
-              5,
-              0.1,
-              "Damps relative motion along the spring.",
+              1,
+              0.05,
+              "Contact friction, not internal material hysteresis.",
             ],
             [
-              "length",
-              "Rest length",
-              "m",
+              "restitution",
+              "Restitution",
+              "e",
+              0,
+              1,
               0.05,
-              50,
+              "0: no bounce · 1: ideally elastic contact.",
+            ],
+            [
+              "linearDamping",
+              "Linear damping",
+              "s⁻¹",
+              0,
+              20,
               0.1,
-              "Unstretched length.",
+              "Velocity decays as exp(−damping × time).",
+            ],
+            [
+              "angularDamping",
+              "Angular damping",
+              "s⁻¹",
+              0,
+              20,
+              0.1,
+              "Spin damping is independent of linear damping.",
             ],
           ]
-        : ["belt", "pulley"].includes(l.type)
-          ? []
-          : [
+        : l.type === "spring"
+          ? [
+              [
+                "k",
+                "Spring stiffness",
+                "N/m",
+                0.1,
+                100,
+                0.1,
+                "Hooke’s law: F = −k × extension.",
+              ],
+              [
+                "damping",
+                "Spring damping",
+                "N·s/m",
+                0,
+                5,
+                0.1,
+                "Damps relative motion along the spring.",
+              ],
               [
                 "length",
-                "Length",
+                "Rest length",
                 "m",
                 0.05,
                 50,
                 0.1,
-                "The distance held by the rod.",
+                "Unstretched length.",
               ],
-            ];
+            ]
+          : ["belt", "pulley"].includes(l.type)
+            ? []
+            : [
+                [
+                  "length",
+                  "Length",
+                  "m",
+                  0.05,
+                  50,
+                  0.1,
+                  "The distance held by the rod.",
+                ],
+              ];
   const form = $("constants");
   form.replaceChildren();
   form.onsubmit = (e) => e.preventDefault();
@@ -630,13 +658,16 @@ function openMenu(id, x, y) {
       min,
       max,
       help,
-      value: (o || l || f)[key],
+      value: (floor ? sim.floorMaterial : o || l || f)[key],
     });
     input.dataset.constant = key;
     range.dataset.slider = key;
     input.onchange = () => {
-      const current =
-        sim.objects.get(id) || sim.links.get(id) || sim.fields.regions.get(id);
+      const current = floor
+        ? sim.floorMaterial
+        : sim.objects.get(id) ||
+          sim.links.get(id) ||
+          sim.fields.regions.get(id);
       if (!current) {
         closeMenu();
         return;
@@ -646,7 +677,8 @@ function openMenu(id, x, y) {
           throw new Error(
             `Enter ${name.toLowerCase()} between ${min} and ${max}.`,
           );
-        if (f) {
+        if (floor) sim.updateFloor({ [key]: Number(input.value) });
+        else if (f) {
           sim.fields.update(id, { [key]: Number(input.value) });
           showDimensions();
         } else if (o) sim.updateConstants(id, { [key]: Number(input.value) });
@@ -1032,7 +1064,8 @@ function cancelDrag() {
 }
 canvas.addEventListener("contextmenu", (e) => {
   const p = locate(e),
-    id = sim.hit(p) || linkAt(p) || sim.fields.hit(p);
+    // The ground: anywhere at or below y = 0 that is not an object.
+    id = sim.hit(p) || linkAt(p) || sim.fields.hit(p) || (p.y <= 0 && FLOOR);
   if (!id) {
     closeMenu();
     return;

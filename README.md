@@ -159,6 +159,8 @@ The floor is not selectable or editable. Gravity defaults to 9.81 m/s² and is c
 
 ## Right-click menu
 
+Right-click the **ground** (anywhere at or below y = 0 that is not an object) for the **Floor** menu: **Surface friction μ** and **Restitution e**, both 0–1 (defaults 0.5 and 0). The scene walls share the floor's material. Where two surfaces touch, the contact uses the lower friction and the higher restitution of the two, so a bouncy ball still bounces on a dead floor. The floor material is saved with the scene and reset by Clear scene.
+
 For a ball, block or wedge, these constants are editable:
 
 | Constant              | Meaning                                         |

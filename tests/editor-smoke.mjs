@@ -949,6 +949,44 @@ for (const open of [
   assert.equal($("vector-legend").hidden, true);
   delete ctx.fillText;
 }
+// Right-clicking the ground opens the floor material menu.
+{
+  clearScene();
+  frames(1);
+  assert.equal(menu(500, 680).defaultPrevented, true);
+  assert.equal($("menu-title").textContent, "Floor");
+  assert.match($("menu-note").textContent, /walls share/);
+  assert.match(
+    $("menu-note").textContent,
+    /lower friction.*higher restitution/,
+  );
+  assert.equal($("selection").hidden, true, "the floor is not selected");
+  const friction = $("constants").querySelector('[data-constant="friction"]'),
+    restitution = $("constants").querySelector('[data-constant="restitution"]');
+  assert.equal(friction.value, "0.5");
+  assert.equal(restitution.value, "0");
+  change(friction, "0.2");
+  change(restitution, "0.9");
+  $("close-menu").click();
+  menu(300, 690);
+  assert.equal(
+    $("constants").querySelector('[data-constant="friction"]').value,
+    "0.2",
+  );
+  assert.equal(
+    $("constants").querySelector('[data-constant="restitution"]').value,
+    "0.9",
+  );
+  // Out-of-range input is rejected and the old value restored.
+  change($("constants").querySelector('[data-constant="friction"]'), "3");
+  assert.equal(
+    $("constants").querySelector('[data-constant="friction"]').value,
+    "0.2",
+  );
+  $("close-menu").click();
+  // Above the ground with nothing there, no menu opens.
+  assert.equal(menu(500, 300).defaultPrevented, false);
+}
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );
