@@ -142,16 +142,6 @@ input[type="checkbox"] {
   width: 14px;
   height: 14px;
 }
-.hint {
-  position: absolute;
-  bottom: 34px;
-  left: 20px;
-  right: 20px;
-  text-align: center;
-  font-size: 11px;
-  color: #7d8c77;
-  pointer-events: none;
-}
 .status {
   position: absolute;
   bottom: 16px;
@@ -258,10 +248,6 @@ input[type="checkbox"] {
   }
   .brand {
     font-size: 13px;
-  }
-  .hint {
-    font-size: 10px;
-    bottom: 32px;
   }
   .status {
     left: 14px;
@@ -576,7 +562,6 @@ select {
   color: #ecf5e8;
   border-color: #768d70;
 }
-:root[data-theme="dark"] .hint,
 :root[data-theme="dark"] .status {
   color: #abbba8;
 }
@@ -602,9 +587,6 @@ select {
   }
   .playback button {
     padding: 6px;
-  }
-  #tool-help {
-    display: none;
   }
 }
 .brand,

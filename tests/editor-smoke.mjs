@@ -1160,6 +1160,16 @@ for (const open of [
   );
   assert.equal($("material-menu").hidden, true);
 }
+// One hint per tool, in the options strip.
+{
+  assert.equal($("hint"), null);
+  key("q");
+  assert.equal($("tool-help").hidden, false);
+  assert.match($("tool-help").textContent, /Drag a box to select/);
+  key("i");
+  assert.equal($("tool-help").hidden, true, "impulse options explain it");
+  key("g");
+}
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );

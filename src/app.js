@@ -79,7 +79,8 @@ function chooseTool(next) {
       : group.dataset.label;
   }
   renderIcons(prefs.iconSet);
-  $("hint").textContent = {
+  // One hint per tool, shown in the tool-options strip under the toolbar.
+  $("tool-help").textContent = {
     select:
       "Drag a box to select · Shift-box adds · drag a selected body to move its assembly · Z toggles snapping",
     grab: "Drag to move · Shift moves · Ctrl rotates · R resizes · Alt refits · Z snaps · ? shortcuts",
@@ -106,8 +107,8 @@ function chooseTool(next) {
   $("tool-name").textContent = tool[0].toUpperCase() + tool.slice(1);
   $("select-options").hidden = tool !== "select";
   $("impulse-options").hidden = tool !== "impulse";
-  $("tool-help").hidden = ["select", "impulse"].includes(tool);
-  $("tool-help").textContent = $("hint").textContent;
+  // Impulse options already explain the drag.
+  $("tool-help").hidden = tool === "impulse";
   canvas.style.cursor = ["grab", "pan"].includes(tool) ? "grab" : "crosshair";
 }
 function select(id) {
