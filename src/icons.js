@@ -58,3 +58,25 @@ export function setPlaybackIcon(running, set) {
   button.dataset.iconLabel = running ? "Pause" : "Run";
   renderIcons(set);
 }
+// Canvas version of an icon: its SVG path data as Path2D objects, filled for
+// sets drawn with fill (Material) and stroked at width 2 for outline sets.
+const canvasIcons = new Map();
+export function canvasIcon(set, name) {
+  const key = set + ":" + name;
+  if (!canvasIcons.has(key)) {
+    const icon = (iconSets[set] || iconSets.material)[name];
+    canvasIcons.set(
+      key,
+      icon && typeof Path2D === "function"
+        ? {
+            paths: [...icon.body.matchAll(/\sd="([^"]+)"/g)].map(
+              (m) => new Path2D(m[1]),
+            ),
+            filled: /fill="currentColor"/.test(icon.body),
+            size: icon.width,
+          }
+        : null,
+    );
+  }
+  return canvasIcons.get(key);
+}

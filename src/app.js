@@ -1,4 +1,4 @@
-import { renderIcons, setPlaybackIcon } from "./icons.js";
+import { canvasIcon, renderIcons, setPlaybackIcon } from "./icons.js";
 import { Sandbox, DT, GRID, snap } from "./physics.js";
 import { setupPreferences } from "./preferences.js";
 import { drawFields, FieldDrag } from "./field-view.js";
@@ -1481,67 +1481,43 @@ function line(a, b, colour, width = 1) {
   ctx.stroke();
 }
 // Lock indicator at a body's centre (or beside a body too small on screen),
-// sized in screen pixels so it does not grow with zoom: a pin (position), a crossed circular arrow (rotation) or a
-// padlock (both). Material draws filled shapes; Lucide and Tabler are
-// stroke-only, like their icons.
-function lockGlyph(kind, p, dark, size) {
-  const ink = dark ? "#cfdec8" : "#3a5140",
-    filled = prefs.iconSet === "material",
-    // Bodies too small to hold the glyph get it beside them instead.
-    offset = size < 14 ? (size + 8) * Math.SQRT1_2 : 0;
+// sized in screen pixels so it does not grow with zoom. It uses the same icons
+// as the Lock toggles in the selected-item panel, so it follows the icon set.
+function lockGlyph(o, p, dark, size) {
+  const names = [
+      ...(o.lockPosition ? ["lockPosition"] : []),
+      ...(o.lockRotation ? ["lockRotation"] : []),
+    ],
+    icons = names.map((n) => canvasIcon(prefs.iconSet, n)).filter(Boolean),
+    px = 14,
+    gap = 3,
+    w = icons.length * px + (icons.length - 1) * gap + 8,
+    h = px + 6,
+    offset = size < 14 ? size * Math.SQRT1_2 + w / 2 + 2 : 0;
+  if (!icons.length) return;
   ctx.save();
-  ctx.translate(Math.round(p.x + offset) + 0.5, Math.round(p.y - offset) + 0.5);
+  ctx.translate(Math.round(p.x + offset), Math.round(p.y - (offset && h)));
   ctx.beginPath();
-  ctx.arc(0, 0, 9.5, 0, Math.PI * 2);
+  if (ctx.roundRect) ctx.roundRect(-w / 2, -h / 2, w, h, h / 2);
+  else ctx.rect(-w / 2, -h / 2, w, h);
   ctx.fillStyle = dark ? "#252d29dd" : "#fffefadd";
   ctx.fill();
   ctx.lineWidth = 0.75;
   ctx.strokeStyle = dark ? "#768d70" : "#b6c9ad";
   ctx.stroke();
-  ctx.strokeStyle = ctx.fillStyle = ink;
-  ctx.lineWidth = 1.4;
-  ctx.lineCap = ctx.lineJoin = "round";
-  ctx.beginPath();
-  if (kind === "position") {
-    // Map pin: the tip marks the fixed point.
-    ctx.moveTo(0, 5.8);
-    ctx.arc(0, -1.6, 3.9, 0.82 * Math.PI, 0.18 * Math.PI);
-    ctx.closePath();
-    if (filled) ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, -1.6, 1.3, 0, Math.PI * 2);
-    if (filled) {
-      ctx.fillStyle = dark ? "#252d29" : "#fffefa";
-      ctx.fill();
-    }
-  } else if (kind === "rotation") {
-    const r = 4.8,
-      end = 1.2 * Math.PI,
-      tip = { x: r * Math.cos(end), y: r * Math.sin(end) },
-      // Direction of travel at the arrow tip, then two barbs behind it.
-      dir = { x: -Math.sin(end), y: Math.cos(end) };
-    ctx.arc(0, 0, r, -0.3 * Math.PI, end);
-    for (const turn of [0.5, -0.5]) {
-      ctx.moveTo(tip.x, tip.y);
-      ctx.lineTo(
-        tip.x - 2.8 * (dir.x * Math.cos(turn) - dir.y * Math.sin(turn)),
-        tip.y - 2.8 * (dir.x * Math.sin(turn) + dir.y * Math.cos(turn)),
-      );
-    }
-    ctx.moveTo(-5.5, 5.5);
-    ctx.lineTo(5.5, -5.5);
-  } else {
-    ctx.moveTo(-2.8, -0.8);
-    ctx.arc(0, -2.6, 2.8, Math.PI, 0);
-    ctx.lineTo(2.8, -0.8);
-    ctx.stroke();
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(-4.2, -0.8, 8.4, 6.6, 1.3);
-    else ctx.rect(-4.2, -0.8, 8.4, 6.6);
-    if (filled) ctx.fill();
-  }
-  ctx.stroke();
+  const ink = dark ? "#cfdec8" : "#3a5140";
+  icons.forEach((icon, i) => {
+    ctx.save();
+    ctx.translate(-w / 2 + 4 + i * (px + gap), -px / 2);
+    ctx.scale(px / icon.size, px / icon.size);
+    ctx.fillStyle = ctx.strokeStyle = ink;
+    ctx.lineWidth = 2;
+    ctx.lineCap = ctx.lineJoin = "round";
+    for (const path of icon.paths)
+      if (icon.filled) ctx.fill(path);
+      else ctx.stroke(path);
+    ctx.restore();
+  });
   ctx.restore();
 }
 function draw() {
@@ -1790,11 +1766,7 @@ function draw() {
     }
     if (o.lockPosition || o.lockRotation)
       lockGlyph(
-        o.lockPosition && o.lockRotation
-          ? "both"
-          : o.lockPosition
-            ? "position"
-            : "rotation",
+        o,
         p,
         dark,
         (o.shape === "ball" ? o.radius : Math.min(o.width, o.height) / 2) *
