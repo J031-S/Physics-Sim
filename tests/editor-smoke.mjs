@@ -918,6 +918,37 @@ for (const open of [
   assert.equal($("setting-gravity").value, "9.81");
   assert.equal($("setting-walls").checked, true);
 }
+// Net force arrows: a freely falling 1 kg ball is labelled m·g = 9.81 N.
+{
+  clearScene();
+  if ($("pause").textContent === "Run") key(" ");
+  key("b");
+  click(500, 150);
+  assert.equal($("selected-name").textContent, "Ball");
+  for (const id of ["vectors", "force-vectors"]) {
+    $(id).checked = false;
+    $(id).dispatchEvent(new window.Event("change"));
+  }
+  assert.equal($("vector-legend").hidden, true);
+  key("f");
+  assert.equal($("force-vectors").checked, true);
+  assert.equal($("vector-legend").hidden, false);
+  assert.equal($("legend-velocity").hidden, true);
+  assert.equal($("force-scale-label").hidden, false);
+  const labels = [];
+  ctx.fillText = (text) => labels.push(text);
+  frames(8);
+  assert.ok(labels.includes("9.81 N"), labels.join(", "));
+  key("v");
+  labels.length = 0;
+  frames(1);
+  assert.ok(labels.some((t) => / m\/s$/.test(t)));
+  assert.equal($("legend-velocity").hidden, false);
+  key("f");
+  key("v");
+  assert.equal($("vector-legend").hidden, true);
+  delete ctx.fillText;
+}
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );

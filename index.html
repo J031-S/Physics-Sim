@@ -183,12 +183,27 @@
             data-icon-label="Velocity vectors"
             data-icon-only="true"
           ></span></label
-        ><label class="icon-toggle" title="Net force vectors"
+        ><label class="icon-toggle" title="Net force vectors (F)"
           ><input type="checkbox" id="force-vectors" /><span
             data-icon="force"
             data-icon-label="Net force vectors"
             data-icon-only="true"
           ></span></label
+        ><label
+          id="force-scale-label"
+          class="cluster-scale"
+          title="Net force arrow scale"
+          hidden
+          ><input
+            id="force-scale"
+            type="number"
+            min="0.1"
+            max="100"
+            step="any"
+            value="4"
+            aria-label="Net force arrow scale, pixels per newton"
+          />
+          px/N</label
         ><label class="icon-toggle" title="Snapping (Z) — 0.5 m / 15°"
           ><input type="checkbox" id="snap-toggle" /><span
             data-icon="snap"
@@ -196,6 +211,17 @@
             data-icon-only="true"
           ></span
         ></label>
+      </div>
+      <div id="vector-legend" class="vector-legend" hidden>
+        <div id="legend-velocity">
+          <span class="swatch velocity" aria-hidden="true"></span> Velocity
+          <small id="legend-velocity-scale"></small>
+        </div>
+        <div id="legend-force">
+          <span class="swatch force" aria-hidden="true"></span> Net force
+          (average of last 6 steps)
+          <small id="legend-force-scale"></small>
+        </div>
       </div>
       <div
         id="selection"
@@ -648,8 +674,8 @@
           Electric · Magnetic field. Right-click for shape, size and strength;
           drag to move, Ctrl to rotate, R to resize.
         </dd>
-        <dt>V</dt>
-        <dd>Toggle velocity vectors</dd>
+        <dt>V · F</dt>
+        <dd>Toggle velocity · net force vectors</dd>
         <dt>R + drag</dt>
         <dd>Resize in place (ball diameter; block width / height)</dd>
         <dt>Z</dt>

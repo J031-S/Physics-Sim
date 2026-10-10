@@ -1174,6 +1174,23 @@ for (const key of settingKeys) {
     input.value = sim.settings[key];
   };
 }
+function updateVectorLegend() {
+  const v = $("vectors").checked,
+    f = $("force-vectors").checked;
+  $("vector-legend").hidden = !v && !f;
+  $("legend-velocity").hidden = !v;
+  $("legend-force").hidden = !f;
+  $("force-scale-label").hidden = !f;
+  $("legend-velocity-scale").textContent = `${VELOCITY_PX} px per m/s`;
+  $("legend-force-scale").textContent = `${fixed(forceScale())} px per N`;
+}
+$("vectors").onchange = updateVectorLegend;
+$("force-vectors").onchange = updateVectorLegend;
+$("force-scale").onchange = () => {
+  $("force-scale").value = fixed(forceScale());
+  updateVectorLegend();
+};
+$("force-scale").oninput = updateVectorLegend;
 $("snap-toggle").onchange = (e) => {
   sim.updateSettings({ snapping: e.target.checked });
   snapStatus();
@@ -1270,6 +1287,7 @@ function replaceScene(next, { fit = true } = {}) {
   cancelDrag();
   sim.dispose();
   sim = next;
+  forceHistory.clear();
   selected = null;
   pending = null;
   select(null);
@@ -1408,6 +1426,7 @@ $("clear-yes").onclick = () => {
   const snapping = sim.settings.snapping;
   sim.dispose();
   sim = new Sandbox();
+  forceHistory.clear();
   sim.updateSettings({ walls: true, snapping });
   syncSettings();
   canvas.focus();
@@ -1552,6 +1571,12 @@ document.addEventListener("keydown", (e) => {
   }
   if (key === "v") {
     $("vectors").checked = !$("vectors").checked;
+    updateVectorLegend();
+    e.preventDefault();
+  }
+  if (key === "f") {
+    $("force-vectors").checked = !$("force-vectors").checked;
+    updateVectorLegend();
     e.preventDefault();
   }
   if (e.key === "?") {
@@ -1697,6 +1722,86 @@ function lockGlyph(o, p, dark, size) {
     ctx.restore();
   });
   ctx.restore();
+}
+// Vector arrows use linear scales in screen pixels, so lengths compare
+// directly. Velocity: fixed px per m/s. Net force: px per newton set in the
+// view cluster, averaged over the last few steps because a collision is a
+// single-step spike; long force arrows are capped and marked with a break.
+const VELOCITY_PX = 12,
+  VELOCITY_COLOUR = "#497caa",
+  FORCE_CAP = 180,
+  FORCE_STEPS = 6,
+  forceHistory = new Map();
+function forceScale() {
+  const value = Number($("force-scale").value);
+  return Number.isFinite(value) ? Math.max(0.1, Math.min(100, value)) : 4;
+}
+function fixed(value) {
+  return Number(value.toPrecision(3)).toString();
+}
+function recordForces() {
+  for (const o of sim.objects.values()) {
+    const list = forceHistory.get(o.id) || [];
+    list.push(sim.netForce(o.id));
+    if (list.length > FORCE_STEPS) list.shift();
+    forceHistory.set(o.id, list);
+  }
+  for (const id of forceHistory.keys())
+    if (!sim.objects.has(id)) forceHistory.delete(id);
+}
+function averageForce(id) {
+  const list = forceHistory.get(id);
+  if (!list?.length) return { x: 0, y: 0 };
+  return {
+    x: list.reduce((t, f) => t + f.x, 0) / list.length,
+    y: list.reduce((t, f) => t + f.y, 0) / list.length,
+  };
+}
+function stepOnce() {
+  sim.step();
+  recordForces();
+}
+// Arrow from screen point p along world-space (dx, dy) pixels (y up).
+function arrow(p, dx, dy, colour, label, cap = 600) {
+  const length = Math.hypot(dx, dy),
+    capped = length > cap,
+    k = capped ? cap / length : 1,
+    end = { x: p.x + dx * k, y: p.y - dy * k },
+    a = Math.atan2(end.y - p.y, end.x - p.x);
+  line(p, end, colour, 2);
+  for (const turn of [-0.45, 0.45])
+    line(
+      end,
+      {
+        x: end.x - 7 * Math.cos(a + turn),
+        y: end.y - 7 * Math.sin(a + turn),
+      },
+      colour,
+      2,
+    );
+  if (capped)
+    // Two short slashes across the shaft: drawn shorter than true length.
+    for (const at of [0.62, 0.68]) {
+      const c = { x: p.x + (end.x - p.x) * at, y: p.y + (end.y - p.y) * at },
+        n = { x: -Math.sin(a), y: Math.cos(a) };
+      line(
+        {
+          x: c.x + 5 * n.x - 2 * Math.cos(a),
+          y: c.y + 5 * n.y - 2 * Math.sin(a),
+        },
+        {
+          x: c.x - 5 * n.x + 2 * Math.cos(a),
+          y: c.y - 5 * n.y + 2 * Math.sin(a),
+        },
+        colour,
+        1.5,
+      );
+    }
+  if (label) {
+    ctx.fillStyle = colour;
+    ctx.font = "10px ui-monospace, monospace";
+    ctx.fillText(label, end.x + 7, end.y - 6);
+  }
 }
 function draw() {
   const r = canvas.getBoundingClientRect(),
@@ -1952,35 +2057,29 @@ function draw() {
       );
     if ($("vectors").checked) {
       const speed = Math.hypot(s.vx, s.vy);
-      if (speed > 0.03) {
-        const factor = Math.min(14, 130 / speed),
-          end = { x: p.x + s.vx * factor, y: p.y - s.vy * factor },
-          a = Math.atan2(end.y - p.y, end.x - p.x);
-        line(p, end, "#497caa", 2);
-        line(
-          end,
-          {
-            x: end.x - 7 * Math.cos(a - 0.45),
-            y: end.y - 7 * Math.sin(a - 0.45),
-          },
-          "#497caa",
-          2,
+      if (speed * VELOCITY_PX >= 3)
+        arrow(
+          p,
+          s.vx * VELOCITY_PX,
+          s.vy * VELOCITY_PX,
+          VELOCITY_COLOUR,
+          highlighted(o.id) && fixed(speed) + " m/s",
         );
-        line(
-          end,
-          {
-            x: end.x - 7 * Math.cos(a + 0.45),
-            y: end.y - 7 * Math.sin(a + 0.45),
-          },
-          "#497caa",
-          2,
+    }
+    if ($("force-vectors").checked) {
+      const f = averageForce(o.id),
+        size = Math.hypot(f.x, f.y),
+        length = size * forceScale();
+      // A body at rest has zero net force and draws nothing.
+      if (length >= 3)
+        arrow(
+          p,
+          f.x * forceScale(),
+          f.y * forceScale(),
+          dark ? "#ef8a6f" : "#c2410c",
+          o.id === selected && fixed(size) + " N",
+          FORCE_CAP,
         );
-        if (highlighted(o.id)) {
-          ctx.fillStyle = "#497caa";
-          ctx.font = "10px monospace";
-          ctx.fillText(speed.toFixed(1) + " m/s", end.x + 7, end.y - 6);
-        }
-      }
     }
   }
   if (sim.grab) {
@@ -2067,7 +2166,7 @@ function frame(now) {
   if (running) {
     accumulator += elapsed;
     while (accumulator >= DT) {
-      sim.step();
+      stepOnce();
       accumulator -= DT;
     }
   }
@@ -2093,5 +2192,6 @@ for (const [key, t] of Object.entries({
     `${t[0].toUpperCase() + t.slice(1)} (${key})`;
 chooseTool("grab");
 snapStatus();
+updateVectorLegend();
 draw();
 requestAnimationFrame(frame);

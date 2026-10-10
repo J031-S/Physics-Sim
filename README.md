@@ -26,6 +26,7 @@ Click **Keys ?** (or press **?**) for the built-in shortcut guide. Shortcuts do 
 | Wheel / middle-drag     | Zoom at cursor / pan in any tool                                                     |
 | E / M                   | Electric / Magnetic field                                                            |
 | V                       | Toggle velocity vectors                                                              |
+| F                       | Toggle net force vectors                                                             |
 | R + left-drag           | Resize a body or field about its current centre                                      |
 | Z                       | Toggle snapping for every geometry operation; also available in Settings             |
 | Shift + drag            | Prioritise movement; moving a position-locked body requires Pause                    |
@@ -44,6 +45,12 @@ In the constants menu each property is one row: name, slider, then the number wi
 - **Resize:** hold R before starting a drag, or click the selected-item panel's **Resize (R)** button. Drag outward/inward to resize a ball's diameter; drag a block near a corner to change width and height along its local axes. Dimensions appear beside the selection. The body stays centred and still during the gesture, even while physics runs. Mass stays constant; inertia is recalculated. Limits are 0.1–10 m. Edits that penetrate the floor or overlap pulley wheels are rejected. Return from the button-operated resize tool with G.
 - **Spring / Rod:** click two bodies, or a world anchor and a body. Connections attach at body centres. Select a connection by clicking its line. Alt-drag changes rod length while paused or running.
 - **Pause / Clear scene:** pause deliberately stops physics but editing still works. Clear removes everything except the static floor. Dragging does not pause the world.
+
+### Velocity and net force vectors
+
+**Velocity vectors** (V) and **Net force vectors** (F) are toggled from the bottom-left view cluster. Both use **linear** scales in screen pixels, so arrow lengths can be compared directly: velocity is 12 px per m/s, and net force uses the px/N value next to its toggle (default 4 px/N). A legend above the cluster names both colours and their scales. The selected body's arrows are labelled with the speed in m/s and the net force in newtons (three significant figures).
+
+The net force is `sim.netForce()` (gravity, contact, friction, rod, spring and cable forces together) **averaged over the last 6 steps** (0.05 s), because a collision lasts a single 1/120 s step and would otherwise flash as a one-frame spike. Very long force arrows are capped on screen and marked with two slashes across the shaft; the label stays truthful. A body at rest, or a position-locked one, has zero net force and draws no arrow; separate weight / normal / friction arrows are not drawn.
 
 ### Presets, save and load
 

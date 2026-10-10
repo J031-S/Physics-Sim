@@ -1054,3 +1054,68 @@ button:disabled {
 #clear-confirm .danger:hover {
   background: #8e463d;
 }
+.cluster-scale {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 2px;
+  font-size: 10px;
+  opacity: 0.85;
+}
+.cluster-scale input {
+  width: 46px;
+  padding: 3px 4px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: transparent;
+  font-size: 11px;
+}
+/* Legend for velocity / net force arrows, above the view cluster. */
+.vector-legend {
+  position: absolute;
+  left: 16px;
+  bottom: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 9px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 10px;
+  pointer-events: none;
+  zoom: var(--ui-scale);
+}
+.vector-legend > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vector-legend small {
+  opacity: 0.65;
+  font-family: ui-monospace, monospace;
+}
+.swatch {
+  position: relative;
+  width: 22px;
+  height: 2px;
+  background: currentColor;
+}
+.swatch::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: -4px;
+  border: 5px solid transparent;
+  border-left: 7px solid currentColor;
+  border-right: 0;
+}
+.swatch.velocity {
+  color: #497caa;
+}
+.swatch.force {
+  color: #c2410c;
+}
+:root[data-theme="dark"] .swatch.force {
+  color: #ef8a6f;
+}
