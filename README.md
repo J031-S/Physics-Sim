@@ -208,6 +208,8 @@ Settings adds a uniform **background field** to each scene, and holds the websit
 
 In the electric scene, choose **Test charge** (`T`) and click to release one from rest. It is a +1 nC, 1 µg particle, so its acceleration in m/s² equals the field in N/C (`a = qE/m`). It moves in real time, leaves a dotted trail, and shows its speed while Values is on. The Display panel counts the test charges and has a **Clear** button for them and their trails.
 
+**Test grid** (`Shift+T`) replaces any test charges with one at every grid intersection on screen and releases them all at the same moment, so you can watch the whole field act at once. The spacing is the drawn grid's (0.25 m), doubled until the points are at least 40 px apart: 0.5 m at 100% zoom, which is about 460 charges. Intersections on top of a point charge are left out, the limit is 1200, and in a grid each trail keeps only its most recent 1000 px or so.
+
 - A test charge feels the field but does not add to it, and test charges do not affect each other.
 - It stops when it lands on a plate or reaches a negative charge, and is stopped if it strays 150 m away. Its trail stays.
 - **Its path is not a field line.** It has inertia, so it only follows a field line where the line is straight (from a single charge, between parallel plates, or along the line joining two charges). Elsewhere it overshoots the curve, and may miss a negative charge altogether and swing round it.

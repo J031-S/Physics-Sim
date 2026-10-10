@@ -309,3 +309,9 @@
   padding: 3px 9px;
   font-size: 11px;
 }
+.glyph-grid {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  opacity: 0.55;
+}

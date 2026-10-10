@@ -164,6 +164,19 @@
               </svg>
               <span>Test charge</span></button
             ><button
+              id="test-grid"
+              data-for="electric"
+              title="Release a test charge at every grid intersection on screen, all at once (Shift+T)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 8h18M3 16h18M8 3v18M16 3v18" class="glyph-grid" />
+                <circle cx="8" cy="8" r="2.4" class="glyph-dot" />
+                <circle cx="16" cy="8" r="2.4" class="glyph-dot" />
+                <circle cx="8" cy="16" r="2.4" class="glyph-dot" />
+                <circle cx="16" cy="16" r="2.4" class="glyph-dot" />
+              </svg>
+              <span>Test grid</span></button
+            ><button
               data-add="wire-out"
               data-for="magnetic"
               aria-pressed="false"
@@ -536,7 +549,8 @@
         <dt>T</dt>
         <dd>
           Test charge (electric scene): click to release one from rest. It moves
-          in the field and leaves a trail.
+          in the field and leaves a trail. Shift+T releases one at every grid
+          intersection on screen, all together.
         </dd>
         <dt>Z</dt>
         <dd>Toggle snapping to 0.25 m and 15°</dd>

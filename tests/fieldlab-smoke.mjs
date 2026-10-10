@@ -307,6 +307,39 @@ assert.equal($("test-row").hidden, false);
 $("clear-tests").click();
 assert.equal($("test-row").hidden, true);
 frame();
+// Test grid: one at every grid intersection on screen, replacing any others
+// and all released together. The view shows the 6 m plates fitted in.
+document.querySelector('[data-add="test"]').click();
+click(at(1, 0.2));
+$("test-grid").click();
+assert.match(
+  $("toast").textContent,
+  /^\d+ test charges released, [\d.]+ m apart$/,
+);
+const released = parseInt($("toast").textContent, 10);
+assert.ok(released > 100, "a screenful");
+assert.equal(
+  $("test-status").textContent,
+  `${released} test charges · ${released} moving`,
+);
+assert.equal($("tool-name").textContent, "Grab");
+for (let i = 0; i < 30; i++) frame();
+const still = Number($("test-status").textContent.match(/· (\d+) moving/)[1]);
+assert.ok(still < released, "those between the plates have landed");
+assert.match(
+  $("test-status").textContent,
+  new RegExp(`^${released} test charges`),
+);
+key("T", { shiftKey: true });
+assert.equal(
+  $("test-status").textContent,
+  `${released} test charges · ${released} moving`,
+);
+key("m");
+assert.equal($("test-grid").hidden, true);
+key("e");
+$("clear-tests").click();
+frame();
 
 // View controls.
 const zoom = () => parseInt($("zoom-level").textContent, 10);

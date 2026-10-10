@@ -642,3 +642,63 @@ test("equipotentials also return the sampled potential for shading", () => {
   assert.ok(at(-3, 1) > 0 && at(3, 1) < 0);
   near(at(0, 2), 0, 1e-9);
 });
+
+test("test charge grid: one per intersection, all evolving together", async () => {
+  const { TestCharges, TEST_CHARGE } = await import("../src/fieldlab/model.js");
+  const a = TEST_CHARGE.charge / TEST_CHARGE.mass;
+  // In a uniform field every one has the same acceleration, so the whole
+  // grid moves as a rigid block: ½at² in 0.5 s.
+  const uniform = new FieldLab();
+  uniform.setUniform("electric", { x: 0, y: -8 });
+  const u = new TestCharges(uniform, { limit: 500 });
+  assert.equal(
+    u.fillGrid({ minX: -2, maxX: 2, minY: -1, maxY: 1 }, 0.5),
+    9 * 5,
+  );
+  const start = u.items.map((t) => [t.x, t.y]);
+  assert.deepEqual(start[0], [-2, -1]);
+  assert.deepEqual(start.at(-1), [2, 1]);
+  for (let i = 0; i < 60; i++) u.step(1 / 120);
+  u.items.forEach((t, i) => {
+    near(t.x, start[i][0], 1e-9);
+    close(start[i][1] - t.y, 0.5 * a * 8 * 0.25, 1e-6, "½at²");
+    close(t.time, 0.5, 1e-9, "same clock");
+  });
+
+  // Round a dipole the grid keeps the mirror symmetry of the field, each one
+  // conserves energy, and none starts on a charge.
+  const lab = new FieldLab();
+  lab.add("charge", { x: -1.5, y: 0, charge: 2 * nC });
+  lab.add("charge", { x: 1.5, y: 0, charge: -2 * nC });
+  const d = new TestCharges(lab, { limit: 500, captureRadius: 0.1 });
+  // 13 × 9 points, less the two that fall on the charges.
+  assert.equal(
+    d.fillGrid({ minX: -3, maxX: 3, minY: -2, maxY: 2 }, 0.5),
+    13 * 9 - 2,
+  );
+  const from = d.items.map((t) => [t.x, t.y]),
+    mirror = d.items.map((t, i) =>
+      from.findIndex((p) => p[0] === from[i][0] && p[1] === -from[i][1]),
+    );
+  for (let i = 0; i < 60; i++) d.step(1 / 120);
+  d.items.forEach((t, i) => {
+    const m = d.items[mirror[i]];
+    near(m.x, t.x, 1e-9, "mirror x");
+    near(m.y, -t.y, 1e-9, "mirror y");
+    if (t.moving)
+      close(
+        0.5 * (t.vx ** 2 + t.vy ** 2),
+        a * (lab.potential(...from[i]) - lab.potential(t.x, t.y)),
+        5e-3,
+        "energy",
+      );
+  });
+  assert.ok(d.moving < d.items.length, "some have reached the negative charge");
+  // Filling again starts afresh; too many is refused and changes nothing.
+  assert.equal(d.fillGrid({ minX: 0, maxX: 1, minY: 0, maxY: 1 }, 1), 4);
+  assert.throws(
+    () => d.fillGrid({ minX: -50, maxX: 50, minY: -50, maxY: 50 }, 1),
+    /Zoom in first/,
+  );
+  assert.equal(d.items.length, 4);
+});

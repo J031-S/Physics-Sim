@@ -394,6 +394,44 @@ export class TestCharges {
     this.items = [];
   }
 
+  // Replace every test charge with one at each point of a square grid of
+  // the given spacing inside `bounds`, all released at the same moment.
+  // Points on top of a charge are left out. Returns how many were placed.
+  fillGrid(bounds, spacing) {
+    if (!(spacing > 0)) throw new Error("The grid spacing must be positive.");
+    const points = [],
+      charges = this.lab.compiled().charges,
+      // Whole multiples of the spacing, so the points sit on grid lines.
+      index = (v, round) =>
+        round(v / spacing - (round === Math.ceil ? 1e-9 : -1e-9));
+    for (
+      let j = index(bounds.minY, Math.ceil);
+      j <= index(bounds.maxY, Math.floor);
+      j++
+    )
+      for (
+        let i = index(bounds.minX, Math.ceil);
+        i <= index(bounds.maxX, Math.floor);
+        i++
+      ) {
+        const x = i * spacing,
+          y = j * spacing;
+        if (
+          !charges.some(
+            (p) => Math.hypot(x - p.x, y - p.y) < this.captureRadius,
+          )
+        )
+          points.push([x, y]);
+      }
+    if (points.length > this.limit)
+      throw new Error(
+        `That would be ${points.length} test charges; the most is ${this.limit}. Zoom in first.`,
+      );
+    this.items = [];
+    for (const [x, y] of points) this.add(x, y);
+    return points.length;
+  }
+
   // Advance every moving test charge by dt seconds: a = qE/m, integrated by
   // velocity Verlet in substeps that shorten close to a point charge, where
   // the field changes quickly.

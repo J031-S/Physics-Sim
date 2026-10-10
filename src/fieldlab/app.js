@@ -42,7 +42,7 @@ const state = {
 };
 // Test charges live in the electric scene; they feel the field only.
 // One that strays 150 m away is stopped, so the scene can come to rest.
-const tests = new TestCharges(lab, { range: 150 });
+const tests = new TestCharges(lab, { range: 150, limit: 1200 });
 let lastFrame = 0,
   previewTheme = null;
 let drag = null,
@@ -789,22 +789,34 @@ function drawForces(c) {
 
 // Test charges and the paths they have taken.
 function drawTests(c) {
+  const many = tests.items.length > 12;
   ctx.lineJoin = "round";
+  ctx.strokeStyle = c.test;
+  // All the trails in one path: a grid of test charges has hundreds.
+  ctx.lineWidth = many ? 1 : 1.6;
+  ctx.globalAlpha = many ? 0.55 : 0.75;
+  ctx.setLineDash(many ? [] : [2, 3]);
+  ctx.beginPath();
+  for (const t of tests.items)
+    for (let i = 0; i < t.trail.length; i++) {
+      const [x, y] = screen(t.trail[i][0], t.trail[i][1]);
+      if (i) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+    }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
   for (const t of tests.items) {
-    ctx.strokeStyle = c.test;
-    ctx.lineWidth = 1.6;
-    ctx.globalAlpha = 0.75;
-    ctx.setLineDash([2, 3]);
-    strokePath(t.trail, true);
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
     const [x, y] = screen(t.x, t.y);
+    if (x < -8 || y < -8 || x > view.width + 8 || y > view.height + 8) continue;
+    ctx.strokeStyle = c.test;
     ctx.beginPath();
-    ctx.arc(x, y, 5.5, 0, 2 * Math.PI);
+    ctx.arc(x, y, many ? 3.2 : 5.5, 0, 2 * Math.PI);
     ctx.fillStyle = t.moving ? c.test : c.panel;
     ctx.fill();
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = many ? 1.2 : 1.5;
     ctx.stroke();
+    if (many) continue;
     ctx.strokeStyle = t.moving ? c.panel : c.test;
     ctx.beginPath();
     ctx.moveTo(x - 3, y);
@@ -815,6 +827,26 @@ function drawTests(c) {
     if (state.show.labels && t.moving)
       label(si(Math.hypot(t.vx, t.vy), "m/s"), x, y - 15, c);
   }
+}
+
+// A test charge at every grid intersection on screen, released together.
+// The spacing is the drawn grid's, doubled until the points are at least
+// 40 px apart, so they stay distinct at any zoom.
+function fillTestGrid() {
+  const spacing =
+    GRID * 2 ** Math.max(0, Math.ceil(Math.log2(40 / (GRID * view.scale))));
+  attempt(() => {
+    tests.captureRadius = SOURCE_RADIUS / view.scale;
+    // Trails are kept to about 1000 px each, a point every 4 px.
+    tests.trailSpacing = 4 / view.scale;
+    tests.trailLength = 250;
+    const n = tests.fillGrid(viewBounds(0), spacing);
+    toast(`${n} test charges released, ${tidy(spacing, 2)} m apart`);
+  });
+  lastFrame = 0;
+  setTool("grab");
+  updateTests();
+  invalidate(false);
 }
 
 function draw() {
@@ -1231,6 +1263,10 @@ canvas.addEventListener("pointerdown", (e) => {
       if (
         attempt(() => {
           tests.captureRadius = SOURCE_RADIUS / view.scale;
+          if (!tests.items.length) {
+            tests.trailSpacing = 0.02;
+            tests.trailLength = 4000;
+          }
           tests.add(at.x, at.y);
         })
       ) {
@@ -1358,7 +1394,8 @@ document.addEventListener("keydown", (e) => {
   else if (key === "l") toggleShow("show-lines");
   else if (key === "a") toggleShow("show-arrows");
   else if (key === "f") toggleShow("show-forces");
-  else if (key === "t" && state.mode === "electric") setTool("test");
+  else if (key === "t" && state.mode === "electric")
+    e.shiftKey ? fillTestGrid() : setTool("test");
   else if (key === "?") togglePanel("keys-panel");
   else if (key === "+" || key === "=")
     zoomAt(view.width / 2, view.height / 2, 1.25);
@@ -1425,6 +1462,7 @@ $("clear").addEventListener("click", () => {
   if (togglePanel("clear-confirm")) $("clear-no").focus();
 });
 $("clear-no").addEventListener("click", () => closePanels());
+$("test-grid").addEventListener("click", fillTestGrid);
 $("clear-tests").addEventListener("click", () => {
   tests.clear();
   updateTests();
