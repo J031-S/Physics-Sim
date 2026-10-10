@@ -1413,7 +1413,8 @@ $("save-scene").onclick = () => {
   document.body.append(link);
   link.click();
   link.remove();
-  setTimeout(() => URL.revokeObjectURL(link.href), 0);
+  // Some browsers start reading the blob after click() returns.
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 };
 $("load-scene").onclick = () => $("scene-file").click();
 $("scene-file").onchange = async () => {
