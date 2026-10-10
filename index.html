@@ -309,6 +309,26 @@
           <summary>Readouts</summary>
           <div id="readout-grid" class="readout-grid"></div>
         </details>
+        <details id="graph-panel" class="graph-panel">
+          <summary>Graph</summary>
+          <label class="select-row"
+            >Plot
+            <select id="graph-quantity">
+              <option value="x">Position x (m)</option>
+              <option value="y">Position y (m)</option>
+              <option value="vx">Velocity vx (m/s)</option>
+              <option value="vy">Velocity vy (m/s)</option>
+              <option value="speed">Speed (m/s)</option>
+              <option value="kinetic">Kinetic energy (J)</option>
+              <option value="total">Total scene energy (J)</option>
+            </select></label
+          >
+          <canvas
+            id="graph-canvas"
+            role="img"
+            aria-label="Graph of the chosen quantity against simulation time for the last 20 seconds"
+          ></canvas>
+        </details>
       </div>
       <div class="hint" id="hint">
         Add a ball or block, then grab and throw it. Right-click for material

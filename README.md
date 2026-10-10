@@ -58,6 +58,10 @@ Selecting a single body adds a collapsible **Readouts** section to the bottom-ri
 
 The **Scene energy** box in the top-right corner shows the total mechanical energy and a stacked bar of its kinetic, gravitational and elastic (spring) parts, with each value listed beside it. A hatched segment is negative (for example gravitational energy with reversed gravity). Electric potential energy is not included. It appears once the scene has a body or connection and can be collapsed. All values use three significant figures in fixed-width digits so they do not jitter.
 
+### Graphs
+
+The selected-item panel also has a collapsible **Graph** for a single selected body. Choose what to plot: position x or y, velocity vx or vy, speed, the body's kinetic energy, or the total scene energy. The graph shows the last 20 s of **simulation** time (one sample per drawn frame), so pausing freezes it and slow motion stretches nothing. The vertical axis scales automatically, but never to less than 10% of the values' size, so a nearly constant quantity such as total energy reads as flat rather than magnifying tiny rounding wobble. The graph starts empty when you select a different body, load a scene, Reset or Clear.
+
 ### Presets, save and load
 
 **Presets** (header) opens a list of ready-made experiments grouped by topic (kinematics, energy and momentum, forces, rotation, oscillations, electricity and magnetism). Each shows a short description and **What to look for**, the textbook result the scene demonstrates. Choosing one replaces the current scene, fits the view to it and starts **paused** so you can read first; press Run (Space) to start.
@@ -182,7 +186,7 @@ Surface friction is not internal material hysteresis. The two damping coefficien
 
 Springs expose stiffness, axial damping and rest length; rods expose length. Every numeric property also has a slider. Sliders apply continuously while dragged and stay synchronized with manual input; manual changes apply on Enter or leaving the field, without pausing, resetting time, or rebuilding the world. Invalid values are rejected. Close with Escape, the cross, or clicking outside. Shift+F10 opens the menu for a selected object while the canvas is focused.
 
-Material menus contain no position/velocity inputs or geometry controls. Geometry, locks and belt drive controls are separate from material constants. Field menus separately expose shape, dimensions, angle and strength. There are no temperature placeholders, equation editor, graph panel, arbitrary custom body shapes, inspector or scene autosave. Scenes are saved and loaded only as files you choose (see Presets, save and load). Only website preferences use localStorage; old scene saves are not loaded or deleted. This is a fresh, transient sandbox on every page load.
+Material menus contain no position/velocity inputs or geometry controls. Geometry, locks and belt drive controls are separate from material constants. Field menus separately expose shape, dimensions, angle and strength. There are no temperature placeholders, equation editor, arbitrary custom body shapes, inspector or scene autosave. Scenes are saved and loaded only as files you choose (see Presets, save and load). Only website preferences use localStorage; old scene saves are not loaded or deleted. This is a fresh, transient sandbox on every page load.
 
 ## Physics implementation
 

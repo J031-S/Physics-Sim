@@ -110,6 +110,7 @@ function chooseTool(next) {
   canvas.style.cursor = ["grab", "pan"].includes(tool) ? "grab" : "crosshair";
 }
 function select(id) {
+  if (id !== selected) graphSamples.length = 0;
   selectionSet = new Set(id ? [id] : []);
   selected = id;
   const o = sim.objects.get(id),
@@ -1321,6 +1322,7 @@ function replaceScene(next, { fit = true } = {}) {
   sim.dispose();
   sim = next;
   forceHistory.clear();
+  graphSamples.length = 0;
   selected = null;
   pending = null;
   select(null);
@@ -1460,6 +1462,7 @@ $("clear-yes").onclick = () => {
   sim.dispose();
   sim = new Sandbox();
   forceHistory.clear();
+  graphSamples.length = 0;
   sim.updateSettings({ walls: true, snapping });
   syncSettings();
   canvas.focus();
@@ -1836,6 +1839,147 @@ function arrow(p, dx, dy, colour, label, cap = 600) {
     ctx.fillText(label, end.x + 7, end.y - 6);
   }
 }
+// Graph of one quantity of the selected body against simulation time. One
+// sample per rendered frame, keeping the last 20 s of sim.time, so pausing
+// freezes the graph. Every quantity is stored so switching shows history.
+const GRAPH_SPAN = 20,
+  GRAPH_UNITS = {
+    x: "m",
+    y: "m",
+    vx: "m/s",
+    vy: "m/s",
+    speed: "m/s",
+    kinetic: "J",
+    total: "J",
+  },
+  graphSamples = [];
+function sampleGraph() {
+  const o = sim.objects.get(selected);
+  if (!o || selectionSet.size > 1) return;
+  const t = sim.time,
+    last = graphSamples.at(-1);
+  if (last && t === last.t) return;
+  // Time went backwards (Reset or a loaded scene): start again.
+  if (last && t < last.t) graphSamples.length = 0;
+  const s = sim.state(o.id),
+    m = sim.measure(o.id);
+  graphSamples.push({
+    t,
+    x: s.x,
+    y: s.y,
+    vx: s.vx,
+    vy: s.vy,
+    speed: m.speed,
+    kinetic: m.kinetic,
+    total: sim.energy().total,
+  });
+  while (graphSamples[0].t < t - GRAPH_SPAN) graphSamples.shift();
+}
+// Round step (1, 2 or 5 × 10ⁿ) giving about `count` intervals over `range`.
+function niceStep(range, count) {
+  const raw = range / count,
+    power = 10 ** Math.floor(Math.log10(raw)),
+    unit = raw / power;
+  return (unit < 1.5 ? 1 : unit < 3.5 ? 2 : unit < 7.5 ? 5 : 10) * power;
+}
+function drawGraph(dark) {
+  const panel = $("graph-panel");
+  if (panel.hidden || !panel.open) return;
+  const c = $("graph-canvas"),
+    g = c.getContext("2d"),
+    dpr = window.devicePixelRatio || 1,
+    w = c.clientWidth || 300,
+    h = c.clientHeight || 130;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
+    c.width = Math.round(w * dpr);
+    c.height = Math.round(h * dpr);
+  }
+  const key = $("graph-quantity").value,
+    unit = GRAPH_UNITS[key],
+    ink = dark ? "#dde6df" : "#354438",
+    grid = dark ? "#48534b" : "#dfe4d9",
+    trace = dark ? "#8fb6e0" : "#3d6f9f",
+    left = 44,
+    right = 8,
+    top = 16,
+    bottom = 20;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  g.font = "9px ui-monospace, monospace";
+  g.fillStyle = ink;
+  g.fillText(`${$("graph-quantity").selectedOptions[0].text}`, left, 10);
+  g.textAlign = "right";
+  g.fillText("t (s)", w - right, h - 2);
+  g.textAlign = "left";
+  if (graphSamples.length < 2) {
+    g.fillText("Run the simulation to plot.", left, h / 2);
+    return;
+  }
+  const t1 = graphSamples.at(-1).t,
+    t0 = Math.max(graphSamples[0].t, t1 - GRAPH_SPAN),
+    tEnd = t0 + GRAPH_SPAN;
+  let lo = Infinity,
+    hi = -Infinity;
+  for (const p of graphSamples) {
+    lo = Math.min(lo, p[key]);
+    hi = Math.max(hi, p[key]);
+  }
+  // Automatic vertical scale with a little headroom. The range is at least
+  // 10% of the values' size, so a nearly constant quantity (total energy,
+  // say) reads as flat instead of magnifying rounding-level wobble.
+  const minRange = Math.max(0.1 * Math.max(Math.abs(lo), Math.abs(hi)), 1e-3);
+  if (hi - lo < minRange) {
+    const mid = (hi + lo) / 2;
+    lo = mid - minRange / 2;
+    hi = mid + minRange / 2;
+  }
+  const pad = (hi - lo) * 0.08;
+  lo -= pad;
+  hi += pad;
+  const X = (t) => left + ((t - t0) / (tEnd - t0)) * (w - left - right),
+    Y = (v) => top + ((hi - v) / (hi - lo)) * (h - top - bottom);
+  g.strokeStyle = grid;
+  g.lineWidth = 1;
+  const yStep = niceStep(hi - lo, 3);
+  g.textAlign = "right";
+  for (let v = Math.ceil(lo / yStep) * yStep; v <= hi; v += yStep) {
+    g.beginPath();
+    g.moveTo(left, Math.round(Y(v)) + 0.5);
+    g.lineTo(w - right, Math.round(Y(v)) + 0.5);
+    g.stroke();
+    g.fillText(
+      (Math.abs(v) < yStep / 1e6 ? 0 : v).toFixed(
+        Math.max(0, -Math.floor(Math.log10(yStep))),
+      ),
+      left - 4,
+      Y(v) + 3,
+    );
+  }
+  g.textAlign = "center";
+  for (let t = Math.ceil(t0 / 5) * 5; t <= tEnd; t += 5) {
+    g.beginPath();
+    g.moveTo(Math.round(X(t)) + 0.5, top);
+    g.lineTo(Math.round(X(t)) + 0.5, h - bottom);
+    g.stroke();
+    if (X(t) < w - right - 24) g.fillText(String(t), X(t), h - 6);
+  }
+  g.textAlign = "left";
+  g.fillText(unit, 4, top + 2);
+  g.strokeStyle = ink;
+  g.strokeRect(
+    left + 0.5,
+    top + 0.5,
+    w - left - right - 1,
+    h - top - bottom - 1,
+  );
+  g.beginPath();
+  graphSamples.forEach((p, i) =>
+    i ? g.lineTo(X(p.t), Y(p[key])) : g.moveTo(X(p.t), Y(p[key])),
+  );
+  g.strokeStyle = trace;
+  g.lineWidth = 1.5;
+  g.stroke();
+}
 // Three significant figures, keeping trailing zeros so a value's width does
 // not jump; tiny values read as zero.
 function sig3(value) {
@@ -1875,6 +2019,7 @@ const READOUT_ROWS = [
 function updateReadouts() {
   const o = sim.objects.get(selected);
   $("readout").hidden = !o || selectionSet.size > 1;
+  $("graph-panel").hidden = $("readout").hidden;
   if (o && $("readout").open) {
     const s = sim.state(o.id),
       m = sim.measure(o.id),
@@ -2264,6 +2409,8 @@ function draw() {
   if (sim.sizing) showDimensions();
   $("time").textContent = sim.time.toFixed(2) + " s";
   updateReadouts();
+  sampleGraph();
+  drawGraph(dark);
 }
 function frame(now) {
   const elapsed = last ? Math.min((now - last) / 1000, 0.05) : 0;

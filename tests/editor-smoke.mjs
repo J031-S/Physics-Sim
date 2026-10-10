@@ -97,7 +97,7 @@ assert.deepEqual(
     "magnetic",
   ],
 );
-assert.equal(document.querySelector("#graph"), null);
+assert.ok($("graph-canvas"), "graph panel exists");
 assert.equal(document.querySelector("#properties"), null);
 assert.equal($("pause").textContent, "Pause");
 tool("ball");
@@ -1020,6 +1020,40 @@ for (const open of [
   frames(1);
   assert.equal($("readout").hidden, true);
   assert.equal($("energy-panel").hidden, false);
+}
+// Graph of the selected body: samples sim time, freezes when paused,
+// clears when the selection changes.
+{
+  clearScene();
+  if ($("pause").textContent === "Run") key(" ");
+  key("b");
+  click(500, 150);
+  $("graph-panel").open = true;
+  change($("graph-quantity"), "vy");
+  const labels = [];
+  ctx.fillText = (text) => labels.push(text);
+  frames(30);
+  labels.length = 0;
+  frames(1);
+  assert.equal($("graph-panel").hidden, false);
+  assert.ok(labels.includes("Velocity vy (m/s)"));
+  assert.ok(labels.includes("m/s"));
+  assert.ok(labels.includes("t (s)"));
+  assert.ok(!labels.includes("Run the simulation to plot."));
+  // Paused: the graph keeps its data.
+  key(" ");
+  labels.length = 0;
+  frames(5);
+  assert.ok(!labels.includes("Run the simulation to plot."));
+  // A new selection starts an empty graph.
+  key("b");
+  click(300, 150);
+  labels.length = 0;
+  frames(2);
+  assert.ok(labels.includes("Run the simulation to plot."));
+  delete ctx.fillText;
+  key(" ");
+  $("graph-panel").open = false;
 }
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
