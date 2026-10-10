@@ -1480,6 +1480,70 @@ function line(a, b, colour, width = 1) {
   ctx.lineWidth = width;
   ctx.stroke();
 }
+// Lock indicator at a body's centre (or beside a body too small on screen),
+// sized in screen pixels so it does not grow with zoom: a pin (position), a crossed circular arrow (rotation) or a
+// padlock (both). Material draws filled shapes; Lucide and Tabler are
+// stroke-only, like their icons.
+function lockGlyph(kind, p, dark, size) {
+  const ink = dark ? "#cfdec8" : "#3a5140",
+    filled = prefs.iconSet === "material",
+    // Bodies too small to hold the glyph get it beside them instead.
+    offset = size < 14 ? (size + 8) * Math.SQRT1_2 : 0;
+  ctx.save();
+  ctx.translate(Math.round(p.x + offset) + 0.5, Math.round(p.y - offset) + 0.5);
+  ctx.beginPath();
+  ctx.arc(0, 0, 9.5, 0, Math.PI * 2);
+  ctx.fillStyle = dark ? "#252d29dd" : "#fffefadd";
+  ctx.fill();
+  ctx.lineWidth = 0.75;
+  ctx.strokeStyle = dark ? "#768d70" : "#b6c9ad";
+  ctx.stroke();
+  ctx.strokeStyle = ctx.fillStyle = ink;
+  ctx.lineWidth = 1.4;
+  ctx.lineCap = ctx.lineJoin = "round";
+  ctx.beginPath();
+  if (kind === "position") {
+    // Map pin: the tip marks the fixed point.
+    ctx.moveTo(0, 5.8);
+    ctx.arc(0, -1.6, 3.9, 0.82 * Math.PI, 0.18 * Math.PI);
+    ctx.closePath();
+    if (filled) ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, -1.6, 1.3, 0, Math.PI * 2);
+    if (filled) {
+      ctx.fillStyle = dark ? "#252d29" : "#fffefa";
+      ctx.fill();
+    }
+  } else if (kind === "rotation") {
+    const r = 4.8,
+      end = 1.2 * Math.PI,
+      tip = { x: r * Math.cos(end), y: r * Math.sin(end) },
+      // Direction of travel at the arrow tip, then two barbs behind it.
+      dir = { x: -Math.sin(end), y: Math.cos(end) };
+    ctx.arc(0, 0, r, -0.3 * Math.PI, end);
+    for (const turn of [0.5, -0.5]) {
+      ctx.moveTo(tip.x, tip.y);
+      ctx.lineTo(
+        tip.x - 2.8 * (dir.x * Math.cos(turn) - dir.y * Math.sin(turn)),
+        tip.y - 2.8 * (dir.x * Math.sin(turn) + dir.y * Math.cos(turn)),
+      );
+    }
+    ctx.moveTo(-5.5, 5.5);
+    ctx.lineTo(5.5, -5.5);
+  } else {
+    ctx.moveTo(-2.8, -0.8);
+    ctx.arc(0, -2.6, 2.8, Math.PI, 0);
+    ctx.lineTo(2.8, -0.8);
+    ctx.stroke();
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(-4.2, -0.8, 8.4, 6.6, 1.3);
+    else ctx.rect(-4.2, -0.8, 8.4, 6.6);
+    if (filled) ctx.fill();
+  }
+  ctx.stroke();
+  ctx.restore();
+}
 function draw() {
   const r = canvas.getBoundingClientRect(),
     dpr = window.devicePixelRatio || 1;
@@ -1724,17 +1788,18 @@ function draw() {
         p.y + 20,
       );
     }
-    if (o.lockPosition) {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = "#3a5140";
-      ctx.fill();
-    }
-    if (o.lockRotation) {
-      ctx.font = "10px system-ui";
-      ctx.fillStyle = "#46553e";
-      ctx.fillText("↻ ×", p.x + 12, p.y - 12);
-    }
+    if (o.lockPosition || o.lockRotation)
+      lockGlyph(
+        o.lockPosition && o.lockRotation
+          ? "both"
+          : o.lockPosition
+            ? "position"
+            : "rotation",
+        p,
+        dark,
+        (o.shape === "ball" ? o.radius : Math.min(o.width, o.height) / 2) *
+          view.scale,
+      );
     if ($("vectors").checked) {
       const speed = Math.hypot(s.vx, s.vy);
       if (speed > 0.03) {
