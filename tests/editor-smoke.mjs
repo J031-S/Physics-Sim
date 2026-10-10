@@ -1090,6 +1090,44 @@ for (const open of [
   assert.equal(document.querySelector(".electric-option").hidden, false);
   assert.equal(document.querySelector('[data-row="electric"]').hidden, false);
 }
+// Right-clicking another object while the constants menu is open opens that
+// object's menu directly (the right press is not swallowed).
+{
+  clearScene();
+  key("b");
+  click(400, 150);
+  key("n");
+  click(650, 150);
+  const rightClick = (x, y) => {
+    canvas.dispatchEvent(
+      new window.PointerEvent("pointerdown", {
+        clientX: x,
+        clientY: y,
+        button: 2,
+        pointerId: 1,
+        bubbles: true,
+      }),
+    );
+    canvas.dispatchEvent(
+      new window.PointerEvent("pointerup", {
+        clientX: x,
+        clientY: y,
+        button: 2,
+        pointerId: 1,
+        bubbles: true,
+      }),
+    );
+    return menu(x, y);
+  };
+  rightClick(400, 150);
+  assert.match($("menu-title").textContent, /^Ball/);
+  rightClick(650, 150);
+  assert.equal($("material-menu").hidden, false);
+  assert.match($("menu-title").textContent, /^Block/);
+  rightClick(500, 680);
+  assert.equal($("menu-title").textContent, "Floor");
+  $("close-menu").click();
+}
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );

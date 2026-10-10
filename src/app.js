@@ -721,8 +721,10 @@ $("material-menu").addEventListener("keydown", (e) => {
 $("material-menu").addEventListener("contextmenu", (e) => e.preventDefault());
 // A press outside an open panel closes it: the constants menu and category
 // drop-downs on any outside press, Settings and Keys on a press on the scene.
-// A scene press that closed something is swallowed (through its pointerup or
-// context menu) so it does not also place an object or start a drag.
+// A left or middle scene press that closed something is swallowed (through
+// its pointerup) so it does not also place an object or start a drag. A
+// right press is not: its context menu opens the menu for whatever is under
+// the pointer, replacing the one it closed.
 let swallowed = null;
 document.addEventListener(
   "pointerdown",
@@ -754,11 +756,11 @@ document.addEventListener(
           close();
           closed = true;
         }
-    if (closed && e.target === canvas) {
+    if (closed && e.target === canvas && e.button !== 2) {
       e.stopPropagation();
       e.preventDefault();
       canvas.focus();
-      swallowed = { id: e.pointerId, button: e.button };
+      swallowed = e.pointerId;
     }
   },
   true,
@@ -766,19 +768,8 @@ document.addEventListener(
 document.addEventListener(
   "pointerup",
   (e) => {
-    if (!swallowed || e.pointerId !== swallowed.id) return;
+    if (swallowed === null || e.pointerId !== swallowed) return;
     e.stopPropagation();
-    // A right-button press still has its context menu to come.
-    if (swallowed.button !== 2) swallowed = null;
-  },
-  true,
-);
-document.addEventListener(
-  "contextmenu",
-  (e) => {
-    if (!swallowed || e.target !== canvas) return;
-    e.stopPropagation();
-    e.preventDefault();
     swallowed = null;
   },
   true,
