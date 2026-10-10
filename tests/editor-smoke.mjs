@@ -590,6 +590,21 @@ assert.equal($("setting-gravity").value, "0");
 change($("range-gravity"), "-2.4", "input");
 assert.equal($("setting-gravity").value, "0");
 assert.ok(document.querySelector(".zero-tick"));
+{
+  const sections = [...document.querySelectorAll(".settings-section")];
+  assert.deepEqual(
+    sections.map((d) => d.querySelector("summary").textContent),
+    ["Simulation", "Fields", "Charge interactions", "Scene", "Website"],
+  );
+  assert.deepEqual(
+    sections.map((d) => d.open),
+    [true, false, false, false, false],
+  );
+  assert.ok(
+    $("range-gravity").closest(".prop-row").contains($("setting-gravity")),
+  );
+  assert.match($("help-gravity").textContent, /Positive pulls down/);
+}
 $("range-gravity").dispatchEvent(
   new window.KeyboardEvent("keydown", {
     key: "ArrowRight",

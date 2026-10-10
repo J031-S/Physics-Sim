@@ -232,223 +232,316 @@
           ×
         </button>
       </div>
-      <p>Changes apply immediately, including while running.</p>
-      <label class="setting-toggle"
-        ><input id="setting-snapping" type="checkbox" /> Snapping (Z) — 0.5 m /
-        15°</label
-      >
-      <label class="setting-toggle"
-        ><input id="setting-walls" type="checkbox" /> Scene boundary
-        walls</label
-      >
-      <label for="setting-gravity">Gravity ↓ <span>m/s²</span></label>
-      <input
-        id="setting-gravity"
-        type="number"
-        min="-50"
-        max="50"
-        step="any"
-        value="9.81"
-      />
-      <div class="zero-slider">
-        <span class="zero-tick" aria-hidden="true"></span>
-        <input
-          id="range-gravity"
-          type="range"
-          min="-50"
-          max="50"
-          step="0.01"
-          value="9.81"
-          aria-label="Gravity slider"
-        />
-        <span class="zero-label" aria-hidden="true">0</span>
-      </div>
-      <small
-        >Positive pulls down; negative pulls up. Slider snaps near the centre
-        mark. Type a value for fine control.</small
-      >
-      <label for="setting-airResistance">Air resistance <span>s⁻¹</span></label>
-      <input
-        id="setting-airResistance"
-        type="number"
-        min="0"
-        max="10"
-        step="any"
-        value="0"
-      />
-      <input
-        id="range-airResistance"
-        type="range"
-        min="0"
-        max="10"
-        step="0.01"
-        value="0"
-        aria-label="Air resistance slider"
-      />
-      <small
-        >Global linear drag and spin damping, added to each object's own
-        damping. Zero means no air resistance.</small
-      >
-      <label for="setting-electricX"
-        >Global electric field → <span>N/C</span></label
-      >
-      <input
-        id="setting-electricX"
-        type="number"
-        min="-100"
-        max="100"
-        step="any"
-        value="0"
-      />
-      <input
-        id="range-electricX"
-        type="range"
-        min="-100"
-        max="100"
-        step=".1"
-        value="0"
-        aria-label="Global electric field → slider"
-      />
-      <small
-        >Positive points right; negative points left. Global and local fields
-        add together.</small
-      >
-      <label for="setting-electricY"
-        >Global electric field ↑ <span>N/C</span></label
-      >
-      <input
-        id="setting-electricY"
-        type="number"
-        min="-100"
-        max="100"
-        step="any"
-        value="0"
-      />
-      <input
-        id="range-electricY"
-        type="range"
-        min="-100"
-        max="100"
-        step=".1"
-        value="0"
-        aria-label="Global electric field ↑ slider"
-      />
-      <small
-        >Positive points up; negative points down. Global and local fields add
-        together.</small
-      >
-      <label for="setting-magneticZ"
-        >Global magnetic field ⊙ <span>T</span></label
-      >
-      <input
-        id="setting-magneticZ"
-        type="number"
-        min="-100"
-        max="100"
-        step="any"
-        value="0"
-      />
-      <input
-        id="range-magneticZ"
-        type="range"
-        min="-100"
-        max="100"
-        step=".1"
-        value="0"
-        aria-label="Global magnetic field ⊙ slider"
-      />
-      <small
-        >Positive points out of the screen (⊙); negative into it (⊗). Global and
-        local fields add together.</small
-      >
-      <h3>Charge interactions</h3>
-      <label class="setting-toggle"
-        ><input id="setting-chargeInteractions" type="checkbox" /> Mutual
-        electric forces</label
-      >
-      <label for="setting-coulombConstant"
-        >Coulomb constant <span>N·m²/C²</span></label
-      ><input
-        id="setting-coulombConstant"
-        type="number"
-        min="0"
-        max="10000000000"
-        step="any"
-        value="1"
-      />
-      <small
-        >Default 1 for manageable sandbox motion. Vacuum value ≈ 8.99 × 10⁹.
-        Like charges repel; opposite charges attract.</small
-      >
-      <label for="setting-chargeSoftening"
-        >Near-contact smoothing <span>m</span></label
-      ><input
-        id="setting-chargeSoftening"
-        type="number"
-        min=".01"
-        max="10"
-        step="any"
-        value=".1"
-      />
-      <small
-        >Uses r / (r² + smoothing²)³ᐟ² to keep overlapping charges
-        finite.</small
-      >
-      <h3>Scene</h3>
-      <label
-        >Width (m)
-        <input
-          id="scene-width"
-          type="number"
-          min="2"
-          max="1000"
-          step="any" /></label
-      ><label
-        >Height (m)
-        <input
-          id="scene-height"
-          type="number"
-          min="2"
-          max="1000"
-          step="any" /></label
-      ><button id="apply-scene">Resize scene</button
-      ><button id="scene-to-view">Bounds to current view</button>
-      <small
-        >Bounds stay fixed while you pan or zoom. Ground stays at y = 0.
-        Resizing does not reposition existing objects.</small
-      >
-      <h3>Website</h3>
-      <label
-        >Theme
-        <select id="ui-theme">
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-          <option value="system">System</option>
-        </select></label
-      >
-      <label
-        >GUI size <output id="ui-size-value">100%</output
-        ><input
-          id="ui-size"
-          type="range"
-          min="80"
-          max="140"
-          step="5"
-          value="100"
-      /></label>
-      <label class="setting-toggle"
-        ><input id="ui-grid" type="checkbox" checked /> Show grid</label
-      >
-      <small>Website preferences are remembered on this browser.</small>
-      <details class="debug-settings">
-        <summary>Debug · icon preview</summary>
-        <label for="ui-icons">Icon set</label
-        ><select id="ui-icons">
-          <option value="material">Material Rounded</option>
-          <option value="lucide">Lucide</option>
-          <option value="tabler">Tabler</option>
-        </select>
-        <small>Changes immediately and is remembered in this browser.</small>
+      <p>
+        Changes apply immediately, including while running. Hover a name for
+        details.
+      </p>
+      <details class="settings-section" open>
+        <summary>Simulation</summary>
+        <label class="setting-toggle"
+          ><input id="setting-snapping" type="checkbox" /> Snapping (Z) — 0.5 m
+          / 15°</label
+        >
+        <label class="setting-toggle"
+          ><input id="setting-walls" type="checkbox" /> Scene boundary
+          walls</label
+        >
+        <div class="prop-row">
+          <label
+            for="setting-gravity"
+            title="Positive pulls down; negative pulls up. The slider snaps to zero near the centre mark. Type a value for fine control."
+            >Gravity ↓</label
+          >
+          <div class="zero-slider">
+            <span class="zero-tick" aria-hidden="true"></span>
+            <input
+              id="range-gravity"
+              type="range"
+              min="-50"
+              max="50"
+              step="0.01"
+              value="9.81"
+              aria-label="Gravity slider"
+              aria-describedby="help-gravity"
+            />
+          </div>
+          <span class="prop-value"
+            ><input
+              id="setting-gravity"
+              type="number"
+              min="-50"
+              max="50"
+              step="any"
+              value="9.81"
+              aria-describedby="help-gravity"
+            /><span class="unit">m/s²</span></span
+          ><span class="sr-only" id="help-gravity"
+            >Positive pulls down; negative pulls up. The slider snaps to zero
+            near the centre mark. Type a value for fine control.</span
+          >
+        </div>
+        <div class="prop-row">
+          <label
+            for="setting-airResistance"
+            title="Global linear drag and spin damping, added to each object's own damping. Zero means no air resistance."
+            >Air resistance</label
+          >
+          <input
+            id="range-airResistance"
+            type="range"
+            min="0"
+            max="10"
+            step="0.01"
+            value="0"
+            aria-label="Air resistance slider"
+            aria-describedby="help-airResistance"
+          />
+          <span class="prop-value"
+            ><input
+              id="setting-airResistance"
+              type="number"
+              min="0"
+              max="10"
+              step="any"
+              value="0"
+              aria-describedby="help-airResistance"
+            /><span class="unit">s⁻¹</span></span
+          ><span class="sr-only" id="help-airResistance"
+            >Global linear drag and spin damping, added to each object's own
+            damping. Zero means no air resistance.</span
+          >
+        </div>
+      </details>
+      <details class="settings-section">
+        <summary>Fields</summary>
+        <div class="prop-row">
+          <label
+            for="setting-electricX"
+            title="Global field. Positive points right; negative points left. Global and local fields add together."
+            >Electric field →</label
+          >
+          <input
+            id="range-electricX"
+            type="range"
+            min="-100"
+            max="100"
+            step=".1"
+            value="0"
+            aria-label="Electric field → slider"
+            aria-describedby="help-electricX"
+          />
+          <span class="prop-value"
+            ><input
+              id="setting-electricX"
+              type="number"
+              min="-100"
+              max="100"
+              step="any"
+              value="0"
+              aria-describedby="help-electricX"
+            /><span class="unit">N/C</span></span
+          ><span class="sr-only" id="help-electricX"
+            >Global field. Positive points right; negative points left. Global
+            and local fields add together.</span
+          >
+        </div>
+        <div class="prop-row">
+          <label
+            for="setting-electricY"
+            title="Global field. Positive points up; negative points down. Global and local fields add together."
+            >Electric field ↑</label
+          >
+          <input
+            id="range-electricY"
+            type="range"
+            min="-100"
+            max="100"
+            step=".1"
+            value="0"
+            aria-label="Electric field ↑ slider"
+            aria-describedby="help-electricY"
+          />
+          <span class="prop-value"
+            ><input
+              id="setting-electricY"
+              type="number"
+              min="-100"
+              max="100"
+              step="any"
+              value="0"
+              aria-describedby="help-electricY"
+            /><span class="unit">N/C</span></span
+          ><span class="sr-only" id="help-electricY"
+            >Global field. Positive points up; negative points down. Global and
+            local fields add together.</span
+          >
+        </div>
+        <div class="prop-row">
+          <label
+            for="setting-magneticZ"
+            title="Global field. Positive points out of the screen (⊙); negative into it (⊗). Global and local fields add together."
+            >Magnetic field ⊙</label
+          >
+          <input
+            id="range-magneticZ"
+            type="range"
+            min="-100"
+            max="100"
+            step=".1"
+            value="0"
+            aria-label="Magnetic field ⊙ slider"
+            aria-describedby="help-magneticZ"
+          />
+          <span class="prop-value"
+            ><input
+              id="setting-magneticZ"
+              type="number"
+              min="-100"
+              max="100"
+              step="any"
+              value="0"
+              aria-describedby="help-magneticZ"
+            /><span class="unit">T</span></span
+          ><span class="sr-only" id="help-magneticZ"
+            >Global field. Positive points out of the screen (⊙); negative into
+            it (⊗). Global and local fields add together.</span
+          >
+        </div>
+      </details>
+      <details class="settings-section">
+        <summary>Charge interactions</summary>
+        <label class="setting-toggle"
+          ><input id="setting-chargeInteractions" type="checkbox" /> Mutual
+          electric forces</label
+        >
+        <div class="prop-row">
+          <label
+            for="setting-coulombConstant"
+            title="Default 1 for manageable sandbox motion. Vacuum value ≈ 8.99 × 10⁹. Like charges repel; opposite charges attract."
+            >Coulomb constant</label
+          >
+          <span></span>
+          <span class="prop-value"
+            ><input
+              id="setting-coulombConstant"
+              type="number"
+              min="0"
+              max="10000000000"
+              step="any"
+              value="1"
+              aria-describedby="help-coulombConstant"
+            /><span class="unit">N·m²/C²</span></span
+          ><span class="sr-only" id="help-coulombConstant"
+            >Default 1 for manageable sandbox motion. Vacuum value ≈ 8.99 × 10⁹.
+            Like charges repel; opposite charges attract.</span
+          >
+        </div>
+        <div class="prop-row">
+          <label
+            for="setting-chargeSoftening"
+            title="Uses r / (r² + smoothing²)³ᐟ² to keep overlapping charges finite."
+            >Near-contact smoothing</label
+          >
+          <span></span>
+          <span class="prop-value"
+            ><input
+              id="setting-chargeSoftening"
+              type="number"
+              min=".01"
+              max="10"
+              step="any"
+              value=".1"
+              aria-describedby="help-chargeSoftening"
+            /><span class="unit">m</span></span
+          ><span class="sr-only" id="help-chargeSoftening"
+            >Uses r / (r² + smoothing²)³ᐟ² to keep overlapping charges
+            finite.</span
+          >
+        </div>
+      </details>
+      <details class="settings-section">
+        <summary>Scene</summary>
+        <div class="prop-row">
+          <label
+            for="scene-width"
+            title="Bounds stay fixed while you pan or zoom. Ground stays at y = 0. Resizing does not reposition existing objects."
+            >Width</label
+          ><span></span
+          ><span class="prop-value"
+            ><input
+              id="scene-width"
+              type="number"
+              min="2"
+              max="1000"
+              step="any"
+              aria-describedby="scene-help"
+            /><span class="unit">m</span></span
+          >
+        </div>
+        <div class="prop-row">
+          <label
+            for="scene-height"
+            title="Bounds stay fixed while you pan or zoom. Ground stays at y = 0. Resizing does not reposition existing objects."
+            >Height</label
+          ><span></span
+          ><span class="prop-value"
+            ><input
+              id="scene-height"
+              type="number"
+              min="2"
+              max="1000"
+              step="any"
+              aria-describedby="scene-help"
+            /><span class="unit">m</span></span
+          >
+        </div>
+        <div class="button-row">
+          <button id="apply-scene">Resize scene</button
+          ><button id="scene-to-view">Bounds to current view</button>
+        </div>
+        <small id="scene-help"
+          >Bounds stay fixed while you pan or zoom. Ground stays at y = 0.
+          Resizing does not reposition existing objects.</small
+        >
+      </details>
+      <details class="settings-section">
+        <summary>Website</summary>
+        <label class="select-row"
+          >Theme
+          <select id="ui-theme">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="system">System</option>
+          </select></label
+        >
+        <div class="prop-row">
+          <label for="ui-size">GUI size</label
+          ><input
+            id="ui-size"
+            type="range"
+            min="80"
+            max="140"
+            step="5"
+            value="100"
+          /><span class="prop-value"
+            ><output id="ui-size-value" for="ui-size">100%</output></span
+          >
+        </div>
+        <label class="setting-toggle"
+          ><input id="ui-grid" type="checkbox" checked /> Show grid</label
+        >
+        <small>Website preferences are remembered on this browser.</small>
+        <details class="debug-settings">
+          <summary>Debug · icon preview</summary>
+          <label class="select-row"
+            >Icon set
+            <select id="ui-icons">
+              <option value="material">Material Rounded</option>
+              <option value="lucide">Lucide</option>
+              <option value="tabler">Tabler</option>
+            </select></label
+          >
+        </details>
       </details>
       <button id="reset-settings">Restore defaults</button>
     </section>
