@@ -34,7 +34,7 @@ export function prepareIcons() {
   const controls = {
     "settings-toggle": ["settings", "Settings", true],
     shortcuts: ["keys", "Keyboard shortcuts", true],
-    pause: ["pause", "Pause"],
+    pause: ["pause", "Pause", true],
     clear: ["clear", "Clear scene"],
     reset: ["reset", "Reset", true],
     step: ["step", "Step", true],

@@ -995,7 +995,7 @@ button:disabled {
 /* When the header does not fit (narrow window or large GUI size; set by
    fitHeader() in app.js), header buttons keep their icon, tooltip and
    accessible name; only Run/Pause keeps its visible label. */
-.compact-header .playback button:not(#pause) > span {
+.compact-header .playback button > span {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1291,7 +1291,7 @@ header {
   flex-basis: 17px;
 }
 #pause {
-  min-width: 70px;
+  min-width: 40px;
 }
 #speed {
   height: 30px;
