@@ -762,7 +762,7 @@ click(500, 300);
 assert.equal($("selected-name").textContent, "Wedge");
 assert.equal($("lock-position").checked, true);
 assert.equal($("lock-rotation").checked, true);
-assert.match($("dimensions").textContent, /slope 26.6/);
+assert.match($("dimensions").textContent, /slope 26.6° · 63.4°/);
 menu(500, 300);
 assert.match($("menu-title").textContent, /Wedge/);
 change(

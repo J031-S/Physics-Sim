@@ -3,7 +3,7 @@ import { GroupMove } from "./group-move.js";
 import { Mechanisms } from "./mechanisms.js";
 import { solveRestingContacts } from "./contacts.js";
 // The sandbox exposes SI units; Matter uses px, ms and 60 Hz-normalised velocity.
-const { Engine, Bodies, Body, Composite, Constraint, Query } =
+const { Engine, Bodies, Body, Composite, Query } =
   globalThis.Matter;
 export const SCALE = 100;
 export const DT = 1 / 120;
@@ -221,6 +221,10 @@ export class Sandbox {
               options,
             );
     Body.setMass(body, 1);
+    // Matter assumes a 60 Hz step until a body's first update and rescales its
+    // velocity then. Start at our step so position − positionPrev is always
+    // one step's displacement, which the contact and rod solvers rely on.
+    body.deltaTime = DT * 1000;
     const id = "body-" + ++this.serial,
       object = {
         id,
@@ -305,40 +309,81 @@ export class Sandbox {
         damping: 0.3,
         lockAngle: false,
         axis: { x: (pb.x - pa.x) / length, y: (pb.y - pa.y) / length },
-        constraint: null,
-        attached: false,
       };
-    if (type === "rod")
-      link.constraint = Constraint.create({
-        bodyA: a ? this.objects.get(a).body : undefined,
-        bodyB: b ? this.objects.get(b).body : undefined,
-        pointA: a ? { x: 0, y: 0 } : toEngine(pa),
-        pointB: b ? { x: 0, y: 0 } : toEngine(pb),
-        length: length * SCALE,
-        stiffness: 1,
-        damping: 0,
-      });
     this.links.set(id, link);
-    this.syncRods();
     return id;
   }
-  syncRods() {
-    for (const l of this.links.values())
-      if (l.constraint) {
-        // Matter's distance solver divides by summed inverse mass. Two pinned
-        // endpoints have no translational degree of freedom: do not solve them.
-        const movable =
-          (l.a && !this.objects.get(l.a).lockPosition) ||
-          (l.b && !this.objects.get(l.b).lockPosition);
-        if (movable && !l.attached) {
-          Composite.add(this.engine.world, l.constraint);
-          l.attached = true;
-        }
-        if (!movable && l.attached) {
-          Composite.remove(this.engine.world, l.constraint);
-          l.attached = false;
-        }
+  // Rods as exact length constraints (SHAKE on the engine's leapfrog step).
+  //
+  // Each rod gets an impulse along its direction at the START of the step,
+  // sized so that the length is exact once positions have advanced. Pulling
+  // along the old direction, rather than projecting the new position back
+  // onto the circle as Matter's constraint does, makes the step time-symmetric:
+  // uniform circular motion is reproduced exactly and a pendulum keeps its
+  // energy instead of losing a fraction proportional to (ω·dt)² every step.
+  // Works in engine units (px, px per step).
+  solveRods(delta) {
+    const rods = [];
+    for (const l of this.links.values()) {
+      if (l.type !== "rod") continue;
+      const ends = ["a", "b"].map((side) => {
+        const o = this.objects.get(l[side]);
+        if (!o) return { anchor: toEngine(l[side + "Point"]), w: 0 };
+        const held =
+          o.lockPosition ||
+          this.grab?.id === o.id ||
+          this.sizing?.id === o.id ||
+          this.group?.ids.has(o.id);
+        return { body: o.body, w: held ? 0 : o.body.inverseMass };
+      });
+      const [A, B] = ends,
+        w = A.w + B.w;
+      if (!w) continue;
+      const at = (e) => (e.body ? e.body.position : e.anchor),
+        dx = at(B).x - at(A).x,
+        dy = at(B).y - at(A).y,
+        d = Math.hypot(dx, dy),
+        // Coincident ends have no direction: fall back to the stored axis.
+        nx = d > 1e-9 ? dx / d : l.axis.x,
+        ny = d > 1e-9 ? dy / d : -l.axis.y;
+      rods.push({ A, B, w, dx, dy, nx, ny, length: l.length * SCALE });
+    }
+    if (!rods.length) return;
+    // Displacement each end will make this step: velocity plus the change
+    // its accumulated force is about to cause.
+    const move = (e) => {
+      const b = e.body;
+      if (!b || !e.w) return { x: 0, y: 0 };
+      const k = b.inverseMass * delta * delta;
+      return {
+        x: b.position.x - b.positionPrev.x + b.force.x * k,
+        y: b.position.y - b.positionPrev.y + b.force.y * k,
+      };
+    };
+    for (let i = 0; i < 40; i++) {
+      let worst = 0;
+      for (const r of rods) {
+        const a = move(r.A),
+          b = move(r.B),
+          px = r.dx + b.x - a.x,
+          py = r.dy + b.y - a.y,
+          along = px * r.nx + py * r.ny,
+          // Solve |p + s·n| = length for the shift s along the old direction.
+          root = along * along - (px * px + py * py - r.length * r.length),
+          shift = root > 0 ? Math.sqrt(root) - along : -along;
+        worst = Math.max(worst, Math.abs(shift));
+        for (const [e, sign] of [
+          [r.A, -1],
+          [r.B, 1],
+        ])
+          if (e.w) {
+            const share = (sign * shift * e.w) / r.w;
+            e.body.positionPrev.x -= share * r.nx;
+            e.body.positionPrev.y -= share * r.ny;
+          }
       }
+      if (worst < 1e-9) break;
+    }
   }
   setLock(id, axis, locked) {
     const o = this.objects.get(id);
@@ -363,7 +408,6 @@ export class Sandbox {
       Body.setInertia(o.body, locked ? Infinity : o.freeInertia);
       Body.setAngularVelocity(o.body, 0);
     } else throw new Error("Unknown lock axis.");
-    this.syncRods();
   }
   updateConstants(id, patch) {
     const o = this.objects.get(id);
@@ -426,7 +470,6 @@ export class Sandbox {
       )
         throw new Error("Invalid " + key + ".");
     Object.assign(l, patch);
-    if (l.constraint) l.constraint.length = l.length * SCALE;
   }
   setSpringAngle(id, locked) {
     const l = this.links.get(id);
@@ -1130,6 +1173,7 @@ export class Sandbox {
     this.group?.hold();
     this.mechanisms.beforeStep();
     solveRestingContacts(this.engine, DT * 1000);
+    this.solveRods(DT * 1000);
     Engine.update(this.engine, DT * 1000);
     this.enforceLocks();
     this.placeGrab();
@@ -1157,6 +1201,16 @@ export class Sandbox {
     const o = this.objects.get(id);
     return o ? { ...(o.netForce || { x: 0, y: 0 }) } : null;
   }
+  // Where a body was half a step ago. The engine's velocity is the average
+  // over the step just taken, so it belongs to the middle of that step, not
+  // its end. Pairing it with potential energy at the end position makes K + U
+  // wobble by about ±(force × speed × dt/2) through every swing or bounce;
+  // evaluating U at this point instead removes that, leaving a total that is
+  // steady to second order. The shift is under a centimetre at normal speeds.
+  potentialPoint(id) {
+    const s = this.state(id);
+    return { x: s.x - (s.vx * DT) / 2, y: s.y - (s.vy * DT) / 2 };
+  }
   // Momentum and energies of one body (SI). Gravitational energy is measured
   // from the floor; positive gravity points down. Electric energy is the
   // body's energy in the global uniform field plus half of each mutual
@@ -1165,6 +1219,7 @@ export class Sandbox {
     const o = this.objects.get(id);
     if (!o) return null;
     const s = this.state(id),
+      p = this.potentialPoint(id),
       inertia = o.freeInertia / (SCALE * SCALE),
       translational = 0.5 * o.mass * (s.vx * s.vx + s.vy * s.vy),
       rotational = 0.5 * inertia * s.omega * s.omega;
@@ -1175,9 +1230,9 @@ export class Sandbox {
       translational,
       rotational,
       kinetic: translational + rotational,
-      gravitational: o.mass * this.settings.gravity * s.y,
+      gravitational: o.mass * this.settings.gravity * p.y,
       electric:
-        this.fields.uniformEnergy(o, s) +
+        this.fields.uniformEnergy(o, p) +
         this.fields
           .pairEnergies()
           .reduce(
@@ -1199,18 +1254,19 @@ export class Sandbox {
     // Not measure(): that would recompute every Coulomb pair for each body.
     for (const [id, o] of this.objects) {
       const s = this.state(id),
+        p = this.potentialPoint(id),
         inertia = o.freeInertia / (SCALE * SCALE);
       kinetic +=
         0.5 * o.mass * (s.vx * s.vx + s.vy * s.vy) +
         0.5 * inertia * s.omega * s.omega;
-      gravitational += o.mass * this.settings.gravity * s.y;
-      electric += this.fields.uniformEnergy(o, s);
+      gravitational += o.mass * this.settings.gravity * p.y;
+      electric += this.fields.uniformEnergy(o, p);
     }
     for (const pair of this.fields.pairEnergies()) electric += pair.energy;
     for (const l of this.links.values())
       if (l.type === "spring") {
-        const a = this.endpoint(l, "a"),
-          b = this.endpoint(l, "b"),
+        const a = l.a ? this.potentialPoint(l.a) : l.aPoint,
+          b = l.b ? this.potentialPoint(l.b) : l.bPoint,
           dx = b.x - a.x,
           dy = b.y - a.y,
           extension =
@@ -1441,10 +1497,7 @@ export class Sandbox {
     if (this.sizing?.id === id) this.endResize();
     this.mechanisms.remove(id);
     for (const [key, l] of this.links)
-      if (key === id || l.a === id || l.b === id) {
-        if (l.constraint) Composite.remove(this.engine.world, l.constraint);
-        this.links.delete(key);
-      }
+      if (key === id || l.a === id || l.b === id) this.links.delete(key);
     const o = this.objects.get(id);
     if (o) {
       Composite.remove(this.engine.world, o.body);

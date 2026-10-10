@@ -48,7 +48,7 @@ No bundler, no framework, no runtime dependencies. `index.html` loads `vendor/ma
 - Engine gravity is disabled (`engine.gravity.scale = 0`); gravity, damping, springs, Coulomb and field forces are applied explicitly in `Sandbox.step()`.
 - Inertia comes from `Sandbox.momentOfInertia(o)` (textbook disc / rectangle / right triangle), never from Matter, which scales polygon inertia by 4. Call it after any change to mass or dimensions.
 - Position lock = `inverseMass 0` plus anchor restore; rotation lock = infinite inertia. `o.mass` and `o.freeInertia` hold the real values, so restore from those, never from the body.
-- Link records live in `sim.links` with `type` of `spring`, `rod`, `belt` or `pulley`. Only rods use a Matter `Constraint`; the others are solved by this code.
+- Link records live in `sim.links` with `type` of `spring`, `rod`, `belt` or `pulley`. None of them uses a Matter `Constraint`: all are solved by this code (rods in `Sandbox.solveRods`).
 
 ## Engine API for UI features
 
@@ -60,11 +60,12 @@ These exist on `Sandbox` and are covered by tests; the UI should call them rathe
 - `netForce(id)` → `{ x, y }` in newtons over the last step, including contact, friction, rod and cable forces.
 - `measure(id)` → speed, momentum, kinetic (translational + rotational), gravitational and electric energy; `energy()` → scene totals `{ kinetic, gravitational, elastic, electric, total, fieldWork }`.
 - Electric energy covers the conservative electric forces only: the global uniform field (`−qE·r`, zero at the origin) and mutual Coulomb pairs. Field **regions** have sharp edges and therefore no potential energy; the work they do on charges accumulates in `fieldWork`. `total − fieldWork` is the quantity that stays constant in a lossless scene. Electric energy and `fieldWork` can both be negative.
+- Potential energies are evaluated at `potentialPoint(id)`, half a step behind the body's position, because the stored velocity belongs to the middle of the last step. Without that shift the displayed total wobbles by a few tenths of a percent through every swing.
 - `step()` advances exactly one 1/120 s step and can be called while paused.
 
 ## Order of operations in `step()`
 
-Per body: Lorentz velocity update → gravity force → exponential damping. Then Coulomb pairs, spring forces, grab/lock/resize holds, `mechanisms.beforeStep()`, `solveRestingContacts` (bodies already touching have their pending acceleration constrained before positions move), `Engine.update` (whose velocity resolver is ours, handling new impacts), locks again, spring guides (6 passes), `mechanisms.afterStep()` (belts, conveyor contacts, cables). Changing this order changes results; re-run the numerical tests if you touch it.
+Per body: Lorentz velocity update → gravity force → exponential damping. Then Coulomb pairs, spring forces, grab/lock/resize holds, `mechanisms.beforeStep()`, `solveRestingContacts` (bodies already touching have their pending acceleration constrained before positions move), `solveRods` (an impulse along each rod's start-of-step direction so its length is exact after positions advance; time-symmetric, so pendulums keep their energy), `Engine.update` (whose velocity resolver is ours, handling new impacts), locks again, spring guides (6 passes), `mechanisms.afterStep()` (belts, conveyor contacts, cables). Changing this order changes results; re-run the numerical tests if you touch it.
 
 ## Code style
 
@@ -85,12 +86,11 @@ Per body: Lorentz velocity update → gravity force → exponential damping. The
 Measured against analytic results (October 2026). Do not assume these behave correctly, and do not write tests that enshrine them:
 
 - **Conveyor traction is about 1.8 × μg** instead of μg (`conveyorContacts` in `mechanisms.js` still uses its own friction estimate rather than the contact solver).
-- **Rods dissipate energy** in proportion to angular speed² (pendulums and circular motion decay with all damping set to zero). Springs conserve energy well.
 - **Restitution** is `max(e₁, e₂)` for a pair. A ball at `e = 1` under gravity loses about 0.1% of its height per bounce.
 - **Air resistance and linear damping are rates (s⁻¹), not forces**, so terminal velocity is independent of mass and size.
 - **Pulley cables cannot go slack** (they push like a rod).
 - **Extreme stacked mass ratios** (about 2000:1, heavy on light) rest correctly but rattle by a millimetre or two; the contact solver stops at a work budget.
-- **A magnetic field removes speed from a charged body that is sliding on a surface or held by a rod**, because the rotated velocity component is discarded by the contact/constraint.
+- **A magnetic field removes speed from a charged body that is sliding on a surface or held by a rod**, because the rotated velocity component is discarded by the contact/constraint (a charged pendulum in a 2 T field loses about 5% of its energy in 30 s).
 - **No continuous collision detection**: bodies tunnel through the 0.5 m floor/walls above roughly 100 m/s, and through thin bodies from about 30 m/s.
 - New bodies default to angular damping 0.05 s⁻¹ and new springs to damping 0.3 N·s/m, so default scenes are not energy-conserving.
 

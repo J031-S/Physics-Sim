@@ -156,14 +156,16 @@ export const presets = [
     group: "Forces",
     title: "Friction on an incline",
     description:
-      "A block with μ = 0.3 sits on a 20° ramp. Because tan 20° = 0.36 exceeds μ it slides. Right-click the block and raise its friction above 0.36, then press Reset, and it stays put.",
-    expect: "Acceleration g(sin θ − μ cos θ) ≈ 0.59 m/s² down the slope.",
+      "A 4 kg block with μ = 0.3 sits on a 25° ramp. Because tan 25° = 0.47 exceeds μ it slides. Turn on net force vectors to see the unbalanced force along the slope. Press Reset, right-click the block and raise its friction above 0.47, and it stays put.",
+    expect:
+      "Acceleration g(sin θ − μ cos θ) ≈ 1.48 m/s² down the slope, from a net force of 5.9 N.",
     setup(sim) {
       scene(sim, { gravity: g });
-      const r = ramp(sim, { left: -6, width: 10, degrees: 20 });
+      const r = ramp(sim, { left: -6, width: 10, degrees: 25 });
       body(sim, "block", {
         ...r.rest(0.85, 0.3),
         size: [0.9, 0.6],
+        mass: 4,
         friction: 0.3,
         restitution: 0,
       });
@@ -258,18 +260,18 @@ export const presets = [
     group: "Forces",
     title: "Atwood machine",
     description:
-      "A 1 kg and a 1.5 kg block hang over a 1 kg pulley wheel. The heavier block falls, and the wheel's rotational inertia slows the whole system.",
+      "A 1 kg and a 1.5 kg block hang over a 1 kg pulley wheel. The heavier block falls 1.3 m to the floor, and the wheel's rotational inertia slows the whole system.",
     expect: "Acceleration (m₂ − m₁)g / (m₁ + m₂ + M/2) ≈ 1.64 m/s².",
     setup(sim) {
       scene(sim, { gravity: g });
-      const wheel = body(sim, "ball", { x: 0, y: 7 }),
+      const wheel = body(sim, "ball", { x: 0, y: 3.5 }),
         blocks = [
           [-0.4, 1],
           [0.4, 1.5],
         ].map(([x, mass]) =>
           body(sim, "block", {
             x,
-            y: 4,
+            y: 1.5,
             size: [0.4, 0.4],
             mass,
             restitution: 0,

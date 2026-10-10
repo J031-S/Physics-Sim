@@ -425,7 +425,6 @@ export class PulleyCables {
     for (const [id, fields] of saved.links) {
       const l = s.links.get(id);
       Object.assign(l, fields);
-      if (l.constraint) l.constraint.length = l.length * S;
     }
   }
 }
