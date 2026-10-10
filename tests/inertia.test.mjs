@@ -18,7 +18,8 @@ test("moments of inertia match the textbook values for each shape", () => {
   near(inertia(s, ball), 0.5 * 1 * 0.4 ** 2, 1e-9); // disc: mr²/2
   near(inertia(s, block), (1 * (0.9 ** 2 + 0.9 ** 2)) / 12, 1e-9);
   near(inertia(s, wedge), (1 * (3 ** 2 + 1.5 ** 2)) / 18, 1e-9);
-  near(s.objects.get(ball).body.inertia, s.objects.get(ball).freeInertia, 1e-6);
+  const o = s.objects.get(ball);
+  near(o.body.inertia, o.freeInertia, 1e-6);
   s.dispose();
 });
 test("inertia stays correct after resizing and changing mass, in either order", () => {
@@ -59,15 +60,18 @@ test("Atwood machine with a disc pulley: a = (m2 − m1)g / (m1 + m2 + M/2)", ()
 });
 test("a ball pushed without spin ends up rolling at 2/3 of its launch speed", () => {
   // Angular momentum about the contact point is conserved while friction
-  // spins the disc up: m v0 r = (m r² + m r²/2) v / r.
+  // spins the disc up: m v0 r = (m r² + m r²/2) v / r. Slipping lasts
+  // v0 / (3 μ g) = 0.34 s at the default μ = 0.3.
   const s = new Sandbox(),
     id = s.add("ball", { x: -20, y: 0.4 });
   s.updateConstants(id, { angularDamping: 0, restitution: 0 });
   run(s, 0.3);
   s.impulse(id, { x: 3, y: 0 }, "velocity");
   run(s, 0.1);
+  near(s.state(id).vx, 3 - 0.3 * 9.81 * 0.1, 0.01); // still slipping
+  run(s, 0.9);
   const st = s.state(id);
-  near(st.vx, 2, 0.05);
-  near(-st.omega * 0.4, st.vx, 0.06); // rolling without slipping
+  near(st.vx, 2, 0.01);
+  near(-st.omega * 0.4, st.vx, 0.01); // rolling without slipping
   s.dispose();
 });

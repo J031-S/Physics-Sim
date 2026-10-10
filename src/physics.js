@@ -1,6 +1,7 @@
 import { Fields } from "./fields.js";
 import { GroupMove } from "./group-move.js";
 import { Mechanisms } from "./mechanisms.js";
+import { solveRestingContacts } from "./contacts.js";
 // The sandbox exposes SI units; Matter uses px, ms and 60 Hz-normalised velocity.
 const { Engine, Bodies, Body, Composite, Constraint, Query } =
   globalThis.Matter;
@@ -1105,6 +1106,7 @@ export class Sandbox {
     this.holdResize();
     this.group?.hold();
     this.mechanisms.beforeStep();
+    solveRestingContacts(this.engine, DT * 1000);
     Engine.update(this.engine, DT * 1000);
     this.enforceLocks();
     this.placeGrab();

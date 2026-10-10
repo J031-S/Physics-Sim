@@ -24,6 +24,7 @@ No bundler, no framework, no runtime dependencies. `index.html` loads `vendor/ma
 | File | Owns |
 | --- | --- |
 | `src/physics.js` | `Sandbox`: bodies, global settings, locks, grab/throw, resize, springs, rods, spring guides, the fixed-step `step()` |
+| `src/contacts.js` | Contact response: Coulomb friction, restitution, exact circle contact. Replaces Matter's velocity resolver; runs a resting-contact pass before `Engine.update` |
 | `src/fields.js` | Field regions, gradient profiles, superposition, Lorentz velocity update, pairwise Coulomb forces |
 | `src/mechanisms.js` | Belts, conveyor contact, delegation to pulley cables |
 | `src/pulley.js` | Tangent cable geometry and the coupled position/velocity cable solver |
@@ -50,7 +51,7 @@ No bundler, no framework, no runtime dependencies. `index.html` loads `vendor/ma
 
 ## Order of operations in `step()`
 
-Per body: Lorentz velocity update → gravity force → exponential damping. Then Coulomb pairs, spring forces, grab/lock/resize holds, `mechanisms.beforeStep()`, `Engine.update`, locks again, spring guides (6 passes), `mechanisms.afterStep()` (belts, conveyor contacts, cables). Changing this order changes results; re-run the numerical tests if you touch it.
+Per body: Lorentz velocity update → gravity force → exponential damping. Then Coulomb pairs, spring forces, grab/lock/resize holds, `mechanisms.beforeStep()`, `solveRestingContacts` (bodies already touching have their pending acceleration constrained before positions move), `Engine.update` (whose velocity resolver is ours, handling new impacts), locks again, spring guides (6 passes), `mechanisms.afterStep()` (belts, conveyor contacts, cables). Changing this order changes results; re-run the numerical tests if you touch it.
 
 ## Code style
 
@@ -70,11 +71,12 @@ Per body: Lorentz velocity update → gravity force → exponential damping. The
 
 Measured against analytic results (October 2026). Do not assume these behave correctly, and do not write tests that enshrine them:
 
-- **Contact friction is not Coulomb friction.** Matter's friction is a velocity clamp that ignores normal force: blocks stick on inclines far beyond `tan θ = μ`, sliding deceleration is roughly 10× `μg` and independent of `g`, and a resting block barely moves under a force several times `μmg`. Only `μ = 0` is correct. Conveyor traction in `mechanisms.js` has the same character.
+- **Conveyor traction is about 1.8 × μg** instead of μg (`conveyorContacts` in `mechanisms.js` still uses its own friction estimate rather than the contact solver).
 - **Rods dissipate energy** in proportion to angular speed² (pendulums and circular motion decay with all damping set to zero). Springs conserve energy well.
-- **Restitution** is `max(e₁, e₂)` for a pair, is about 1–2% low, and collisions slower than about 1.35 m/s are treated as perfectly inelastic.
+- **Restitution** is `max(e₁, e₂)` for a pair. A ball at `e = 1` under gravity loses about 0.1% of its height per bounce.
 - **Air resistance and linear damping are rates (s⁻¹), not forces**, so terminal velocity is independent of mass and size.
-- **Pulley cables cannot go slack** (they push like a rod), and rolling balls experience a spurious rolling resistance of about 0.2–0.4 m/s² (a ball on a 20° incline accelerates at 1.96 m/s² against 2.24 for a disc).
+- **Pulley cables cannot go slack** (they push like a rod).
+- **Extreme stacked mass ratios** (about 2000:1, heavy on light) rest correctly but rattle by a millimetre or two; the contact solver stops at a work budget.
 - **A magnetic field removes speed from a charged body that is sliding on a surface or held by a rod**, because the rotated velocity component is discarded by the contact/constraint.
 - **No continuous collision detection**: bodies tunnel through the 0.5 m floor/walls above roughly 100 m/s, and through thin bodies from about 30 m/s.
 - New bodies default to angular damping 0.05 s⁻¹ and new springs to damping 0.3 N·s/m, so default scenes are not energy-conserving.
