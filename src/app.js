@@ -1212,11 +1212,21 @@ function updateVectorLegend() {
 }
 $("vectors").onchange = updateVectorLegend;
 $("force-vectors").onchange = updateVectorLegend;
-$("force-scale").onchange = () => {
-  $("force-scale").value = fixed(forceScale());
+$("force-scale").oninput = () => {
+  const value = typedForceScale();
+  if (value !== null) forceScaleValue = value;
   updateVectorLegend();
 };
-$("force-scale").oninput = updateVectorLegend;
+$("force-scale").onchange = () => {
+  const value = typedForceScale();
+  if (value === null) {
+    if ($("force-scale").value.trim() !== "")
+      toast("Enter an arrow scale between 0.1 and 100 px/N.");
+    // Restore the previous valid value rather than clamping.
+    $("force-scale").value = fixed(forceScaleValue);
+  } else forceScaleValue = value;
+  updateVectorLegend();
+};
 $("snap-toggle").onchange = (e) => {
   sim.updateSettings({ snapping: e.target.checked });
   snapStatus();
@@ -1769,9 +1779,17 @@ const VELOCITY_PX = 12,
   FORCE_CAP = 180,
   FORCE_STEPS = 6,
   forceHistory = new Map();
+// Last valid px/N value: an empty or out-of-range entry never takes effect.
+let forceScaleValue = 4;
 function forceScale() {
-  const value = Number($("force-scale").value);
-  return Number.isFinite(value) ? Math.max(0.1, Math.min(100, value)) : 4;
+  return forceScaleValue;
+}
+function typedForceScale() {
+  const text = $("force-scale").value.trim(),
+    value = Number(text);
+  return text !== "" && Number.isFinite(value) && value >= 0.1 && value <= 100
+    ? value
+    : null;
 }
 function fixed(value) {
   return Number(value.toPrecision(3)).toString();

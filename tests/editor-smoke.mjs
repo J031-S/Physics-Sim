@@ -1128,6 +1128,20 @@ for (const open of [
   assert.equal($("menu-title").textContent, "Floor");
   $("close-menu").click();
 }
+// Clearing or mistyping the force arrow scale keeps the last valid value.
+{
+  change($("force-scale"), "6", "input");
+  change($("force-scale"), "6");
+  assert.match($("legend-force-scale").textContent, /^6 px per N/);
+  change($("force-scale"), "", "input");
+  change($("force-scale"), "");
+  assert.equal($("force-scale").value, "6");
+  assert.match($("legend-force-scale").textContent, /^6 px per N/);
+  change($("force-scale"), "500");
+  assert.equal($("force-scale").value, "6");
+  assert.match($("toast").textContent, /between 0\.1 and 100/);
+  change($("force-scale"), "4");
+}
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );
