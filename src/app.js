@@ -1836,6 +1836,77 @@ function arrow(p, dx, dy, colour, label, cap = 600) {
     ctx.fillText(label, end.x + 7, end.y - 6);
   }
 }
+// Three significant figures, keeping trailing zeros so a value's width does
+// not jump; tiny values read as zero.
+function sig3(value) {
+  if (!Number.isFinite(value)) return "—";
+  if (Math.abs(value) < 5e-4) return "0.00";
+  const text = value.toPrecision(3);
+  return text.includes("e") ? Number(text).toFixed(0) : text;
+}
+// Rows of the selected-body readout: label, values, unit.
+const READOUT_ROWS = [
+  ["position", "Position x, y", 2, "m"],
+  ["velocity", "Velocity vx, vy", 2, "m/s"],
+  ["speed", "Speed", 1, "m/s"],
+  ["acceleration", "Acceleration ax, ay", 2, "m/s²"],
+  ["momentum", "Momentum px, py", 2, "kg·m/s"],
+  ["kinetic", "Kinetic energy", 1, "J"],
+  ["gravitational", "Gravitational PE", 1, "J"],
+];
+{
+  const grid = $("readout-grid");
+  for (const [key, label, count, unit] of READOUT_ROWS) {
+    const name = document.createElement("span");
+    name.textContent = label;
+    grid.append(name);
+    for (let i = 0; i < 2; i++) {
+      const value = document.createElement("span");
+      value.className = "num";
+      if (i < count) value.id = `readout-${key}-${i}`;
+      grid.append(value);
+    }
+    const units = document.createElement("span");
+    units.className = "unit";
+    units.textContent = unit;
+    grid.append(units);
+  }
+}
+function updateReadouts() {
+  const o = sim.objects.get(selected);
+  $("readout").hidden = !o || selectionSet.size > 1;
+  if (o && $("readout").open) {
+    const s = sim.state(o.id),
+      m = sim.measure(o.id),
+      // Same 6-step average as the net force arrow, so the two agree.
+      f = averageForce(o.id),
+      values = {
+        position: [s.x, s.y],
+        velocity: [s.vx, s.vy],
+        speed: [m.speed],
+        acceleration: [f.x / o.mass, f.y / o.mass],
+        momentum: [m.momentum.x, m.momentum.y],
+        kinetic: [m.kinetic],
+        gravitational: [m.gravitational],
+      };
+    for (const [key, list] of Object.entries(values))
+      list.forEach((v, i) => ($(`readout-${key}-${i}`).textContent = sig3(v)));
+  }
+  const empty = !sim.objects.size && !sim.links.size;
+  $("energy-panel").hidden = empty;
+  if (empty || !$("energy-panel").open) return;
+  const e = sim.energy(),
+    parts = ["kinetic", "gravitational", "elastic"],
+    sum = parts.reduce((t, k) => t + Math.abs(e[k]), 0);
+  $("energy-total").textContent = `${sig3(e.total)} J`;
+  for (const k of parts) {
+    $("energy-" + k).textContent = sig3(e[k]);
+    const bar = $("bar-" + k);
+    bar.style.width = sum > 1e-9 ? (100 * Math.abs(e[k])) / sum + "%" : "0";
+    // Negative potential energy (below the floor, or gravity reversed).
+    bar.classList.toggle("negative", e[k] < 0);
+  }
+}
 function draw() {
   const r = canvas.getBoundingClientRect(),
     dpr = window.devicePixelRatio || 1;
@@ -2192,6 +2263,7 @@ function draw() {
   }
   if (sim.sizing) showDimensions();
   $("time").textContent = sim.time.toFixed(2) + " s";
+  updateReadouts();
 }
 function frame(now) {
   const elapsed = last ? Math.min((now - last) / 1000, 0.05) : 0;

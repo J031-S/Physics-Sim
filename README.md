@@ -52,6 +52,12 @@ In the constants menu each property is one row: name, slider, then the number wi
 
 The net force is `sim.netForce()` (gravity, contact, friction, rod, spring and cable forces together) **averaged over the last 6 steps** (0.05 s), because a collision lasts a single 1/120 s step and would otherwise flash as a one-frame spike. Very long force arrows are capped on screen and marked with two slashes across the shaft; the label stays truthful. A body at rest, or a position-locked one, has zero net force and draws no arrow; separate weight / normal / friction arrows are not drawn.
 
+### Readouts and scene energy
+
+Selecting a single body adds a collapsible **Readouts** section to the bottom-right panel, updated every frame: position x, y (m), velocity vx, vy and speed (m/s), acceleration ax, ay (m/s², the net force ÷ mass, using the same 6-step average as the net force arrow), momentum px, py (kg·m/s), kinetic energy (translational + rotational) and gravitational potential energy measured from the floor (J).
+
+The **Scene energy** box in the top-right corner shows the total mechanical energy and a stacked bar of its kinetic, gravitational and elastic (spring) parts, with each value listed beside it. A hatched segment is negative (for example gravitational energy with reversed gravity). Electric potential energy is not included. It appears once the scene has a body or connection and can be collapsed. All values use three significant figures in fixed-width digits so they do not jitter.
+
 ### Presets, save and load
 
 **Presets** (header) opens a list of ready-made experiments grouped by topic (kinematics, energy and momentum, forces, rotation, oscillations, electricity and magnetism). Each shows a short description and **What to look for**, the textbook result the scene demonstrates. Choosing one replaces the current scene, fits the view to it and starts **paused** so you can read first; press Run (Space) to start.

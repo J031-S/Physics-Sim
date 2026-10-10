@@ -987,6 +987,40 @@ for (const open of [
   // Above the ground with nothing there, no menu opens.
   assert.equal(menu(500, 300).defaultPrevented, false);
 }
+// Readouts for the selected body and scene energy totals.
+{
+  clearScene();
+  frames(1);
+  assert.equal($("energy-panel").hidden, true, "hidden for an empty scene");
+  if ($("pause").textContent === "Run") key(" ");
+  key("b");
+  click(500, 150);
+  frames(10);
+  assert.equal($("readout").hidden, false);
+  assert.equal($("energy-panel").hidden, false);
+  // A free-falling ball: ax = 0, ay = −g, and the units are shown.
+  assert.equal($("readout-acceleration-0").textContent, "0.00");
+  assert.equal($("readout-acceleration-1").textContent, "-9.81");
+  assert.match($("readout-grid").textContent, /m\/s²/);
+  assert.ok(Number($("readout-velocity-1").textContent) < 0);
+  const ke = Number($("readout-kinetic-0").textContent),
+    pe = Number($("readout-gravitational-0").textContent);
+  assert.ok(
+    // Each shown value is rounded to three significant figures.
+    Math.abs(Number($("energy-total").textContent.split(" ")[0]) - (ke + pe)) <
+      0.1,
+  );
+  assert.equal($("energy-elastic").textContent, "0.00");
+  // Values keep three significant figures.
+  for (const id of ["readout-position-0", "readout-speed-0"])
+    assert.match($(id).textContent, /^-?(\d\.\d\d|\d\d\.\d|\d{3,}|0\.\d+)$/);
+  // Nothing selected: the body readout hides, the scene totals stay.
+  key("Escape");
+  click(900, 100);
+  frames(1);
+  assert.equal($("readout").hidden, true);
+  assert.equal($("energy-panel").hidden, false);
+}
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );

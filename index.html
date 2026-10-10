@@ -212,6 +212,33 @@
           ></span
         ></label>
       </div>
+      <details id="energy-panel" class="energy-panel" open hidden>
+        <summary>
+          Scene energy <span class="energy-total" id="energy-total"></span>
+        </summary>
+        <div
+          class="energy-bar"
+          role="img"
+          id="energy-bar"
+          aria-label="Share of kinetic, gravitational and elastic energy"
+        >
+          <span class="kinetic" id="bar-kinetic"></span
+          ><span class="gravitational" id="bar-gravitational"></span
+          ><span class="elastic" id="bar-elastic"></span>
+        </div>
+        <div class="energy-rows">
+          <span class="key kinetic" aria-hidden="true"></span
+          ><span>Kinetic</span><span class="num" id="energy-kinetic"></span
+          ><span class="unit">J</span>
+          <span class="key gravitational" aria-hidden="true"></span
+          ><span>Gravitational</span
+          ><span class="num" id="energy-gravitational"></span
+          ><span class="unit">J</span>
+          <span class="key elastic" aria-hidden="true"></span
+          ><span>Elastic</span><span class="num" id="energy-elastic"></span
+          ><span class="unit">J</span>
+        </div>
+      </details>
       <div id="vector-legend" class="vector-legend" hidden>
         <div id="legend-velocity">
           <span class="swatch velocity" aria-hidden="true"></span> Velocity
@@ -278,6 +305,10 @@
             m/s</label
           >
         </div>
+        <details id="readout" class="readout" open>
+          <summary>Readouts</summary>
+          <div id="readout-grid" class="readout-grid"></div>
+        </details>
       </div>
       <div class="hint" id="hint">
         Add a ball or block, then grab and throw it. Right-click for material
