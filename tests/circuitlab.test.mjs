@@ -11,6 +11,7 @@ import {
   factor,
   substitute,
 } from "../src/circuitlab/model.js";
+import { presets } from "../src/circuitlab/presets.js";
 
 const STEADY = 1e-9, // steady-state readings: relative error
   TIMED = 0.005; // time-dependent readings: relative error
@@ -1027,4 +1028,75 @@ test("random circuits: never NaN, never unsolvable, current conserved at every n
           );
     }
   }
+});
+
+test("presets: each builds a sound circuit and shows its stated readings", () => {
+  assert.deepEqual(
+    presets.map((p) => p.id),
+    ["series", "parallel", "divider", "internal-resistance", "wheatstone", "rc"],
+  );
+  for (const preset of presets) {
+    const lab = new CircuitLab();
+    preset.build(lab);
+    const named = (name) => {
+        const item = lab.list().find((i) => i.name === name);
+        assert.ok(item, `${preset.id}: no ${name}`);
+        return item;
+      },
+      s = solved(lab);
+    assert.ok(preset.title && preset.text && preset.expect && preset.view);
+    named(preset.watch);
+    // Sound wiring: no loose end, no doubled wire, no meter left floating.
+    const ends = new Map();
+    for (const item of lab.list())
+      for (const node of item.nodes) ends.set(node, (ends.get(node) || 0) + 1);
+    for (const [node, count] of ends)
+      assert.ok(count >= 2, `${preset.id}: loose end at ${node}`);
+    assert.deepEqual(s.notices, [], preset.id);
+    for (const r of preset.readings) {
+      const actual = s.of(named(r.name).id)[r.quantity];
+      if (r.value === 0) assert.equal(actual, 0, `${preset.id}: ${r.name}`);
+      else close(actual, r.value, STEADY, `${preset.id}: ${r.name}`);
+    }
+    for (const r of preset.later || []) {
+      lab.advance(r.time - lab.time);
+      close(lab.time, r.time, 1e-12);
+      close(
+        lab.solve().of(named(r.name).id)[r.quantity],
+        r.value,
+        TIMED,
+        `${preset.id}: ${r.name} at ${r.time} s`,
+      );
+    }
+    if (preset.timeConstant)
+      close(lab.timeConstants()[0], preset.timeConstant, STEADY);
+  }
+  // The capacitor preset, switched over once charged: discharge through
+  // the same 10 kΩ, the ammeter now reading the other way.
+  const lab = new CircuitLab(),
+    rcPreset = presets.find((p) => p.id === "rc");
+  rcPreset.build(lab);
+  const id = (name) => lab.list().find((i) => i.name === name).id;
+  lab.advance(30);
+  close(lab.solve().of(id("C1")).voltage, 10, 1e-9, "fully charged");
+  lab.toggle(id("S1"));
+  let s = lab.solve();
+  close(s.of(id("A1")).current, -1e-3, 1e-9, "discharge starts at −V/R");
+  close(lab.timeConstants(id("C1"))[0], 1, STEADY);
+  lab.advance(1);
+  s = lab.solve();
+  close(s.of(id("V1")).voltage, 10 * Math.exp(-1), TIMED, "3.679 V after 1 s");
+  // The internal-resistance preset with its switch opened reads the EMF.
+  const real = new CircuitLab();
+  presets.find((p) => p.id === "internal-resistance").build(real);
+  real.toggle(real.list().find((i) => i.name === "S1").id);
+  s = real.solve();
+  assert.equal(s.status, "open");
+  close(s.of(real.list().find((i) => i.name === "V1").id).voltage, 12, STEADY);
+  // The divider with its lower resistor raised to 2 kΩ gives half the supply.
+  const divider = new CircuitLab();
+  presets.find((p) => p.id === "divider").build(divider);
+  const find = (name) => divider.list().find((i) => i.name === name).id;
+  divider.update(find("R2"), { resistance: 2e3 });
+  close(divider.solve().of(find("V1")).voltage, 6, STEADY);
 });
