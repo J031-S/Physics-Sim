@@ -1949,6 +1949,7 @@ $("presets-toggle").addEventListener("click", () => {
 });
 $("close-presets").addEventListener("click", () => closePanels());
 
+// Sets up a preset's launch and leaves it paused, ready for Run.
 function loadPreset(preset) {
   attempt(() => {
     changeBody({ key: preset.body, ...BODIES[preset.body] }, false, true);
@@ -1956,7 +1957,6 @@ function loadPreset(preset) {
     setWarp(preset.warp);
     setAutoFit(true);
     syncForms();
-    launch();
   });
 }
 {

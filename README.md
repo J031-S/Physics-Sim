@@ -254,7 +254,7 @@ The strip at the top of the scene says what the launch will do, and the dashed l
 
 **Launch** (`L`) releases the satellite. Up to 8 can be in flight at once, each in its own colour; launch again with different values to compare orbits. Click a satellite, or its chip under the Launch button, to choose which one the readouts and graphs describe; the × on a chip removes it. Changing the central body removes the satellites in flight, because their orbits belonged to the old one.
 
-**Presets** loads a ready-made launch: low Earth orbit (400 km), geostationary orbit, the Moon's orbit, Newton's cannon, and an eccentric ellipse. Each sets a suitable time warp and says what to check.
+**Presets** loads a ready-made launch: low Earth orbit (400 km), geostationary orbit, the Moon's orbit, Newton's cannon, and an eccentric ellipse. Each sets a suitable time warp and says what to check. Loading one removes the satellites in flight and does not start anything: the launch is set up, with its predicted path, and waits for **Run** (or **Launch**).
 
 ### Running it
 

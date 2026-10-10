@@ -88,10 +88,14 @@ const about = (actual, expected) =>
 const preset = async (id) => {
   $("presets-toggle").click();
   document.querySelector(`[data-preset="${id}"]`).click();
-  // Presets launch and run; stop the clock and start again from rest.
-  if (/Pause/.test($("pause").title)) $("pause").click();
-  $("reset").click();
   await frame();
+  // A preset only sets the launch up: nothing is in flight or running
+  // until Run is pressed.
+  assert.equal($("presets-panel").hidden, true);
+  assert.equal(chips(), 0);
+  assert.match($("pause").title, /Run/);
+  assert.match(text("tool-name"), /^This launch: /);
+  assert.match(text("time"), /^t = 0 s/);
 };
 
 // Navigation: a drop-down of links at the left of the top bar.
@@ -388,8 +392,18 @@ $("auto-fit").click();
 
 // Kepler's second law on an eccentric ellipse: twelve equal-time areas,
 // all the same. One orbit is 9.374 h; a step at ×2000 is 33.3 s.
+// Loading a preset while something is in flight removes it and stops.
+$("launch").click();
+assert.match($("pause").title, /Pause/);
 await preset("eccentric-ellipse");
 assert.equal(field("speed").value, "10.0035");
+// Run then launches the preset's satellite.
+$("pause").click();
+await frame();
+assert.equal(chips(), 1);
+assert.match($("pause").title, /Pause/);
+$("pause").click();
+$("reset").click();
 key("k");
 assert.equal($("show-areas").checked, true);
 assert.equal($("kepler-panel").open, true);
