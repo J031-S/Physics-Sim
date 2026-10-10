@@ -1312,3 +1312,22 @@ header {
   gap: 3px;
   min-width: 0;
 }
+/* Clear scene is destructive: red, like its confirmation button. */
+#clear {
+  background: #a5544a;
+  border-color: #a5544a;
+  color: white;
+}
+#clear:hover {
+  background: #8e463d;
+}
+:root[data-theme="dark"] #clear {
+  background: #b35d52;
+  border-color: #b35d52;
+}
+:root[data-theme="dark"] #clear:hover {
+  background: #c46b5f;
+}
+#speed {
+  width: 62px;
+}

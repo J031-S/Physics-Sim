@@ -32,11 +32,11 @@ export function prepareIcons() {
     toggle.dataset.iconLabel = group.dataset.label;
   }
   const controls = {
-    "settings-toggle": ["settings", "Settings"],
-    shortcuts: ["keys", "Keys"],
+    "settings-toggle": ["settings", "Settings", true],
+    shortcuts: ["keys", "Keyboard shortcuts", true],
     pause: ["pause", "Pause"],
     clear: ["clear", "Clear scene"],
-    reset: ["reset", "Reset"],
+    reset: ["reset", "Reset", true],
     step: ["step", "Step", true],
     "presets-toggle": ["presets", "Presets"],
     "save-scene": ["save", "Save scene", true],
