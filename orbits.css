@@ -43,8 +43,8 @@
 }
 .ol-left,
 .ol-side {
-  flex: 0 0 304px;
-  width: 304px;
+  flex: 0 0 340px;
+  width: 340px;
   max-height: 100%;
   overflow: auto;
   display: flex;
@@ -86,10 +86,21 @@
   margin-top: 6px;
 }
 .ol-panel .fl-form .prop-row {
-  grid-template-columns: 7.6em minmax(40px, 1fr) auto;
+  grid-template-columns: 7em minmax(80px, 1fr) auto;
 }
+/* Number boxes are kept narrow so the sliders have room. The spin buttons
+   are hidden to leave the whole box for the digits (the slider beside each
+   box, and the arrow keys inside it, do the same job). */
 .ol-panel .fl-form input[type="number"] {
-  width: 98px;
+  width: 80px;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.ol-panel .fl-form input[type="number"]::-webkit-inner-spin-button,
+.ol-panel .fl-form input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
 }
 .ol-panel .fl-form .unit {
   min-width: 2.6em;
@@ -276,7 +287,7 @@
 }
 /* The view cluster sits beside the left-hand panels, not under them. */
 .orbit-lab .camera-controls {
-  left: 326px;
+  left: 362px;
 }
 .orbit-lab #settings-panel .prop-row input[type="number"] {
   width: 84px;
@@ -296,7 +307,7 @@
   .ol-left,
   .ol-side {
     flex-basis: auto;
-    width: min(304px, 100%);
+    width: min(340px, 100%);
   }
   .ol-top > .fl-centre {
     order: 3;
