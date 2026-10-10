@@ -1808,7 +1808,7 @@ function lockGlyph(o, p, dark, size) {
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(-w / 2, -h / 2, w, h, h / 2);
   else ctx.rect(-w / 2, -h / 2, w, h);
-  ctx.fillStyle = dark ? "#252d29dd" : "#fffefadd";
+  ctx.fillStyle = dark ? "#2a2722dd" : "#fffefadd";
   ctx.fill();
   ctx.lineWidth = 0.75;
   ctx.strokeStyle = dark ? "#768d70" : "#b6c9ad";
@@ -1978,8 +1978,8 @@ function drawGraph(dark) {
   }
   const key = $("graph-quantity").value,
     unit = GRAPH_UNITS[key],
-    ink = dark ? "#dde6df" : "#354438",
-    grid = dark ? "#48534b" : "#dfe4d9",
+    ink = dark ? "#ebe5d6" : "#354438",
+    grid = dark ? "#4a453b" : "#dfe4d9",
     trace = dark ? "#8fb6e0" : "#3d6f9f",
     left = 44,
     right = 8,
@@ -2351,7 +2351,7 @@ function draw() {
       line(
         screen({ x, y: min.y }),
         screen({ x, y: max.y }),
-        major ? (dark ? "#3c5042" : "#c6cebf") : dark ? "#2c3931" : "#dce1d4",
+        major ? (dark ? "#3d3930" : "#c6cebf") : dark ? "#2a2721" : "#dce1d4",
         major ? 1 : 0.75,
       );
     }
@@ -2365,7 +2365,7 @@ function draw() {
       line(
         screen({ x: min.x, y }),
         screen({ x: max.x, y }),
-        major ? (dark ? "#3c5042" : "#c6cebf") : dark ? "#2c3931" : "#dce1d4",
+        major ? (dark ? "#3d3930" : "#c6cebf") : dark ? "#2a2721" : "#dce1d4",
         major ? 1 : 0.75,
       );
     }

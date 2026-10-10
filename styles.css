@@ -385,11 +385,13 @@ input[type="checkbox"] {
   --canvas-bg: #f2f0e9;
 }
 :root[data-theme="dark"] {
+  /* Darkened parchment neutrals (the light theme's paper, in shadow), with
+     green kept for accents: active tools, toggles, Run, ground and walls. */
   color-scheme: dark;
-  --ink: #dde6df;
-  --line: #48534b;
-  --panel: #252d29;
-  --canvas-bg: #18201c;
+  --ink: #ebe5d6;
+  --line: #4a453b;
+  --panel: #2a2722;
+  --canvas-bg: #1c1a16;
   color: var(--ink);
   background: var(--canvas-bg);
 }
@@ -553,7 +555,7 @@ select {
 :root[data-theme="dark"] #constants input,
 :root[data-theme="dark"] #constants select,
 :root[data-theme="dark"] #settings-panel input[type="number"] {
-  background: #18201c;
+  background: #1c1a16;
   color: var(--ink);
 }
 :root[data-theme="dark"] .tools .active,
@@ -563,7 +565,7 @@ select {
   border-color: #768d70;
 }
 :root[data-theme="dark"] .status {
-  color: #abbba8;
+  color: #bdb4a2;
 }
 #ui-size-value {
   float: right;
@@ -606,7 +608,7 @@ select {
 :root[data-theme="dark"] #constants small,
 :root[data-theme="dark"] #menu-note,
 :root[data-theme="dark"] #keys-panel p {
-  color: #b5c3b0;
+  color: #bdb4a2;
 }
 .ui-icon {
   width: 20px;
@@ -734,7 +736,7 @@ button[data-icon] {
   font-size: 10px;
 }
 :root[data-theme="dark"] .prop-row .unit {
-  color: #b5c3b0;
+  color: #bdb4a2;
 }
 #constants .prop-row input {
   display: block;
@@ -923,7 +925,7 @@ button[data-icon] {
   background: color-mix(in srgb, var(--panel), #8aa17c 18%);
 }
 :root[data-theme="dark"] #dimensions {
-  color: #abbba8;
+  color: #bdb4a2;
 }
 .header-divider {
   align-self: stretch;
@@ -1238,4 +1240,7 @@ button:disabled {
   font-size: 11px;
   padding: 0 4px;
   border-radius: 7px;
+}
+:root[data-theme="dark"] .tools {
+  border-color: var(--line);
 }
