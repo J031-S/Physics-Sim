@@ -246,7 +246,7 @@ function closeMenu(focus = false) {
 }
 function positionMenu() {
   const box = $("material-menu").getBoundingClientRect(),
-    w = box.width || 285,
+    w = box.width || 330,
     h = box.height || 420;
   $("material-menu").style.left =
     Math.max(10, Math.min(menuPoint.x, window.innerWidth - w - 10)) /
@@ -256,6 +256,45 @@ function positionMenu() {
     Math.max(10, Math.min(menuPoint.y, window.innerHeight - h - 10)) /
       (prefs.size / 100) +
     "px";
+}
+// One compact row: label (help as tooltip and description), slider, number
+// input with its unit.
+function propertyRow({ id, name, unit, min, max, help, value }) {
+  const row = document.createElement("div"),
+    label = document.createElement("label"),
+    range = document.createElement("input"),
+    input = document.createElement("input"),
+    box = document.createElement("span"),
+    units = document.createElement("span"),
+    info = document.createElement("span");
+  row.className = "prop-row";
+  label.htmlFor = id;
+  label.textContent = name;
+  info.id = id + "-help";
+  info.className = "sr-only";
+  info.textContent = help;
+  if (help) label.title = help;
+  input.type = "number";
+  input.id = id;
+  input.min = min;
+  input.max = max;
+  input.step = "any";
+  input.value = value;
+  input.setAttribute("aria-label", name);
+  range.type = "range";
+  range.min = min;
+  range.max = max;
+  range.step = "any";
+  range.value = value;
+  range.setAttribute("aria-label", name + " slider");
+  for (const control of [input, range])
+    if (help) control.setAttribute("aria-describedby", info.id);
+  units.className = "unit";
+  units.textContent = unit;
+  box.className = "prop-value";
+  box.append(input, units);
+  row.append(label, range, box, info);
+  return { row, input, range };
 }
 function openMenu(id, x, y) {
   const o = sim.objects.get(id),
@@ -520,6 +559,7 @@ function openMenu(id, x, y) {
     for (const [key, name, options] of controls) {
       const label = document.createElement("label"),
         control = document.createElement("select");
+      label.className = "select-row";
       label.textContent = name;
       control.setAttribute("aria-label", name);
       for (const [value, text] of options) {
@@ -540,27 +580,17 @@ function openMenu(id, x, y) {
       "Strength is the peak. Gradient origin/axes are independent of the boundary. Linear: max(0, 1−d); inverse: 1/√(1+d²); inverse-square: 1/(1+d²); exponential: exp(−d). Scales define d. Axial falloff starts at the origin and decreases along +axis.";
   }
   for (const [key, name, unit, min, max, step, help] of fields) {
-    const label = document.createElement("label");
-    label.append(document.createTextNode(name));
-    const units = document.createElement("span");
-    units.textContent = unit;
-    label.append(units);
-    const input = document.createElement("input");
-    input.type = "number";
-    input.min = min;
-    input.max = max;
-    input.step = "any";
-    input.value = (o || l || f)[key];
-    input.setAttribute("aria-label", name);
+    const { row, input, range } = propertyRow({
+      id: "constant-" + key,
+      name,
+      unit,
+      min,
+      max,
+      help,
+      value: (o || l || f)[key],
+    });
     input.dataset.constant = key;
-    const range = document.createElement("input");
-    range.type = "range";
-    range.min = min;
-    range.max = max;
-    range.step = "any";
-    range.value = input.value;
     range.dataset.slider = key;
-    range.setAttribute("aria-label", name + " slider");
     input.onchange = () => {
       const current =
         sim.objects.get(id) || sim.links.get(id) || sim.fields.regions.get(id);
@@ -588,11 +618,7 @@ function openMenu(id, x, y) {
       input.value = String(Number(Number(range.value).toFixed(3)));
       input.onchange();
     };
-    label.append(input, range);
-    const info = document.createElement("small");
-    info.textContent = help;
-    label.append(info);
-    form.append(label);
+    form.append(row);
   }
   $("material-menu").hidden = false;
   positionMenu();

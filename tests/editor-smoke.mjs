@@ -101,6 +101,19 @@ assert.equal($("selection").hidden, false);
 assert.equal($("selected-name").textContent, "Ball");
 assert.equal(menu(500, 250).defaultPrevented, true);
 assert.equal($("material-menu").hidden, false);
+// Compact rows: label, slider and number on one row; help as a description.
+{
+  const mass = $("constants").querySelector('[data-constant="mass"]'),
+    row = mass.closest(".prop-row");
+  assert.ok(row.querySelector('[data-slider="mass"]'));
+  assert.equal(row.querySelector("label").htmlFor, mass.id);
+  assert.equal(row.querySelector("label").title, "Inertial mass.");
+  assert.equal(
+    document.getElementById(mass.getAttribute("aria-describedby")).textContent,
+    "Inertial mass.",
+  );
+  assert.equal($("constants").querySelector("small"), null);
+}
 assert.deepEqual(
   [...$("constants").querySelectorAll("input[type=number]")].map(
     (i) => i.dataset.constant,
