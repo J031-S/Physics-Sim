@@ -206,6 +206,49 @@ const key = (k, type = "keydown", extra = {}) =>
       ...extra,
     }),
   );
+// Edit tools on the left bar; other categories behind drop-downs.
+assert.deepEqual(
+  [...document.querySelectorAll(".edit-tools [data-tool]")].map(
+    (b) => b.dataset.tool,
+  ),
+  ["grab", "select", "impulse", "pan"],
+);
+for (const b of document.querySelectorAll("[data-tool]"))
+  assert.ok(["true", "false"].includes(b.getAttribute("aria-pressed")));
+$("category-bodies").click();
+assert.equal($("menu-bodies").hidden, false);
+assert.equal($("category-bodies").getAttribute("aria-expanded"), "true");
+$("category-fields").click();
+assert.equal($("menu-bodies").hidden, true, "one drop-down at a time");
+assert.equal($("menu-fields").hidden, false);
+document.querySelector('[data-tool="magnetic"]').click();
+assert.equal($("menu-fields").hidden, true, "choosing a tool closes it");
+assert.ok($("category-fields").classList.contains("active"));
+assert.equal($("category-fields").dataset.icon, "magnetic");
+assert.equal(
+  document.querySelector('[data-tool="magnetic"]').getAttribute("aria-pressed"),
+  "true",
+);
+$("category-connections").click();
+document.activeElement.dispatchEvent(
+  new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+);
+assert.equal($("menu-connections").hidden, true);
+assert.ok(
+  $("category-fields").classList.contains("active"),
+  "Escape keeps tool",
+);
+$("category-connections").click();
+document.activeElement.dispatchEvent(
+  new window.KeyboardEvent("keydown", { key: "s", bubbles: true }),
+);
+assert.ok(
+  $("category-connections").classList.contains("active"),
+  "shortcuts work while a drop-down is open",
+);
+assert.equal($("menu-connections").hidden, true);
+assert.ok(!$("category-fields").classList.contains("active"));
+key("g");
 $("clear").click();
 canvas.focus();
 key(" ");

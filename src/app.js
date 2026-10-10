@@ -1,4 +1,4 @@
-import { setPlaybackIcon } from "./icons.js";
+import { renderIcons, setPlaybackIcon } from "./icons.js";
 import { Sandbox, DT, GRID, snap } from "./physics.js";
 import { setupPreferences } from "./preferences.js";
 import { drawFields, FieldDrag } from "./field-view.js";
@@ -63,6 +63,17 @@ function chooseTool(next) {
     b.classList.toggle("active", b.dataset.tool === tool);
     b.setAttribute("aria-pressed", b.dataset.tool === tool);
   }
+  closeCategories();
+  for (const group of document.querySelectorAll(".tool-category")) {
+    const toggle = group.querySelector(".category-toggle"),
+      current = group.querySelector(`[data-tool="${tool}"]`);
+    toggle.classList.toggle("active", !!current);
+    if (current) toggle.dataset.icon = tool;
+    toggle.title = current
+      ? `${group.dataset.label}: ${current.dataset.iconLabel} active`
+      : group.dataset.label;
+  }
+  renderIcons(prefs.iconSet);
   $("hint").textContent = {
     select:
       "Drag a box to select · Shift-box adds · drag a selected body to move its assembly · Z toggles snapping",
@@ -1111,6 +1122,47 @@ $("clear").onclick = () => {
   chooseTool("grab");
   accumulator = 0;
 };
+function closeCategories(except) {
+  for (const group of document.querySelectorAll(".tool-category")) {
+    if (group === except) continue;
+    group.querySelector(".category-menu").hidden = true;
+    group
+      .querySelector(".category-toggle")
+      .setAttribute("aria-expanded", "false");
+  }
+}
+for (const group of document.querySelectorAll(".tool-category")) {
+  const toggle = group.querySelector(".category-toggle"),
+    menu = group.querySelector(".category-menu"),
+    items = [...menu.querySelectorAll("[data-tool]")];
+  toggle.onclick = () => {
+    closeCategories(group);
+    menu.hidden = !menu.hidden;
+    toggle.setAttribute("aria-expanded", String(!menu.hidden));
+    if (!menu.hidden)
+      (items.find((b) => b.dataset.tool === tool) || items[0]).focus();
+  };
+  group.addEventListener("keydown", (e) => {
+    if (menu.hidden) return;
+    if (e.key === "Escape") {
+      // Closing the drop-down should not also cancel the active tool.
+      e.stopPropagation();
+      closeCategories();
+      toggle.focus();
+    } else if (["ArrowDown", "ArrowUp"].includes(e.key)) {
+      e.preventDefault();
+      const i = items.indexOf(document.activeElement),
+        step = e.key === "ArrowDown" ? 1 : -1;
+      items[(i + step + items.length) % items.length].focus();
+    }
+  });
+  group.addEventListener("focusout", (e) => {
+    if (e.relatedTarget && !group.contains(e.relatedTarget)) {
+      menu.hidden = true;
+      toggle.setAttribute("aria-expanded", "false");
+    }
+  });
+}
 for (const b of document.querySelectorAll("[data-tool]"))
   b.onclick = () => {
     sim.endGrab(false);
@@ -1118,6 +1170,14 @@ for (const b of document.querySelectorAll("[data-tool]"))
     canvas.focus();
   };
 function typing(e) {
+  // Tool shortcuts keep working while focus is on a toolbar button or an
+  // open drop-down; Space and Enter still activate the focused button.
+  if (
+    e.target.closest?.(".tools, .edit-tools") &&
+    e.target.tagName === "BUTTON" &&
+    ![" ", "Enter"].includes(e.key)
+  )
+    return false;
   return (
     ["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A"].includes(e.target.tagName) ||
     e.target.isContentEditable ||
@@ -1343,9 +1403,17 @@ function draw() {
       maxY: view.y / view.scale,
     });
   $("zoom-level").textContent = Math.round((view.scale / 65) * 100) + "%";
-  const toolbar = document.querySelector(".tools");
+  const toolbar = document.querySelector(".tools"),
+    editBar = document.querySelector(".edit-tools");
   $("tool-settings").style.top =
     toolbar.offsetTop + toolbar.offsetHeight + 8 + "px";
+  // Keep the centred options strip clear of the left-hand edit bar.
+  $("tool-settings").style.maxWidth =
+    Math.max(
+      200,
+      canvas.clientWidth / (prefs.size / 100) -
+        2 * (editBar.offsetLeft + editBar.offsetWidth + 8),
+    ) + "px";
   const dark = document.documentElement.dataset.theme === "dark";
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, r.width, r.height);

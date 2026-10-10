@@ -23,6 +23,13 @@ export function prepareIcons() {
     const key = button.dataset.tool;
     button.dataset.icon = key;
     button.dataset.iconLabel = key[0].toUpperCase() + key.slice(1);
+    if (button.closest(".edit-tools")) button.dataset.iconOnly = "true";
+  }
+  // Category toggles show the icon of their active (or first) tool.
+  for (const group of document.querySelectorAll(".tool-category")) {
+    const toggle = group.querySelector(".category-toggle");
+    toggle.dataset.icon = group.querySelector("[data-tool]").dataset.tool;
+    toggle.dataset.iconLabel = group.dataset.label;
   }
   const controls = {
     "settings-toggle": ["settings", "Settings"],

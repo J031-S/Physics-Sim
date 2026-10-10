@@ -287,22 +287,6 @@ input[type="checkbox"] {
   .brand {
     font-size: 13px;
   }
-  .tools {
-    top: 12px;
-    gap: 2px;
-    padding: 7px;
-    flex-wrap: wrap;
-    justify-content: center;
-    width: calc(100% - 24px);
-    max-width: 580px;
-  }
-  .tools button {
-    font-size: 10px;
-    padding: 7px;
-  }
-  .tools b {
-    font-size: 20px;
-  }
   .selection {
     top: 112px;
     max-width: calc(100% - 24px);
@@ -368,15 +352,6 @@ input[type="checkbox"] {
   max-width: calc(100% - 24px);
 }
 @media (max-width: 1000px) {
-  .tools {
-    width: calc(100% - 24px);
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 2px;
-  }
-  .tools button {
-    padding: 6px 8px;
-  }
   .selection {
     top: 138px;
     max-width: calc(100% - 24px);
@@ -492,10 +467,6 @@ input[type="checkbox"] {
   background: #f8f9f2;
 }
 @media (max-width: 1250px) {
-  .tools {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
   .selection {
     top: 138px;
   }
@@ -540,28 +511,14 @@ select {
 }
 .tools {
   top: 12px;
-  gap: 10px;
+  gap: 4px;
+  padding: 5px;
   width: max-content;
   max-width: calc(100% - 24px);
   flex-wrap: wrap;
   justify-content: center;
   background: var(--panel);
   zoom: var(--ui-scale);
-}
-.tool-group {
-  border-right: 1px solid var(--line);
-  padding-right: 8px;
-}
-.tool-group > small {
-  display: block;
-  padding: 0 7px 4px;
-  opacity: 0.65;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-.tool-group > div {
-  display: flex;
 }
 .tools button {
   padding: 5px 7px;
@@ -650,7 +607,8 @@ select {
   background: #18201c;
   color: var(--ink);
 }
-:root[data-theme="dark"] .tools .active {
+:root[data-theme="dark"] .tools .active,
+:root[data-theme="dark"] .edit-tools .active {
   background: #3b4c3f;
   color: #ecf5e8;
   border-color: #768d70;
@@ -728,7 +686,8 @@ button[data-icon] {
   justify-content: center;
   gap: 7px;
 }
-.tools button .ui-icon {
+.tools button .ui-icon,
+.edit-tools button .ui-icon {
   width: 22px;
   height: 22px;
   flex-basis: 22px;
@@ -756,4 +715,63 @@ button[data-icon] {
 #ui-icons {
   width: 100%;
   margin-top: 8px;
+}
+.edit-tools {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 5px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  box-shadow: 0 8px 30px #3b4b3610;
+  zoom: var(--ui-scale);
+}
+.edit-tools button {
+  padding: 7px;
+  border-color: transparent;
+  background: transparent;
+}
+.edit-tools button:hover {
+  background: color-mix(in srgb, var(--panel), #8aa17c 18%);
+}
+.edit-tools .active {
+  background: #e5eedf;
+  border-color: #b6c9ad;
+}
+/* Drop-downs open over the tool-options strip below the toolbar. */
+.tools {
+  z-index: 3;
+}
+.tool-category {
+  position: relative;
+}
+.category-toggle::after {
+  content: "";
+  border: 4px solid transparent;
+  border-top-color: currentColor;
+  margin: 4px 0 0 -2px;
+  opacity: 0.6;
+}
+.category-menu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 9px);
+  left: -5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: calc(100% + 10px);
+  padding: 5px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  box-shadow: 0 10px 30px #34473125;
+}
+.tools .category-menu button {
+  justify-content: flex-start;
+  padding-right: 14px;
 }

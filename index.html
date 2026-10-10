@@ -28,36 +28,84 @@
         tabindex="0"
         aria-label="Physics sandbox. Choose Ball or Block, then click to create. Drag to throw. Press Z to toggle snapping."
       ></canvas>
-      <div class="tools" role="toolbar" aria-label="Simulation tools">
-        <div class="tool-group">
-          <small>Edit</small>
-          <div>
-            <button data-tool="grab" aria-pressed="true">Grab</button
-            ><button data-tool="select" aria-pressed="false">Select</button
-            ><button data-tool="impulse" aria-pressed="false">Impulse</button
-            ><button data-tool="pan" aria-pressed="false">Pan</button>
-          </div>
-        </div>
-        <div class="tool-group">
-          <small>Bodies</small>
-          <div>
+      <div
+        class="edit-tools"
+        role="toolbar"
+        aria-label="Edit tools"
+        aria-orientation="vertical"
+      >
+        <button data-tool="grab" aria-pressed="true">Grab</button
+        ><button data-tool="select" aria-pressed="false">Select</button
+        ><button data-tool="impulse" aria-pressed="false">Impulse</button
+        ><button data-tool="pan" aria-pressed="false">Pan</button>
+      </div>
+      <div class="tools" role="toolbar" aria-label="Add to scene">
+        <div class="tool-category" data-category="bodies" data-label="Bodies">
+          <button
+            class="category-toggle"
+            id="category-bodies"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="menu-bodies"
+          >
+            Bodies
+          </button>
+          <div
+            class="category-menu"
+            id="menu-bodies"
+            role="group"
+            aria-labelledby="category-bodies"
+            hidden
+          >
             <button data-tool="ball" aria-pressed="false">Ball</button
             ><button data-tool="block" aria-pressed="false">Block</button
             ><button data-tool="wedge" aria-pressed="false">Wedge</button>
           </div>
         </div>
-        <div class="tool-group">
-          <small>Connections</small>
-          <div>
+        <div
+          class="tool-category"
+          data-category="connections"
+          data-label="Connections"
+        >
+          <button
+            class="category-toggle"
+            id="category-connections"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="menu-connections"
+          >
+            Connections
+          </button>
+          <div
+            class="category-menu"
+            id="menu-connections"
+            role="group"
+            aria-labelledby="category-connections"
+            hidden
+          >
             <button data-tool="spring" aria-pressed="false">Spring</button
             ><button data-tool="rod" aria-pressed="false">Rod</button
             ><button data-tool="belt" aria-pressed="false">Belt</button
             ><button data-tool="pulley" aria-pressed="false">Pulley</button>
           </div>
         </div>
-        <div class="tool-group">
-          <small>Fields</small>
-          <div>
+        <div class="tool-category" data-category="fields" data-label="Fields">
+          <button
+            class="category-toggle"
+            id="category-fields"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="menu-fields"
+          >
+            Fields
+          </button>
+          <div
+            class="category-menu"
+            id="menu-fields"
+            role="group"
+            aria-labelledby="category-fields"
+            hidden
+          >
             <button data-tool="electric" aria-pressed="false">Electric</button
             ><button data-tool="magnetic" aria-pressed="false">Magnetic</button>
           </div>
