@@ -1234,3 +1234,8 @@ button:disabled {
 .playback button {
   white-space: nowrap;
 }
+#speed {
+  font-size: 11px;
+  padding: 0 4px;
+  border-radius: 7px;
+}

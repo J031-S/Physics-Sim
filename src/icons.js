@@ -37,6 +37,7 @@ export function prepareIcons() {
     pause: ["pause", "Pause"],
     clear: ["clear", "Clear scene"],
     reset: ["reset", "Reset"],
+    step: ["step", "Step", true],
     "presets-toggle": ["presets", "Presets"],
     "save-scene": ["save", "Save scene", true],
     "load-scene": ["load", "Load scene", true],

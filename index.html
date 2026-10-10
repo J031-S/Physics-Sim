@@ -27,6 +27,21 @@
         >
           Reset</button
         ><button id="pause" title="Play / pause (Space)">Pause</button
+        ><button
+          id="step"
+          title="Advance one 1/120 s step while paused (.)"
+          disabled
+        >
+          Step</button
+        ><select
+          id="speed"
+          title="Simulation speed"
+          aria-label="Simulation speed"
+        >
+          <option value="1">1×</option>
+          <option value="0.5">0.5×</option>
+          <option value="0.25">0.25×</option>
+          <option value="0.1">0.1×</option></select
         ><span class="header-divider" aria-hidden="true"></span
         ><button
           id="presets-toggle"
@@ -721,6 +736,8 @@
         ><button id="close-keys" aria-label="Close shortcuts">×</button>
       </div>
       <dl>
+        <dt>.</dt>
+        <dd>Step one 1/120 s while paused (Step button)</dd>
         <dt>Space</dt>
         <dd>
           Play / pause. Reset (beside it) returns to the state at load or at the

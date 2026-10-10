@@ -1282,7 +1282,24 @@ function setRunning(next) {
   running = next;
   accumulator = 0;
   setPlaybackIcon(running, prefs.iconSet);
+  $("step").disabled = running;
 }
+// One fixed 1/120 s step while paused.
+function stepPaused() {
+  if (running) return;
+  cancelDrag();
+  if (!startScene) {
+    // A hand-built scene's reset point is its state before it first moves.
+    startScene = sim.exportScene();
+    $("reset").disabled = false;
+  }
+  stepOnce();
+}
+$("step").onclick = stepPaused;
+$("speed").onchange = () => {
+  accumulator = 0;
+  canvas.focus();
+};
 $("pause").onclick = () => {
   cancelDrag();
   setRunning(!running);
@@ -1615,6 +1632,10 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     cancelDrag();
     chooseTool(keys[key]);
+  }
+  if (e.key === ".") {
+    e.preventDefault();
+    stepPaused();
   }
   if (key === "v") {
     $("vectors").checked = !$("vectors").checked;
@@ -2508,7 +2529,9 @@ function draw() {
     ctx.setLineDash([]);
   }
   if (sim.sizing) showDimensions();
-  $("time").textContent = sim.time.toFixed(2) + " s";
+  const speed = $("speed").value;
+  $("time").textContent =
+    sim.time.toFixed(2) + " s" + (speed === "1" ? "" : ` · ${speed}×`);
   updateReadouts();
   sampleGraph();
   drawGraph(dark);
@@ -2517,7 +2540,8 @@ function frame(now) {
   const elapsed = last ? Math.min((now - last) / 1000, 0.05) : 0;
   last = now;
   if (running) {
-    accumulator += elapsed;
+    // Slow motion: less simulated time per real second, same fixed step.
+    accumulator += elapsed * Number($("speed").value);
     while (accumulator >= DT) {
       stepOnce();
       accumulator -= DT;

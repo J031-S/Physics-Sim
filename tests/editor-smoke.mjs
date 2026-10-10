@@ -1170,6 +1170,32 @@ for (const open of [
   assert.equal($("tool-help").hidden, true, "impulse options explain it");
   key("g");
 }
+// Time controls: Step while paused, and slow motion.
+{
+  clearScene();
+  if ($("pause").textContent === "Pause") key(" ");
+  frames(1);
+  assert.equal($("time").textContent, "0.00 s");
+  assert.equal($("step").disabled, false);
+  for (let i = 0; i < 12; i++) key(".");
+  frames(1);
+  assert.equal($("time").textContent, "0.10 s", "12 steps of 1/120 s");
+  $("step").click();
+  frames(3);
+  assert.equal($("time").textContent, "0.11 s", "paused: only Step advances");
+  change($("speed"), "0.5");
+  key(" ");
+  assert.equal($("step").disabled, true);
+  key(".");
+  frames(60);
+  // One real second at half speed is half a simulated second.
+  const t = Number.parseFloat($("time").textContent);
+  assert.ok(Math.abs(t - 0.11 - 0.5) < 0.02, $("time").textContent);
+  assert.match($("time").textContent, / · 0\.5×$/);
+  change($("speed"), "1");
+  frames(1);
+  assert.match($("time").textContent, /^\d+\.\d\d s$/);
+}
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );

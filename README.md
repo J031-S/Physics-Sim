@@ -27,6 +27,7 @@ Click **Keys ?** (or press **?**) for the built-in shortcut guide. Shortcuts do 
 | E / M                   | Electric / Magnetic field                                                            |
 | V                       | Toggle velocity vectors                                                              |
 | F                       | Toggle net force vectors                                                             |
+| .                       | Step one 1/120 s while paused                                                        |
 | R + left-drag           | Resize a body or field about its current centre                                      |
 | Z                       | Toggle snapping for every geometry operation; also available in Settings             |
 | Shift + drag            | Prioritise movement; moving a position-locked body requires Pause                    |
@@ -63,6 +64,10 @@ Placed field **regions** have sharp edges, so their fields have no potential ene
 ### Graphs
 
 The selected-item panel also has a collapsible **Graph** for a single selected body. Choose what to plot: position x or y, velocity vx or vy, speed, the body's kinetic energy, or the total scene energy. The graph shows the last 20 s of **simulation** time (one sample per drawn frame), so pausing freezes it and slow motion stretches nothing. The vertical axis scales automatically, but never to less than 10% of the values' size, so a nearly constant quantity such as total energy reads as flat rather than magnifying tiny rounding wobble. The graph starts empty when you select a different body, load a scene, Reset or Clear.
+
+### Time controls
+
+Beside Run/Pause, **Step** (or **.**) advances exactly one fixed 1/120 s step while paused, so you can watch a collision or a turning point frame by frame. The **speed** selector (1×, 0.5×, 0.25×, 0.1×) runs the simulation in slow motion: less simulated time passes per real second, but every step is still the same 1/120 s, so results are identical to full speed. When the speed is not 1×, it is shown after the clock in the bottom-right corner.
 
 ### Presets, save and load
 
