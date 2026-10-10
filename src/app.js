@@ -257,6 +257,42 @@ function positionMenu() {
       (prefs.size / 100) +
     "px";
 }
+// Sliders centred on zero (min = −max) snap to exactly zero within 2.5% of
+// their span, marked by a centre tick. Arrow keys nudge by exact steps so the
+// detent never traps keyboard users.
+function centred(range) {
+  return Number(range.max) > 0 && Number(range.min) === -Number(range.max);
+}
+function detent(range, value) {
+  return centred(range) && Math.abs(value) <= 0.025 * (range.max - range.min)
+    ? 0
+    : value;
+}
+function addZeroDetent(range, step, nudge) {
+  if (!centred(range)) return;
+  const wrap = document.createElement("div"),
+    tick = document.createElement("span");
+  wrap.className = "zero-slider";
+  tick.className = "zero-tick";
+  tick.setAttribute("aria-hidden", "true");
+  range.replaceWith(wrap);
+  wrap.append(tick, range);
+  range.addEventListener("keydown", (e) => {
+    const keys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+    if (!keys.includes(e.key)) return;
+    e.preventDefault();
+    const delta = ["ArrowRight", "ArrowUp"].includes(e.key) ? step : -step;
+    nudge(
+      Math.max(
+        Number(range.min),
+        Math.min(
+          Number(range.max),
+          Number((Number(range.value) + delta).toFixed(6)),
+        ),
+      ),
+    );
+  });
+}
 // One compact row: label (help as tooltip and description), slider, number
 // input with its unit.
 function propertyRow({ id, name, unit, min, max, help, value }) {
@@ -615,9 +651,15 @@ function openMenu(id, x, y) {
       range.value = current[key];
     };
     range.oninput = () => {
-      input.value = String(Number(Number(range.value).toFixed(3)));
+      input.value = String(
+        Number(detent(range, Number(range.value)).toFixed(3)),
+      );
       input.onchange();
     };
+    addZeroDetent(range, step, (value) => {
+      input.value = String(value);
+      input.onchange();
+    });
     form.append(row);
   }
   $("material-menu").hidden = false;
@@ -1061,28 +1103,12 @@ for (const key of settingKeys) {
     }
     syncSettings();
   };
-  range.onkeydown = (e) => {
-    // Keyboard nudges use exact values and must be able to leave the detent.
-    if (
-      key !== "gravity" ||
-      !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)
-    )
-      return;
-    e.preventDefault();
-    const delta = ["ArrowRight", "ArrowUp"].includes(e.key) ? 0.1 : -0.1;
-    sim.updateSettings({
-      gravity: Math.max(
-        -50,
-        Math.min(50, Number((sim.settings.gravity + delta).toFixed(2))),
-      ),
-    });
+  addZeroDetent(range, 0.1, (value) => {
+    sim.updateSettings({ [key]: value });
     syncSettings();
-  };
+  });
   range.oninput = () => {
-    const value =
-      key === "gravity" && Math.abs(Number(range.value)) <= 2.5
-        ? 0
-        : Number(range.value);
+    const value = detent(range, Number(range.value));
     sim.updateSettings({ [key]: value });
     range.value = value;
     input.value = sim.settings[key];

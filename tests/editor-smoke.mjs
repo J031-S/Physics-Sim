@@ -113,6 +113,15 @@ assert.equal($("material-menu").hidden, false);
     "Inertial mass.",
   );
   assert.equal($("constants").querySelector("small"), null);
+  const charge = $("constants").querySelector('[data-slider="charge"]');
+  assert.ok(charge.closest(".zero-slider"));
+  assert.equal(row.querySelector(".zero-slider"), null);
+  charge.value = "3";
+  charge.dispatchEvent(new window.Event("input"));
+  assert.equal(
+    $("constants").querySelector('[data-constant="charge"]').value,
+    "0",
+  );
 }
 assert.deepEqual(
   [...$("constants").querySelectorAll("input[type=number]")].map(
@@ -582,14 +591,26 @@ $("close-menu").click();
 frames(1);
 $("settings-toggle").click();
 change($("range-electricX"), "3", "input");
-assert.equal($("setting-electricX").value, "3");
+assert.equal($("setting-electricX").value, "0", "centred sliders snap to 0");
+change($("range-electricX"), "8", "input");
+assert.equal($("setting-electricX").value, "8");
 change($("setting-magneticZ"), "-2");
 assert.equal($("range-magneticZ").value, "-2");
 change($("range-gravity"), "2.4", "input");
 assert.equal($("setting-gravity").value, "0");
 change($("range-gravity"), "-2.4", "input");
 assert.equal($("setting-gravity").value, "0");
-assert.ok(document.querySelector(".zero-tick"));
+// Every slider centred on zero gets the tick; others do not.
+for (const key of ["gravity", "electricX", "electricY", "magneticZ"])
+  assert.ok($("range-" + key).closest(".zero-slider"), key);
+assert.equal($("range-airResistance").closest(".zero-slider"), null);
+// Arrow keys leave the detent in exact steps.
+change($("range-magneticZ"), "0", "input");
+$("range-magneticZ").dispatchEvent(
+  new window.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+);
+assert.equal($("setting-magneticZ").value, "0.1");
+change($("range-magneticZ"), "0", "input");
 {
   const sections = [...document.querySelectorAll(".settings-section")];
   assert.deepEqual(

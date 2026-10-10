@@ -366,7 +366,7 @@ input[type="checkbox"] {
   z-index: 14;
   right: 16px;
   top: 76px;
-  width: min(340px, calc(100vw - 32px));
+  width: min(380px, calc(100vw - 32px));
   max-height: calc(100dvh - 92px);
   overflow: auto;
   padding: 18px;
@@ -427,25 +427,6 @@ input[type="checkbox"] {
 }
 
 /* Always-visible centre marker, independent of browser datalist rendering. */
-.zero-slider {
-  position: relative;
-  padding-bottom: 18px;
-  margin-top: 8px;
-}
-#settings-panel .zero-slider input {
-  position: relative;
-  z-index: 1;
-  margin-top: 0;
-}
-.zero-tick {
-  position: absolute;
-  left: 50%;
-  top: 1px;
-  width: 2px;
-  height: 22px;
-  background: #526c49;
-  pointer-events: none;
-}
 #constants select {
   display: block;
   width: 100%;
@@ -893,14 +874,6 @@ button[data-icon] {
 #settings-panel .prop-row .unit {
   float: none;
 }
-#settings-panel .zero-slider {
-  margin: 0;
-  padding: 0;
-}
-#settings-panel .zero-slider .zero-tick {
-  top: -3px;
-  height: 26px;
-}
 #settings-panel .setting-toggle {
   margin: 6px 0;
   font-size: 11px;
@@ -947,10 +920,30 @@ button[data-icon] {
 #reset-settings {
   margin-top: 10px;
 }
-#settings-panel .zero-slider .zero-tick {
-  z-index: 2;
-  opacity: 0.8;
+/* Centre detent for sliders centred on zero: short stubs above and below the
+   track, hidden by the thumb when it sits on zero. */
+.zero-slider {
+  position: relative;
 }
-:root[data-theme="dark"] .zero-tick {
-  background: #a9c49d;
+.zero-slider input[type="range"] {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin: 0;
+}
+.zero-tick {
+  position: absolute;
+  left: calc(50% - 0.5px);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: currentColor;
+  opacity: 0.35;
+  pointer-events: none;
+}
+#settings-panel .prop-row {
+  grid-template-columns: 8.4em minmax(60px, 1fr) auto;
+}
+#settings-panel .prop-row input[type="number"] {
+  width: 58px;
 }
