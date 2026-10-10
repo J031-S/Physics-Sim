@@ -99,6 +99,12 @@ tool("ball");
 click(500, 250);
 assert.equal($("selection").hidden, false);
 assert.equal($("selected-name").textContent, "Ball");
+// Compact panel: icon buttons in the header, lock toggles on one row.
+assert.ok($("delete").closest(".selection-header"));
+assert.equal($("delete").dataset.iconOnly, "true");
+assert.equal($("lock-position").parentElement.hidden, false);
+assert.equal($("lock-caption").hidden, false);
+assert.equal(document.querySelector(".selection-row").hidden, false);
 assert.equal(menu(500, 250).defaultPrevented, true);
 assert.equal($("material-menu").hidden, false);
 // Compact rows: label, slider and number on one row; help as a description.
@@ -536,6 +542,7 @@ canvas.focus();
 key("e");
 click(500, 300);
 assert.equal($("selected-name").textContent, "Electric field");
+assert.equal(document.querySelector(".selection-row").hidden, true);
 menu(500, 300);
 const change = (node, value, event = "change") => {
   node.value = value;

@@ -166,39 +166,61 @@
           ></span
         ></label>
       </div>
-      <div id="selection" class="selection" hidden>
-        <strong id="selected-name"></strong
-        ><label
-          ><input type="checkbox" id="lock-position" /> Lock position</label
-        ><label
-          ><input type="checkbox" id="lock-rotation" /> Lock rotation</label
-        ><label
-          ><input type="checkbox" id="lock-angle" /> Lock spring angle</label
-        ><label
-          ><input type="checkbox" id="reverse-wrap" /> Reverse cable wrap</label
-        ><label><input type="checkbox" id="crossed-belt" /> Crossed belt</label
-        ><label><input type="checkbox" id="belt-motor" /> Drive belt</label
-        ><label id="belt-speed-label"
-          >Speed
-          <input
-            id="belt-speed"
-            type="number"
-            min="-10"
-            max="10"
-            step="0.1"
-            value="1"
-            aria-label="Belt speed"
-          />
-          m/s</label
-        ><button
-          id="resize-object"
-          title="Resize tool: drag the object; Z toggles dimension snapping"
-        >
-          Resize (R)</button
-        ><span id="dimensions"></span
-        ><button id="delete" title="Delete selected object or connection">
-          Delete
-        </button>
+      <div
+        id="selection"
+        class="selection"
+        role="region"
+        aria-label="Selected item"
+        hidden
+      >
+        <div class="selection-header">
+          <strong id="selected-name"></strong><span id="dimensions"></span
+          ><span class="header-actions"
+            ><button
+              id="resize-object"
+              title="Resize tool: drag the object; Z toggles dimension snapping"
+            >
+              Resize (R)</button
+            ><button id="delete" title="Delete selected object or connection">
+              Delete
+            </button></span
+          >
+        </div>
+        <div class="selection-row">
+          <span id="lock-caption" class="row-caption">Lock</span
+          ><label class="icon-toggle" title="Lock position"
+            ><input type="checkbox" id="lock-position" /><span
+              data-icon="lockPosition"
+              data-icon-label="Lock position"
+              data-icon-only="true"
+            ></span></label
+          ><label class="icon-toggle" title="Lock rotation"
+            ><input type="checkbox" id="lock-rotation" /><span
+              data-icon="lockRotation"
+              data-icon-label="Lock rotation"
+              data-icon-only="true"
+            ></span></label
+          ><label class="switch" title="Keep the spring at its current angle"
+            ><input type="checkbox" id="lock-angle" /> Lock angle</label
+          ><label class="switch" title="Wrap the cable round the other side"
+            ><input type="checkbox" id="reverse-wrap" /> Reverse wrap</label
+          ><label class="switch"
+            ><input type="checkbox" id="crossed-belt" /> Crossed</label
+          ><label class="switch" title="Drive the belt at a set speed"
+            ><input type="checkbox" id="belt-motor" /> Drive</label
+          ><label id="belt-speed-label" class="switch"
+            ><input
+              id="belt-speed"
+              type="number"
+              min="-10"
+              max="10"
+              step="0.1"
+              value="1"
+              aria-label="Belt speed"
+            />
+            m/s</label
+          >
+        </div>
       </div>
       <div class="hint" id="hint">
         Add a ball or block, then grab and throw it. Right-click for material

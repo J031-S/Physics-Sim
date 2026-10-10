@@ -145,6 +145,9 @@ function select(id) {
     $(id).parentElement.hidden = !o;
     $(id).checked = !!o?.[key];
   }
+  $("lock-caption").hidden = !o;
+  const row = document.querySelector(".selection-row");
+  row.hidden = ![...row.children].some((c) => !c.hidden);
 }
 function selectMany(ids) {
   const list = [...new Set(ids)].filter(

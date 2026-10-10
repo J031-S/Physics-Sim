@@ -142,34 +142,6 @@ input[type="checkbox"] {
   width: 14px;
   height: 14px;
 }
-.selection {
-  position: absolute;
-  top: 96px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 14px;
-  border: 1px solid #d4dacd;
-  border-radius: 9px;
-  background: #fffefaf5;
-  font-size: 11px;
-  white-space: nowrap;
-}
-.selection strong {
-  font-weight: 600;
-}
-.selection label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.selection button {
-  font-size: 10px;
-  padding: 5px 8px;
-  color: #a56c62;
-}
 .hint {
   position: absolute;
   bottom: 34px;
@@ -287,13 +259,6 @@ input[type="checkbox"] {
   .brand {
     font-size: 13px;
   }
-  .selection {
-    top: 112px;
-    max-width: calc(100% - 24px);
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
   .hint {
     font-size: 10px;
     bottom: 32px;
@@ -350,15 +315,6 @@ input[type="checkbox"] {
 }
 .tools {
   max-width: calc(100% - 24px);
-}
-@media (max-width: 1000px) {
-  .selection {
-    top: 138px;
-    max-width: calc(100% - 24px);
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
-  }
 }
 
 #settings-panel {
@@ -435,11 +391,6 @@ input[type="checkbox"] {
   border: 1px solid var(--line);
   border-radius: 5px;
   background: #f8f9f2;
-}
-@media (max-width: 1250px) {
-  .selection {
-    top: 138px;
-  }
 }
 
 :root {
@@ -523,28 +474,6 @@ select {
 #tool-help,
 #impulse-options > span {
   opacity: 0.7;
-}
-#selection.selection {
-  top: auto;
-  left: auto;
-  right: 16px;
-  bottom: 64px;
-  transform: none;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 12px;
-  width: 245px;
-  max-height: 50vh;
-  overflow: auto;
-  white-space: normal;
-  background: var(--panel);
-  border-color: var(--line);
-  zoom: var(--ui-scale);
-}
-#selection > strong {
-  padding-bottom: 9px;
-  border-bottom: 1px solid var(--line);
 }
 .camera-controls {
   position: absolute;
@@ -671,11 +600,6 @@ select {
   }
   .playback button {
     padding: 6px;
-  }
-  #selection.selection {
-    width: 200px;
-    bottom: 95px;
-    max-height: 35vh;
   }
   #tool-help {
     display: none;
@@ -946,4 +870,73 @@ button[data-icon] {
 }
 #settings-panel .prop-row input[type="number"] {
   width: 58px;
+}
+/* Selected-item panel: header row, then one row of toggles. */
+#selection {
+  position: absolute;
+  right: 16px;
+  bottom: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 190px;
+  max-width: min(330px, calc(100% - 32px));
+  padding: 6px 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 11px;
+  zoom: var(--ui-scale);
+}
+.selection-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.selection-header strong {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.header-actions {
+  display: flex;
+  margin-left: auto;
+}
+.row-caption {
+  opacity: 0.7;
+  margin-right: -4px;
+}
+.selection-header button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+.selection-header button .ui-icon {
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
+}
+.selection-header #delete {
+  color: #a56c62;
+}
+.selection-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+.selection-row .switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.selection-header button:hover {
+  background: color-mix(in srgb, var(--panel), #8aa17c 18%);
+}
+:root[data-theme="dark"] #dimensions {
+  color: #abbba8;
 }
