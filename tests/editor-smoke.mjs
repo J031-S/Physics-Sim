@@ -2,6 +2,7 @@ import { Window } from "happy-dom";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import Matter from "../vendor/matter.js";
+import { presets } from "../src/presets.js";
 const window = new Window({ url: "http://localhost:3000" });
 window.document.write(
   await readFile(new URL("../index.html", import.meta.url), "utf8"),
@@ -812,6 +813,83 @@ for (const open of [
   assert.equal($("selection").hidden, true, "closing press placed nothing");
   click(500, 250);
   assert.equal($("selected-name").textContent, "Ball", "next press places");
+}
+// Presets, Reset, Save and Load.
+{
+  $("presets-toggle").click();
+  assert.equal($("presets-panel").hidden, false);
+  assert.equal(
+    $("preset-list").querySelectorAll("button.preset").length,
+    presets.length,
+  );
+  assert.deepEqual(
+    [...$("preset-list").querySelectorAll("h3")].map((h) => h.textContent),
+    [...new Set(presets.map((p) => p.group))],
+  );
+  assert.match(
+    document.querySelector('[data-preset="free-fall"]').textContent,
+    /What to look for: All three reach the floor/,
+  );
+  document.querySelector('[data-preset="free-fall"]').click();
+  assert.equal($("presets-panel").hidden, true);
+  assert.equal($("pause").textContent, "Run", "presets load paused");
+  assert.equal($("reset").disabled, false);
+  frames(3);
+  assert.equal($("time").textContent, "0.00 s");
+  key(" ");
+  frames(60);
+  assert.notEqual($("time").textContent, "0.00 s");
+  key(" ");
+  $("reset").click();
+  frames(1);
+  assert.equal($("time").textContent, "0.00 s", "Reset restores the start");
+  assert.equal($("pause").textContent, "Run");
+  // Save goes through a Blob download.
+  let saved;
+  const createObjectURL = URL.createObjectURL;
+  URL.createObjectURL = (blob) => ((saved = blob), "blob:test");
+  $("save-scene").click();
+  URL.createObjectURL = createObjectURL;
+  const sceneText = await saved.text();
+  assert.equal(JSON.parse(sceneText).format, "physics-sim-scene");
+  assert.equal(JSON.parse(sceneText).bodies.length, 3);
+  // A bad file shows a readable message and leaves the scene alone.
+  const load = async (text) => {
+    Object.defineProperty($("scene-file"), "files", {
+      configurable: true,
+      value: [new File([text], "scene.json", { type: "application/json" })],
+    });
+    $("scene-file").dispatchEvent(new window.Event("change"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  };
+  key(" ");
+  frames(30);
+  key(" ");
+  const before = $("time").textContent;
+  await load("not json");
+  assert.equal($("toast").textContent, "This file is not a Physics Sim scene.");
+  await load(JSON.stringify({ format: "something-else" }));
+  assert.equal($("toast").textContent, "This file is not a Physics Sim scene.");
+  frames(1);
+  assert.equal($("time").textContent, before, "bad file left scene untouched");
+  await load(sceneText);
+  assert.match($("toast").textContent, /Scene loaded/);
+  frames(1);
+  assert.equal($("time").textContent, "0.00 s");
+  // The panel closes on a scene press and on Escape.
+  $("presets-toggle").click();
+  click(500, 250);
+  assert.equal($("presets-panel").hidden, true);
+  $("presets-toggle").click();
+  $("preset-list")
+    .querySelector("button")
+    .dispatchEvent(
+      new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+  assert.equal($("presets-panel").hidden, true);
+  // Clear forgets the reset point.
+  $("clear").click();
+  assert.equal($("reset").disabled, true);
 }
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",

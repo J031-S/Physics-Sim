@@ -45,6 +45,14 @@ In the constants menu each property is one row: name, slider, then the number wi
 - **Spring / Rod:** click two bodies, or a world anchor and a body. Connections attach at body centres. Select a connection by clicking its line. Alt-drag changes rod length while paused or running.
 - **Pause / Clear scene:** pause deliberately stops physics but editing still works. Clear removes everything except the static floor. Dragging does not pause the world.
 
+### Presets, save and load
+
+**Presets** (header) opens a list of ready-made experiments grouped by topic (kinematics, energy and momentum, forces, rotation, oscillations, electricity and magnetism). Each shows a short description and **What to look for**, the textbook result the scene demonstrates. Choosing one replaces the current scene, fits the view to it and starts **paused** so you can read first; press Run (Space) to start.
+
+**Save scene** (download icon) downloads the whole scene, including settings, floor material, bodies, connections and fields, as `physics-sim-scene.json`. **Load scene** (folder icon) opens such a file. A file that is not a valid scene shows a message and leaves the current scene untouched. Loaded scenes also start paused.
+
+**Reset** (beside Run/Pause) returns to the scene as it was when it was loaded, or when you last pressed Run after pausing, so you can repeat a run exactly. It is unavailable after Clear scene until you load something or press Run from paused.
+
 ### Wedge / inclined plane
 
 Choose **Wedge (W)** and click to create a right-triangular ramp, initially 3 m wide and 1.5 m high. It starts with both position and rotation locked. Pause and Shift-drag to reposition it, Ctrl-drag to rotate it, or R-drag to change width/height and therefore slope. The selected-item panel shows the local incline angle. Resize keeps the centre of mass fixed; the triangle's centroid is not its bounding-box centre. The base slopes upward to the right at zero rotation.
@@ -157,7 +165,7 @@ Surface friction is not internal material hysteresis. The two damping coefficien
 
 Springs expose stiffness, axial damping and rest length; rods expose length. Every numeric property also has a slider. Sliders apply continuously while dragged and stay synchronized with manual input; manual changes apply on Enter or leaving the field, without pausing, resetting time, or rebuilding the world. Invalid values are rejected. Close with Escape, the cross, or clicking outside. Shift+F10 opens the menu for a selected object while the canvas is focused.
 
-Material menus contain no position/velocity inputs or geometry controls. Geometry, locks and belt drive controls are separate from material constants. Field menus separately expose shape, dimensions, angle and strength. There are no temperature placeholders, equation editor, graph panel, presets, arbitrary custom body shapes, inspector, scene autosave or scene import/export. Only website preferences use localStorage; old scene saves are not loaded or deleted. This is a fresh, transient sandbox on every page load.
+Material menus contain no position/velocity inputs or geometry controls. Geometry, locks and belt drive controls are separate from material constants. Field menus separately expose shape, dimensions, angle and strength. There are no temperature placeholders, equation editor, graph panel, arbitrary custom body shapes, inspector or scene autosave. Scenes are saved and loaded only as files you choose (see Presets, save and load). Only website preferences use localStorage; old scene saves are not loaded or deleted. This is a fresh, transient sandbox on every page load.
 
 ## Physics implementation
 

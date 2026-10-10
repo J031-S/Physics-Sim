@@ -1,5 +1,6 @@
 import { canvasIcon, renderIcons, setPlaybackIcon } from "./icons.js";
 import { Sandbox, DT, GRID, snap } from "./physics.js";
+import { presets } from "./presets.js";
 import { setupPreferences } from "./preferences.js";
 import { drawFields, FieldDrag } from "./field-view.js";
 let fieldDrag = null,
@@ -31,6 +32,9 @@ let sim = new Sandbox(),
   last = 0,
   menuId = null,
   menuPoint = null,
+  // exportScene() snapshot that Reset restores: taken when a preset or file
+  // is loaded and whenever the simulation goes from paused to running.
+  startScene = null,
   toastTimer;
 sim.updateSettings({ walls: true });
 const prefs = setupPreferences($);
@@ -707,10 +711,13 @@ document.addEventListener(
         closed = true;
       }
     if (e.target === canvas)
-      for (const panel of ["settings-panel", "keys-panel"])
+      for (const [panel, close] of [
+        ["settings-panel", closeSettings],
+        ["keys-panel", () => ($("keys-panel").hidden = true)],
+        ["presets-panel", closePresets],
+      ])
         if (!$(panel).hidden) {
-          if (panel === "settings-panel") closeSettings();
-          else $(panel).hidden = true;
+          close();
           closed = true;
         }
     if (closed && e.target === canvas) {
@@ -1211,12 +1218,168 @@ function removeSelected() {
   }
 }
 $("delete").onclick = removeSelected;
-$("pause").onclick = () => {
-  cancelDrag();
-  running = !running;
+function setRunning(next) {
+  if (next && !running) {
+    startScene = sim.exportScene();
+    $("reset").disabled = false;
+  }
+  running = next;
   accumulator = 0;
   setPlaybackIcon(running, prefs.iconSet);
+}
+$("pause").onclick = () => {
+  cancelDrag();
+  setRunning(!running);
   canvas.focus();
+};
+function fitScene() {
+  cancelDrag();
+  const v = sim.viewport;
+  if (!v) return;
+  // Fit inside the area not covered by the edit bar, the toolbars above and
+  // the view cluster below.
+  const c = canvas.getBoundingClientRect(),
+    rect = (sel) => document.querySelector(sel).getBoundingClientRect(),
+    edge = (r, k) => (r.width ? r[k] : null),
+    left = (edge(rect(".edit-tools"), "right") ?? c.left) - c.left + 12,
+    top =
+      (edge($("tool-settings").getBoundingClientRect(), "bottom") ??
+        c.top + 20) -
+      c.top +
+      12,
+    canvasBottom = c.top + c.height,
+    bottom =
+      canvasBottom -
+      (edge(rect(".camera-controls"), "top") ?? canvasBottom) +
+      12,
+    right = 20,
+    w = Math.max(50, view.width - left - right),
+    h = Math.max(50, view.height - top - bottom);
+  view.scale = Math.max(
+    0.1,
+    Math.min(400, w / (v.maxX - v.minX), h / (v.maxY - v.minY)),
+  );
+  view.x = left + w / 2 - ((v.minX + v.maxX) / 2) * view.scale;
+  view.y = top + h / 2 + ((v.minY + v.maxY) / 2) * view.scale;
+}
+// Swap in a loaded scene (preset, file or Reset) exactly as Clear does, and
+// start paused so students can read the description first.
+function replaceScene(next, { fit = true } = {}) {
+  cancelDrag();
+  sim.dispose();
+  sim = next;
+  selected = null;
+  pending = null;
+  select(null);
+  closeMenu();
+  chooseTool("grab");
+  setRunning(false);
+  syncSettings();
+  if (fit) fitScene();
+  startScene = sim.exportScene();
+  $("reset").disabled = false;
+}
+$("reset").onclick = () => {
+  if (!startScene) return;
+  replaceScene(Sandbox.fromScene(startScene), { fit: false });
+  canvas.focus();
+};
+function closePresets() {
+  $("presets-panel").hidden = true;
+  $("presets-toggle").setAttribute("aria-expanded", "false");
+}
+$("presets-toggle").onclick = () => {
+  const open = $("presets-panel").hidden;
+  $("presets-panel").hidden = !open;
+  $("presets-toggle").setAttribute("aria-expanded", String(open));
+  if (open) $("preset-list").querySelector("button")?.focus();
+};
+$("close-presets").onclick = () => {
+  closePresets();
+  canvas.focus();
+};
+$("presets-panel").addEventListener("keydown", (e) => {
+  e.stopPropagation();
+  if (e.key === "Escape") {
+    closePresets();
+    $("presets-toggle").focus();
+  }
+});
+{
+  const groups = Map.groupBy
+    ? Map.groupBy(presets, (p) => p.group)
+    : presets.reduce(
+        (m, p) => m.set(p.group, [...(m.get(p.group) || []), p]),
+        new Map(),
+      );
+  for (const [group, list] of groups) {
+    const heading = document.createElement("h3");
+    heading.textContent = group;
+    $("preset-list").append(heading);
+    for (const preset of list) {
+      const button = document.createElement("button"),
+        title = document.createElement("strong"),
+        description = document.createElement("span"),
+        expect = document.createElement("span");
+      button.className = "preset";
+      button.dataset.preset = preset.id;
+      title.textContent = preset.title;
+      description.textContent = preset.description;
+      expect.className = "preset-expect";
+      expect.textContent = "What to look for: " + preset.expect;
+      button.append(title, description, expect);
+      button.onclick = () => {
+        const next = new Sandbox();
+        try {
+          preset.setup(next);
+        } catch (error) {
+          next.dispose();
+          toast(error.message);
+          return;
+        }
+        closePresets();
+        replaceScene(next);
+        toast(preset.title + " loaded · press Run to start");
+        canvas.focus();
+      };
+      $("preset-list").append(button);
+    }
+  }
+}
+$("save-scene").onclick = () => {
+  const blob = new Blob([JSON.stringify(sim.exportScene(), null, 2)], {
+      type: "application/json",
+    }),
+    link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "physics-sim-scene.json";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 0);
+};
+$("load-scene").onclick = () => $("scene-file").click();
+$("scene-file").onchange = async () => {
+  const file = $("scene-file").files[0];
+  $("scene-file").value = "";
+  if (!file) return;
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch {
+    toast("This file is not a Physics Sim scene.");
+    return;
+  }
+  let next;
+  try {
+    next = Sandbox.fromScene(data);
+  } catch (error) {
+    // The current scene is untouched.
+    toast(error.message);
+    return;
+  }
+  replaceScene(next);
+  toast("Scene loaded · press Run to start");
 };
 $("clear").onclick = () => {
   const settings = { ...sim.settings };
@@ -1231,6 +1394,8 @@ $("clear").onclick = () => {
   closeMenu();
   chooseTool("grab");
   accumulator = 0;
+  startScene = null;
+  $("reset").disabled = true;
 };
 function closeCategories(except) {
   for (const group of document.querySelectorAll(".tool-category")) {
@@ -1331,6 +1496,7 @@ document.addEventListener("keydown", (e) => {
     closeMenu();
     $("keys-panel").hidden = true;
     closeSettings();
+    closePresets();
   }
   if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.code === "Space" || e.key === " ") {
@@ -1431,21 +1597,7 @@ canvas.addEventListener(
 );
 $("zoom-in").onclick = () => zoom(1.25);
 $("zoom-out").onclick = () => zoom(0.8);
-$("fit-scene").onclick = () => {
-  cancelDrag();
-  const v = sim.viewport;
-  if (!v) return;
-  view.scale = Math.max(
-    0.1,
-    Math.min(
-      400,
-      (view.width - 40) / (v.maxX - v.minX),
-      (view.height - 40) / (v.maxY - v.minY),
-    ),
-  );
-  view.x = view.width / 2 - ((v.minX + v.maxX) / 2) * view.scale;
-  view.y = view.height / 2 + ((v.minY + v.maxY) / 2) * view.scale;
-};
+$("fit-scene").onclick = fitScene;
 $("apply-scene").onclick = () => {
   try {
     sim.setSceneSize(

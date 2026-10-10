@@ -13,13 +13,37 @@
       <div class="playback">
         <button
           id="settings-toggle"
+          title="Simulation settings"
           aria-expanded="false"
           aria-controls="settings-panel"
         >
           Settings</button
         ><button id="shortcuts" title="Keyboard shortcuts (?)">Keys ?</button
+        ><span class="header-divider" aria-hidden="true"></span
+        ><button
+          id="reset"
+          title="Reset to the state when the scene was loaded or last started"
+          disabled
+        >
+          Reset</button
         ><button id="pause" title="Play / pause (Space)">Pause</button
-        ><button id="clear">Clear scene</button>
+        ><span class="header-divider" aria-hidden="true"></span
+        ><button
+          id="presets-toggle"
+          title="Ready-made experiments"
+          aria-expanded="false"
+          aria-controls="presets-panel"
+        >
+          Presets</button
+        ><button id="save-scene" title="Save scene to a file">Save scene</button
+        ><button id="load-scene" title="Load a saved scene file">
+          Load scene</button
+        ><input
+          id="scene-file"
+          type="file"
+          accept="application/json,.json"
+          hidden
+        /><button id="clear" title="Clear scene">Clear scene</button>
       </div>
     </header>
     <main>
@@ -564,6 +588,17 @@
       </details>
       <button id="reset-settings">Restore defaults</button>
     </section>
+    <section id="presets-panel" hidden aria-labelledby="presets-title">
+      <div class="menu-header">
+        <strong id="presets-title">Presets</strong
+        ><button id="close-presets" aria-label="Close presets">×</button>
+      </div>
+      <p>
+        Ready-made experiments. Loading one replaces the current scene and
+        starts paused, so you can read what to look for first.
+      </p>
+      <div id="preset-list"></div>
+    </section>
     <section id="keys-panel" hidden aria-label="Keyboard shortcuts">
       <div class="menu-header">
         <strong>Keyboard &amp; mouse</strong
@@ -571,7 +606,10 @@
       </div>
       <dl>
         <dt>Space</dt>
-        <dd>Play / pause</dd>
+        <dd>
+          Play / pause. Reset (beside it) returns to the state at load or at the
+          last Run.
+        </dd>
         <dt>Q · Shift</dt>
         <dd>Select tool · add to a selection box</dd>
         <dt>G · B · N · W</dt>

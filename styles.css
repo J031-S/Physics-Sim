@@ -557,6 +557,7 @@ select {
 }
 #settings-panel,
 #keys-panel,
+#presets-panel,
 #material-menu {
   background: var(--panel);
   color: var(--ink);
@@ -610,7 +611,8 @@ select {
   zoom: var(--ui-scale);
 }
 #settings-panel,
-#keys-panel {
+#keys-panel,
+#presets-panel {
   max-height: calc((100dvh - 92px) / var(--ui-scale));
 }
 #material-menu {
@@ -939,4 +941,80 @@ button[data-icon] {
 }
 :root[data-theme="dark"] #dimensions {
   color: #abbba8;
+}
+.header-divider {
+  align-self: stretch;
+  margin: 6px 2px;
+  border-left: 1px solid var(--line);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* Presets panel: grouped cards, each one loads its experiment. */
+#presets-panel {
+  position: fixed;
+  z-index: 15;
+  right: 16px;
+  top: 76px;
+  width: min(420px, calc(100vw - 32px));
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px #34473125;
+}
+#presets-panel > p {
+  margin: 6px 0 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.8;
+}
+#preset-list h3 {
+  margin: 14px 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+#preset-list .preset {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.45;
+}
+#preset-list .preset strong {
+  font-size: 12px;
+}
+#preset-list .preset-expect {
+  color: #4f7547;
+}
+:root[data-theme="dark"] #preset-list .preset-expect {
+  color: #a9c49d;
+}
+@media (max-width: 1150px) {
+  .subtitle {
+    display: none;
+  }
+}
+/* Narrow windows: header buttons keep their icon, tooltip and accessible
+   name; only Run/Pause keeps its visible label. */
+@media (max-width: 1000px) {
+  .playback button:not(#pause) > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .playback {
+    gap: 4px;
+  }
 }
