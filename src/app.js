@@ -3,6 +3,8 @@ import { Sandbox, DT, GRID, snap } from "./physics.js";
 import { presets } from "./presets.js";
 import { setupPreferences } from "./preferences.js";
 import { drawFields, FieldDrag } from "./field-view.js";
+import { setupNav } from "./nav.js";
+setupNav();
 let fieldDrag = null,
   impulseDrag = null,
   panDrag = null;

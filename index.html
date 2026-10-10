@@ -8,8 +8,29 @@
   </head>
   <body>
     <header>
-      <a class="brand" href="./"><span>φ</span> Physics Sim</a
-      ><span class="subtitle">Mechanics &amp; fields sandbox</span>
+      <a class="brand" href="./"><span>φ</span> Physics Sim</a>
+      <nav class="site-nav" aria-label="Simulations">
+        <button
+          id="nav-toggle"
+          class="nav-toggle"
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-controls="nav-menu"
+          title="Switch simulation"
+        >
+          Mechanics sandbox
+        </button>
+        <div id="nav-menu" class="nav-menu" hidden>
+          <a href="./" aria-current="page"
+            ><strong>Mechanics sandbox</strong
+            ><small>Kinematics, forces, springs and pulleys</small></a
+          >
+          <a href="fields.html"
+            ><strong>Electric &amp; magnetic fields</strong
+            ><small>Charges, currents and their field lines</small></a
+          >
+        </div>
+      </nav>
       <div class="playback">
         <button
           id="settings-toggle"

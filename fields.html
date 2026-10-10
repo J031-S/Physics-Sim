@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Physics Sim · Electric &amp; magnetic fields</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="fields.css" />
+  </head>
+  <body class="field-lab">
+    <header>
+      <a class="brand" href="./"><span>φ</span> Physics Sim</a>
+      <nav class="site-nav" aria-label="Simulations">
+        <button
+          id="nav-toggle"
+          class="nav-toggle"
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-controls="nav-menu"
+          title="Switch simulation"
+        >
+          Electric &amp; magnetic fields
+        </button>
+        <div id="nav-menu" class="nav-menu" hidden>
+          <a href="./"
+            ><strong>Mechanics sandbox</strong
+            ><small>Kinematics, forces, springs and pulleys</small></a
+          >
+          <a href="fields.html" aria-current="page"
+            ><strong>Electric &amp; magnetic fields</strong
+            ><small>Charges, currents and their field lines</small></a
+          >
+        </div>
+      </nav>
+      <div class="playback">
+        <button
+          id="settings-toggle"
+          title="Settings"
+          aria-expanded="false"
+          aria-controls="settings-panel"
+          data-icon="settings"
+          data-icon-label="Settings"
+          data-icon-only="true"
+        >
+          Settings</button
+        ><button
+          id="shortcuts"
+          title="Keyboard shortcuts (?)"
+          aria-expanded="false"
+          aria-controls="keys-panel"
+          data-icon="keys"
+          data-icon-label="Keyboard shortcuts"
+          data-icon-only="true"
+        >
+          Keys ?</button
+        ><span class="header-divider" aria-hidden="true"></span
+        ><button
+          id="presets-toggle"
+          title="Ready-made arrangements"
+          aria-expanded="false"
+          aria-controls="presets-panel"
+          data-icon="presets"
+          data-icon-label="Presets"
+        >
+          Presets</button
+        ><button
+          id="clear"
+          title="Clear this scene"
+          aria-expanded="false"
+          aria-controls="clear-confirm"
+          data-icon="clear"
+          data-icon-label="Clear scene"
+        >
+          Clear scene
+        </button>
+      </div>
+    </header>
+    <main>
+      <canvas
+        id="canvas"
+        tabindex="0"
+        aria-label="Field scene. Choose a source in the toolbar, then click to place it. Drag sources to move them."
+      ></canvas>
+      <div class="fl-top">
+        <div class="edit-tools" role="toolbar" aria-label="Edit tools">
+          <button
+            data-tool="grab"
+            aria-pressed="true"
+            title="Grab: move sources (G)"
+          >
+            Grab</button
+          ><button
+            data-tool="pan"
+            aria-pressed="false"
+            title="Pan the view (H)"
+          >
+            Pan
+          </button>
+        </div>
+        <div class="fl-centre">
+          <div class="fl-toolbar" role="toolbar" aria-label="Field and sources">
+            <div class="fl-modes" role="group" aria-label="Field">
+              <button
+                id="mode-electric"
+                data-mode="electric"
+                aria-pressed="true"
+              >
+                Electric</button
+              ><button
+                id="mode-magnetic"
+                data-mode="magnetic"
+                aria-pressed="false"
+              >
+                Magnetic
+              </button>
+            </div>
+            <span class="cluster-divider" aria-hidden="true"></span>
+            <button
+              data-add="positive"
+              data-for="electric"
+              aria-pressed="false"
+              title="Positive point charge"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" class="glyph-positive" />
+                <path d="M12 7.5v9M7.5 12h9" class="glyph-mark" />
+              </svg>
+              <span>Charge</span></button
+            ><button
+              data-add="negative"
+              data-for="electric"
+              aria-pressed="false"
+              title="Negative point charge"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" class="glyph-negative" />
+                <path d="M7.5 12h9" class="glyph-mark" />
+              </svg>
+              <span>Charge</span></button
+            ><button
+              data-add="plate"
+              data-for="electric"
+              aria-pressed="false"
+              title="Charged plate (seen edge-on)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 15h18" class="glyph-plate" />
+                <path
+                  d="M6.5 6.5v5M4 9h5M12 6.5v5M9.5 9h5M17.5 6.5v5M15 9h5"
+                  class="glyph-line"
+                />
+              </svg>
+              <span>Plate</span></button
+            ><button
+              data-add="wire-out"
+              data-for="magnetic"
+              aria-pressed="false"
+              title="Wire carrying current out of the screen"
+              hidden
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" class="glyph-ring" />
+                <circle cx="12" cy="12" r="2.6" class="glyph-dot" />
+              </svg>
+              <span>Wire out</span></button
+            ><button
+              data-add="wire-in"
+              data-for="magnetic"
+              aria-pressed="false"
+              title="Wire carrying current into the screen"
+              hidden
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" class="glyph-ring" />
+                <path d="M8 8l8 8M16 8l-8 8" class="glyph-line" />
+              </svg>
+              <span>Wire in</span></button
+            ><button
+              data-add="magnet"
+              data-for="magnetic"
+              aria-pressed="false"
+              title="Bar magnet, or a solenoid in cross-section"
+              hidden
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 8h9v8H3z" class="glyph-negative" />
+                <path d="M12 8h9v8h-9z" class="glyph-positive" />
+              </svg>
+              <span>Magnet</span>
+            </button>
+          </div>
+          <div id="tool-settings" class="fl-hint">
+            <strong id="tool-name">Grab</strong>
+            <span id="tool-help"></span>
+          </div>
+        </div>
+        <details id="display-panel" class="fl-display" open>
+          <summary>Display</summary>
+          <label class="fl-check"
+            ><input id="show-lines" type="checkbox" checked /> Field
+            lines</label
+          >
+          <label class="fl-check"
+            ><input id="show-arrows" type="checkbox" /> Field arrows</label
+          >
+          <label class="fl-check" id="show-equipotentials-label"
+            ><input id="show-equipotentials" type="checkbox" /> Equipotentials
+            <small id="equipotential-step"></small
+          ></label>
+          <label class="fl-check"
+            ><input id="show-forces" type="checkbox" />
+            <span id="show-forces-text">Forces on charges</span></label
+          >
+          <label class="fl-check"
+            ><input id="show-labels" type="checkbox" checked /> Values</label
+          >
+          <div class="prop-row fl-density">
+            <label for="line-density" title="How many lines are drawn"
+              >Line density</label
+            >
+            <input
+              id="line-density"
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.25"
+              value="1"
+            />
+            <span class="prop-value"
+              ><output id="line-density-value" for="line-density"
+                >1×</output
+              ></span
+            >
+          </div>
+          <div class="fl-probe" aria-live="off">
+            <strong>At the pointer</strong>
+            <div class="fl-probe-grid">
+              <span>Position</span
+              ><span class="num" id="probe-position">–</span>
+              <span id="probe-field-name">E</span
+              ><span class="num" id="probe-field">–</span> <span>Direction</span
+              ><span class="num" id="probe-direction">–</span>
+              <span class="probe-potential">V</span
+              ><span class="num probe-potential" id="probe-potential">–</span>
+            </div>
+          </div>
+        </details>
+      </div>
+      <div class="camera-controls" role="toolbar" aria-label="View">
+        <button
+          id="zoom-out"
+          title="Zoom out"
+          data-icon="zoomOut"
+          data-icon-label="Zoom out"
+          data-icon-only="true"
+        >
+          −</button
+        ><span id="zoom-level">100%</span
+        ><button
+          id="zoom-in"
+          title="Zoom in"
+          data-icon="zoomIn"
+          data-icon-label="Zoom in"
+          data-icon-only="true"
+        >
+          +</button
+        ><button
+          id="fit-scene"
+          title="Fit scene"
+          data-icon="fit"
+          data-icon-label="Fit scene"
+          data-icon-only="true"
+        >
+          Fit scene</button
+        ><span class="cluster-divider" aria-hidden="true"></span
+        ><label class="icon-toggle" title="Snapping (Z) — 0.25 m / 15°"
+          ><input type="checkbox" id="snap-toggle" /><span
+            data-icon="snap"
+            data-icon-label="Snapping"
+            data-icon-only="true"
+          ></span
+        ></label>
+      </div>
+      <div
+        id="selection"
+        class="selection"
+        role="region"
+        aria-label="Selected source"
+        hidden
+      >
+        <div class="selection-header">
+          <strong id="selected-name"></strong
+          ><span class="header-actions"
+            ><button
+              id="delete"
+              title="Delete this source (Delete)"
+              data-icon="delete"
+              data-icon-label="Delete"
+              data-icon-only="true"
+            >
+              Delete
+            </button></span
+          >
+        </div>
+        <form id="source-form" class="fl-form"></form>
+        <p id="source-note" class="fl-note"></p>
+      </div>
+      <div class="status">
+        <span id="snap-status"></span><span id="scene-status"></span>
+      </div>
+      <div id="toast" role="status" aria-live="polite"></div>
+    </main>
+    <section id="settings-panel" hidden aria-labelledby="settings-title">
+      <div class="menu-header">
+        <strong id="settings-title">Settings</strong
+        ><button
+          id="close-settings"
+          aria-label="Close settings"
+          data-icon="close"
+          data-icon-label="Close settings"
+          data-icon-only="true"
+        >
+          ×
+        </button>
+      </div>
+      <p>Changes apply immediately.</p>
+      <details class="settings-section" open>
+        <summary>Background field</summary>
+        <div class="prop-row">
+          <label
+            for="uniform-electric-x"
+            title="A uniform electric field added everywhere. Positive points right."
+            >Electric field →</label
+          ><span></span
+          ><span class="prop-value"
+            ><input
+              id="uniform-electric-x"
+              type="number"
+              min="-1000"
+              max="1000"
+              step="any"
+              value="0"
+            /><span class="unit">N/C</span></span
+          >
+        </div>
+        <div class="prop-row">
+          <label
+            for="uniform-electric-y"
+            title="A uniform electric field added everywhere. Positive points up."
+            >Electric field ↑</label
+          ><span></span
+          ><span class="prop-value"
+            ><input
+              id="uniform-electric-y"
+              type="number"
+              min="-1000"
+              max="1000"
+              step="any"
+              value="0"
+            /><span class="unit">N/C</span></span
+          >
+        </div>
+        <div class="prop-row">
+          <label
+            for="uniform-magnetic-x"
+            title="A uniform magnetic field in the plane of the screen. Positive points right."
+            >Magnetic field →</label
+          ><span></span
+          ><span class="prop-value"
+            ><input
+              id="uniform-magnetic-x"
+              type="number"
+              min="-1000"
+              max="1000"
+              step="any"
+              value="0"
+            /><span class="unit">µT</span></span
+          >
+        </div>
+        <div class="prop-row">
+          <label
+            for="uniform-magnetic-y"
+            title="A uniform magnetic field in the plane of the screen. Positive points up."
+            >Magnetic field ↑</label
+          ><span></span
+          ><span class="prop-value"
+            ><input
+              id="uniform-magnetic-y"
+              type="number"
+              min="-1000"
+              max="1000"
+              step="any"
+              value="0"
+            /><span class="unit">µT</span></span
+          >
+        </div>
+        <small
+          >Each scene has its own background field, added to the field of its
+          sources.</small
+        >
+      </details>
+      <details class="settings-section" open>
+        <summary>Website</summary>
+        <label class="setting-toggle"
+          ><input id="setting-snapping" type="checkbox" /> Snapping (Z) — 0.25 m
+          / 15°</label
+        >
+        <label class="select-row"
+          >Theme
+          <select id="ui-theme">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="system">System</option>
+          </select></label
+        >
+        <div class="prop-row">
+          <label for="ui-size">GUI size</label
+          ><input
+            id="ui-size"
+            type="range"
+            min="80"
+            max="140"
+            step="5"
+            value="100"
+          /><span class="prop-value"
+            ><output id="ui-size-value" for="ui-size">100%</output></span
+          >
+        </div>
+        <label class="setting-toggle"
+          ><input id="ui-grid" type="checkbox" checked /> Show grid</label
+        >
+        <label class="select-row"
+          >Angle unit
+          <select id="ui-angle-unit">
+            <option value="degrees">Degrees (°)</option>
+            <option value="radians">Radians (rad)</option>
+          </select></label
+        >
+        <small
+          >Website preferences are remembered on this browser and shared with
+          the mechanics sandbox.</small
+        >
+      </details>
+    </section>
+    <section
+      id="clear-confirm"
+      role="alertdialog"
+      aria-labelledby="clear-confirm-title"
+      aria-describedby="clear-confirm-text"
+      hidden
+    >
+      <strong id="clear-confirm-title">Clear this scene?</strong>
+      <p id="clear-confirm-text"></p>
+      <div class="button-row">
+        <button id="clear-no">Cancel</button
+        ><button id="clear-yes" class="danger">Clear scene</button>
+      </div>
+    </section>
+    <section id="presets-panel" hidden aria-labelledby="presets-title">
+      <div class="menu-header">
+        <strong id="presets-title">Presets</strong
+        ><button
+          id="close-presets"
+          aria-label="Close presets"
+          data-icon="close"
+          data-icon-label="Close presets"
+          data-icon-only="true"
+        >
+          ×
+        </button>
+      </div>
+      <p>
+        Ready-made arrangements. Loading one replaces that scene. Each says what
+        to check with the pointer readout.
+      </p>
+      <div id="preset-list"></div>
+    </section>
+    <section id="keys-panel" hidden aria-label="Keyboard shortcuts">
+      <div class="menu-header">
+        <strong>Keyboard &amp; mouse</strong
+        ><button
+          id="close-keys"
+          aria-label="Close shortcuts"
+          data-icon="close"
+          data-icon-label="Close shortcuts"
+          data-icon-only="true"
+        >
+          ×
+        </button>
+      </div>
+      <dl>
+        <dt>Click</dt>
+        <dd>
+          With a source chosen in the toolbar, places one. Otherwise selects the
+          source under the pointer.
+        </dd>
+        <dt>Drag</dt>
+        <dd>Moves a source. Dragging empty space pans the view.</dd>
+        <dt>Ctrl + drag</dt>
+        <dd>Rotates a plate or magnet about its centre.</dd>
+        <dt>Arrow keys</dt>
+        <dd>Nudge the selected source by 0.05 m (0.25 m with snapping).</dd>
+        <dt>Delete</dt>
+        <dd>Deletes the selected source.</dd>
+        <dt>E · M</dt>
+        <dd>Electric scene · magnetic scene</dd>
+        <dt>G · H</dt>
+        <dd>Grab · Pan. Scroll to zoom; middle-drag pans in any tool.</dd>
+        <dt>L · A · F</dt>
+        <dd>Toggle field lines · field arrows · forces</dd>
+        <dt>Z</dt>
+        <dd>Toggle snapping to 0.25 m and 15°</dd>
+        <dt>Escape</dt>
+        <dd>Back to Grab; closes any open panel</dd>
+      </dl>
+      <p>
+        The screen is a slice through a three-dimensional arrangement. Point
+        charges lie in the slice. Plates, wires and magnets run straight into
+        the screen. Positive current comes out of the screen (⊙); negative goes
+        into it (⊗).
+      </p>
+    </section>
+    <script type="module" src="src/fieldlab/app.js"></script>
+  </body>
+</html>

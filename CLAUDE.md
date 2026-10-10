@@ -2,6 +2,8 @@
 
 Interactive 2D mechanics and electromagnetism sandbox for teaching high-school / introductory physics (kinematics, forces, springs, pulleys, electric and magnetic fields). Students use it to check their intuition against "what really happens", so **physical correctness matters more than visual polish**: a result that looks plausible but disagrees with the textbook formula is a bug.
 
+The site has two pages, switched from the drop-down at the left of the top bar (`src/nav.js`): the mechanics sandbox (`index.html`) and the electric & magnetic fields tool (`fields.html`, code in `src/fieldlab/`). Most of this file is about the sandbox; the fields tool has its own section below.
+
 `README.md` is the user-facing manual (controls, feature behaviour, model assumptions). Keep it in sync when behaviour changes.
 
 ## Commands
@@ -15,7 +17,7 @@ node --test tests/wedge.test.mjs                       # one file
 node --test --test-name-pattern="Atwood" tests/*.test.mjs   # one test
 ```
 
-Run `npm run check && npm test` before finishing any change. Run `npm run test:ui` as well when touching `src/app.js`, `index.html`, or anything a control binds to. Node 20.11+.
+Run `npm run check && npm test` before finishing any change. Run `npm run test:ui` as well when touching `src/app.js`, `index.html`, `fields.html`, `src/fieldlab/app.js`, or anything a control binds to. Node 20.11+.
 
 ## Architecture
 
@@ -32,7 +34,11 @@ No bundler, no framework, no runtime dependencies. `index.html` loads `vendor/ma
 | `src/group-move.js` | Layout translation of connected assemblies (Select tool) |
 | `src/field-view.js` | Field rendering and field drag/rotate/resize gestures |
 | `src/app.js` | Canvas drawing, pointer/keyboard input, menus, settings panel, the `requestAnimationFrame` loop |
-| `src/preferences.js`, `src/icons.js` | Persistent website preferences (localStorage key `physics-sim-ui`), icon sets |
+| `src/preferences.js`, `src/icons.js` | Persistent website preferences (localStorage key `physics-sim-ui`), icon sets. Shared by both pages, so every control they touch is optional |
+| `src/nav.js` | The drop-down of links that switches between the two pages |
+| `src/fieldlab/model.js` | `FieldLab`: sources, E, V, B, A_z, forces, field-line tracing, contours. No DOM |
+| `src/fieldlab/presets.js` | Field arrangements with the textbook result each one shows |
+| `src/fieldlab/app.js` | The fields page: drawing, input, panels |
 | `server.mjs` | Tiny static server for local use only |
 | `vendor/` | Third-party code and licences. Do not edit `vendor/matter.js` |
 
@@ -66,6 +72,18 @@ These exist on `Sandbox` and are covered by tests; the UI should call them rathe
 ## Order of operations in `step()`
 
 Per body: Lorentz velocity update → gravity force → exponential damping. Then Coulomb pairs, spring forces, grab/lock/resize holds, `mechanisms.beforeStep()`, `solveRestingContacts` (bodies already touching have their pending acceleration constrained before positions move), `solveRods` (an impulse along each rod's start-of-step direction so its length is exact after positions advance; time-symmetric, so pendulums keep their energy), `Engine.update` (whose velocity resolver is ours, handling new impacts), locks again, spring guides (6 passes), `mechanisms.afterStep()` (belts, conveyor contacts, cables). Changing this order changes results; re-run the numerical tests if you touch it.
+
+## Fields tool (`src/fieldlab/`)
+
+Static fields only: nothing is integrated in time, and the canvas is redrawn on change, not every frame. `FieldLab` is independent of `Sandbox` and of Matter.
+
+- The model is **SI throughout** (C, C/m², A, A/m, T, V), y up, angles anticlockwise in radians. `app.js` converts to nC, nC/m², µT and degrees for display; `FIELDS` there mirrors `LIMITS` in `model.js`.
+- The screen is a slice through a 3D arrangement. Point charges are true 3D charges (`kq/r²`). Plates, wires and magnets extend into the screen without end, so they are 2D sources (logarithmic potentials). Both kinds are mirror-symmetric about the screen, which is why the in-plane field is the whole field there.
+- A plate and a magnet face share one kernel (`kernelG`, `kernelP`): a strip of charge has `E = σG/2πε₀`, a sheet of current has `B = μ₀K ẑ×G/2π`. A magnet is two sheets, `+K` on the face to the left of its S → N axis.
+- **Magnetic lines are contours of `A_z`** at equal steps (marching squares), so equal flux lies between neighbours. Do not replace this with integration along B: lines would stop closing.
+- **Electric lines are integrated** (RK4 on the unit field) from positive charges, evenly in angle, then backwards from negative charges where too few arrived. Plates and the region's edge are seeded by flux. A line that reaches a plate is finished with a straight step, because RK4 samples beyond the plate see a different field.
+- Uniform angular seeding cannot agree with flux for 3D charges in a flat slice (see the README). This is a stated limit of the picture, not a bug to fix by changing counts.
+- New behaviour needs a test in `tests/fieldlab.test.mjs` against the formula. `tests/fieldlab-smoke.mjs` drives the page in happy-dom; its `// ---- checks ----` part uses only DOM calls, so it can also be run inside a real browser.
 
 ## Code style
 

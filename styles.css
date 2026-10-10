@@ -1331,3 +1331,78 @@ header {
 #speed {
   width: 62px;
 }
+/* Site navigation: the drop-down beside the brand that switches between the
+   simulations. Its entries are ordinary links. */
+.site-nav {
+  position: relative;
+  zoom: var(--ui-scale);
+}
+.nav-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.nav-toggle::after {
+  content: "";
+  border: 4px solid transparent;
+  border-top-color: currentColor;
+  margin-top: 4px;
+  opacity: 0.6;
+}
+.nav-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  max-width: min(300px, calc(100vw - 24px));
+  padding: 5px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  box-shadow: 0 10px 30px #34473125;
+}
+.nav-menu a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 12px;
+}
+.nav-menu a:hover {
+  background: color-mix(in srgb, var(--panel), #8aa17c 18%);
+}
+.nav-menu a:focus-visible {
+  outline: 2px solid #63876a;
+  outline-offset: 1px;
+}
+.nav-menu a[aria-current="page"] {
+  background: #e5eedf;
+  border-color: #b6c9ad;
+}
+:root[data-theme="dark"] .nav-menu a[aria-current="page"] {
+  background: #3b4c3f;
+  border-color: #768d70;
+}
+.nav-menu small {
+  font-size: 10.5px;
+  opacity: 0.7;
+}
+@media (max-width: 700px) {
+  .nav-toggle {
+    padding: 4px 7px;
+    font-size: 11px;
+  }
+}

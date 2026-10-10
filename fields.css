@@ -1,0 +1,273 @@
+/* Electric & magnetic fields page. Shared pieces (header, panels, toggles,
+   property rows) come from styles.css. */
+.field-lab {
+  --electric: #ae7d24;
+  --magnetic: #8060ae;
+  --positive: #c2503c;
+  --negative: #3f76aa;
+}
+:root[data-theme="dark"] .field-lab {
+  --electric: #e0a94a;
+  --magnetic: #a891e0;
+  --positive: #e9826e;
+  --negative: #6fa8ec;
+}
+/* One row across the top of the scene: edit tools, the toolbar with its hint
+   strip, and the display panel. Only its children take pointer input. */
+.fl-top {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  pointer-events: none;
+  zoom: var(--ui-scale);
+}
+.fl-top > * {
+  pointer-events: auto;
+}
+.fl-top .edit-tools {
+  position: static;
+  zoom: 1;
+}
+.fl-centre {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.fl-centre > * {
+  pointer-events: auto;
+}
+.fl-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 5px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  box-shadow: 0 8px 30px #3b4b3610;
+}
+.fl-toolbar button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.fl-toolbar button:hover {
+  background: color-mix(in srgb, var(--panel), #8aa17c 18%);
+}
+.fl-toolbar button[aria-pressed="true"] {
+  background: #e5eedf;
+  border-color: #b6c9ad;
+}
+:root[data-theme="dark"] .fl-toolbar button[aria-pressed="true"] {
+  background: #3b4c3f;
+  color: #ecf5e8;
+  border-color: #768d70;
+}
+.fl-modes {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--line), transparent 55%);
+}
+.fl-modes button {
+  padding: 4px 10px;
+  font-weight: 600;
+}
+.fl-modes button[aria-pressed="true"] {
+  background: var(--panel);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .fl-modes button[aria-pressed="true"] {
+  background: var(--panel);
+  border-color: var(--line);
+}
+#mode-electric[aria-pressed="true"] {
+  color: var(--electric);
+}
+#mode-magnetic[aria-pressed="true"] {
+  color: var(--magnetic);
+}
+.fl-toolbar .ui-icon {
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
+}
+.glyph-positive {
+  fill: var(--positive);
+}
+.glyph-negative {
+  fill: var(--negative);
+}
+.glyph-mark {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+.glyph-plate {
+  fill: none;
+  stroke: var(--positive);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.glyph-line,
+.glyph-ring {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.glyph-dot {
+  fill: currentColor;
+}
+.fl-hint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  max-width: 100%;
+  padding: 7px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 11px;
+}
+.fl-hint span {
+  opacity: 0.75;
+}
+.fl-display {
+  flex: 0 0 216px;
+  width: 216px;
+  padding: 6px 10px 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 11px;
+}
+.fl-display > summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 2px 0;
+}
+.fl-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  cursor: pointer;
+}
+.fl-check small {
+  margin-left: auto;
+  opacity: 0.65;
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+}
+.fl-display .prop-row {
+  grid-template-columns: auto minmax(40px, 1fr) 2.6em;
+  margin-top: 8px;
+}
+.fl-display input[type="range"],
+.fl-form input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  accent-color: #58784f;
+}
+.fl-probe {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid var(--line);
+}
+.fl-probe-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  margin-top: 4px;
+  font-size: 10.5px;
+}
+.fl-probe-grid > span:nth-child(odd) {
+  opacity: 0.7;
+}
+/* Selected-source panel: one compact row per quantity. */
+.field-lab #selection {
+  width: 306px;
+  max-width: calc(100% - 32px);
+}
+.fl-form {
+  display: flex;
+  flex-direction: column;
+  padding-top: 2px;
+  border-top: 1px solid var(--line);
+}
+.fl-form .prop-row {
+  grid-template-columns: 7.6em minmax(40px, 1fr) auto;
+}
+.fl-form .prop-row > label {
+  cursor: default;
+}
+.fl-form input[type="number"] {
+  width: 62px;
+  padding: 3px 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: transparent;
+  font-size: 11px;
+}
+.fl-form .unit {
+  min-width: 3.4em;
+}
+.fl-note {
+  margin: 2px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  font-size: 10.5px;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+.fl-note:empty {
+  display: none;
+}
+#preset-list .preset {
+  flex-direction: column;
+  gap: 3px;
+}
+.field-lab #settings-panel .prop-row {
+  grid-template-columns: 9.4em minmax(0, 1fr) auto;
+}
+.field-lab #settings-panel .unit {
+  min-width: 2.6em;
+}
+@media (max-width: 820px) {
+  .fl-top {
+    flex-wrap: wrap;
+  }
+  .fl-display {
+    order: 3;
+    margin-left: auto;
+  }
+  .fl-display:not([open]) {
+    flex-basis: auto;
+    width: auto;
+  }
+}
+/* The focus ring sits inside the scene, where all four sides show. */
+.field-lab canvas:focus-visible {
+  outline-offset: -2px;
+}

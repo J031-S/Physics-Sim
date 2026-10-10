@@ -12,6 +12,8 @@ npm start
 
 Open http://localhost:3000. Running the app needs no package installation or build step. The bundled Matter.js 0.20.0 engine includes its MIT licence. Any ordinary static server also works; opening via `file://` does not.
 
+The site has two tools. The drop-down at the left of the top bar switches between them: the **Mechanics sandbox** (`index.html`, described first below) and **Electric & magnetic fields** (`fields.html`, described in its own section).
+
 ## Controls
 
 Click **Keys ?** (or press **?**) for the built-in shortcut guide. Shortcuts do not intercept typing in property fields or other form controls.
@@ -174,6 +176,47 @@ The model is a taut, massless, no-slip cable with finite wheel inertia. It allow
 
 The floor is not selectable or editable. Gravity defaults to 9.81 m/s² and is configurable in Settings. Grid lines mark 0.5 m and 1 m intervals.
 
+## Electric & magnetic fields tool
+
+A separate page for static fields: place charges and currents, drag them about, and watch the field lines redraw. Nothing moves on its own here; it is a picture of the field, not a simulation in time. Open it from the drop-down at the left of the top bar.
+
+It holds two independent scenes, switched with **Electric / Magnetic** in the toolbar (`E` / `M`). Each starts with one arrangement so that it does not open empty.
+
+| Scene    | Source                                                | Quantity                                                          | Range                                     |
+| -------- | ----------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------- |
+| Electric | Point charge                                          | Charge                                                            | −20 to 20 nC                              |
+| Electric | Charged plate, seen edge-on                           | Surface charge density, length, angle                             | −10 to 10 nC/m², 0.2 to 20 m              |
+| Magnetic | Straight wire, perpendicular to the screen            | Current; positive is out of the screen (⊙), negative into it (⊗)  | −100 to 100 A                             |
+| Magnetic | Bar magnet, which is also a solenoid in cross-section | Coil current nI (turns per metre × current), length, width, angle | −500 to 500 A/m, 0.2 to 20 m, 0.1 to 10 m |
+
+Choose a source in the toolbar and click the scene to place it. With Grab (`G`), drag a source to move it, Ctrl-drag a plate or magnet to turn it, and click a source to edit its values and exact position in the panel at the bottom right. Arrow keys nudge the selected source; `Delete` removes it. Dragging empty space, or the Pan tool (`H`), moves the view; scroll to zoom. `Z` snaps positions to 0.25 m and angles to 15°. Up to 40 sources per scene.
+
+The **Display** panel chooses what is drawn:
+
+- **Field lines** (`L`), with arrows along the field.
+- **Field arrows** (`A`) on a grid. Length and opacity grow with the square root of the field strength relative to the strongest tenth on screen: a guide to strength, not a scale.
+- **Equipotentials** (electric scene only), dashed, at equal steps of a round number of volts shown beside the tick box. The 0 V line is solid.
+- **Forces** (`F`): the force on each point charge (in newtons), or on each metre of each wire (N/m), from every other source and the background field. Arrow lengths are in proportion to each other.
+- **Values**: the labels on the sources.
+- **Line density**: half to twice the usual number of lines.
+
+**At the pointer** reads out the field under the mouse: magnitude, direction (anticlockwise from +x) and, in the electric scene, potential. Use it to check a calculation.
+
+Settings adds a uniform **background field** to each scene, and holds the website preferences shared with the mechanics sandbox. **Presets** loads ready-made arrangements, each with the textbook result to check; the numbers quoted are tested against the model. **Clear scene** empties the scene on show only.
+
+### What the picture means, and where it stops being exact
+
+The screen is a flat slice through a three-dimensional arrangement.
+
+- **Point charges** lie in the slice. `E = kq/r²` and `V = kq/r`, with V zero at infinity.
+- **Plates, wires and magnets run straight into the screen without end.** A plate is a strip of uniform charge density σ: close to its middle the field is σ/2ε₀ on each side, and two opposite plates give σ/ε₀ between them, falling short of that as the gap becomes comparable with their length, and bulging at the edges. A wire gives `B = μ₀I/2πr`.
+- **A bar magnet** is modelled as a uniformly magnetised bar, which is exactly equivalent to two sheets of current on its long faces: an ideal solenoid in cross-section. Inside a long one `B = μ₀nI`; the field lines continue through the inside, from south to north. Because it runs into the screen without end, its field far away falls as 1/r² rather than the 1/r³ of a short real magnet.
+- **Magnetic field lines are exact.** They are contours of the vector potential, drawn at equal steps, so the same flux passes between every pair of neighbours and the spacing is inversely proportional to |B| everywhere. The flux per line rescales to suit the scene, so the number of lines cannot be compared between two different scenes.
+- **Electric field lines are the textbook convention**, which a flat picture of a three-dimensional field cannot make exact. Lines leave each positive charge evenly in angle, 8 per nanocoulomb at normal density, and each line follows E precisely. But their spacing is only a guide to strength, and the number arriving at a negative charge can differ from 8 per nanocoulomb: with +4 nC and −1 nC, the lines that leave within 60° of the line joining the charges arrive, which is 11 of 32, although only a quarter of the flux does. Plates and the background field are seeded by flux, so equal uniform fields do get equal spacing.
+- **A plate has no zero of potential at infinity**, because it never ends. Its potential is taken as zero about 1 m away, so only potential differences mean anything in a scene with plates.
+- **Equipotentials** stop short of the few percent of the screen closest to the charges, where they would merge.
+- **Statics only.** Sources stay where they are put: forces are shown but do not move anything, there is no induction, and the two scenes do not affect each other. No force is calculated on plates or magnets.
+
 ## Right-click menu
 
 Right-click the **ground** (anywhere at or below y = 0 that is not an object) for the **Floor** menu: **Surface friction μ** and **Restitution e**, both 0–1 (defaults 0.5 and 0). The scene walls share the floor's material. Where two surfaces touch, the contact uses the lower friction and the higher restitution of the two, so a bouncy ball still bounces on a dead floor. The floor material is saved with the scene and reset by Clear scene.
@@ -216,6 +259,8 @@ npm test
 npm ci
 npm run test:ui
 ```
+
+`tests/fieldlab.test.mjs` checks the fields tool against the textbook: inverse-square and 1/r laws, superposition and null points, E = −∇V and B = curl A, Gauss's and Ampère's laws by numerical integration, σ/ε₀ between plates, μ₀nI inside a solenoid, Coulomb's law, the force between parallel wires and BIℓ, field lines tangent to the field, equal flux between magnetic field lines, and every number quoted in the presets. `tests/fieldlab-smoke.mjs` drives `fields.html` through its controls and runs with `npm run test:ui`.
 
 Belts and pulley cables share iterative position and velocity solving, so one connection no longer overwrites a wheel angle already solved by the other. Guided springs use signed extension to remain continuous when an endpoint crosses its anchor.
 

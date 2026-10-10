@@ -26,23 +26,25 @@ export function setupPreferences($) {
           : "light"
         : prefs.theme;
     document.documentElement.style.setProperty("--ui-scale", prefs.size / 100);
-    $("ui-icons").value = prefs.iconSet;
+    // The icon-set and angle-unit controls exist only on some pages.
+    if ($("ui-icons")) $("ui-icons").value = prefs.iconSet;
     renderIcons(prefs.iconSet);
     $("ui-theme").value = prefs.theme;
     $("ui-size").value = prefs.size;
     $("ui-size-value").textContent = prefs.size + "%";
     $("ui-grid").checked = prefs.grid;
-    $("ui-angle-unit").value = prefs.angleUnit;
+    if ($("ui-angle-unit")) $("ui-angle-unit").value = prefs.angleUnit;
     try {
       window.localStorage.setItem("physics-sim-ui", JSON.stringify(prefs));
     } catch {}
   };
-  $("ui-icons").onchange = (e) => {
-    prefs.iconSet = iconSetNames.includes(e.target.value)
-      ? e.target.value
-      : "material";
-    apply();
-  };
+  if ($("ui-icons"))
+    $("ui-icons").onchange = (e) => {
+      prefs.iconSet = iconSetNames.includes(e.target.value)
+        ? e.target.value
+        : "material";
+      apply();
+    };
   $("ui-theme").onchange = (e) => {
     prefs.theme = e.target.value;
     apply();
@@ -55,11 +57,12 @@ export function setupPreferences($) {
     prefs.grid = e.target.checked;
     apply();
   };
-  $("ui-angle-unit").onchange = (e) => {
-    prefs.angleUnit = e.target.value === "radians" ? "radians" : "degrees";
-    apply();
-    prefs.onchange?.();
-  };
+  if ($("ui-angle-unit"))
+    $("ui-angle-unit").onchange = (e) => {
+      prefs.angleUnit = e.target.value === "radians" ? "radians" : "degrees";
+      apply();
+      prefs.onchange?.();
+    };
   media?.addEventListener?.("change", apply);
   apply();
   return prefs;

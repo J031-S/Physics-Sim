@@ -53,6 +53,8 @@ export function prepareIcons() {
   };
   for (const [id, [icon, label, only]] of Object.entries(controls)) {
     const button = document.getElementById(id);
+    // Each page has its own subset of these controls.
+    if (!button) continue;
     button.dataset.icon = icon;
     button.dataset.iconLabel = label;
     if (only) button.dataset.iconOnly = "true";
