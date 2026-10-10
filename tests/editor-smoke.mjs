@@ -1142,6 +1142,24 @@ for (const open of [
   assert.match($("toast").textContent, /between 0\.1 and 100/);
   change($("force-scale"), "4");
 }
+// Escape closes the constants menu after Enter has blurred its field.
+{
+  clearScene();
+  key("b");
+  click(500, 150);
+  menu(500, 150);
+  const mass = $("constants").querySelector('[data-constant="mass"]');
+  mass.focus();
+  mass.value = "2";
+  mass.dispatchEvent(
+    new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+  );
+  assert.notEqual(document.activeElement, mass, "Enter blurs the field");
+  document.body.dispatchEvent(
+    new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+  );
+  assert.equal($("material-menu").hidden, true);
+}
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );

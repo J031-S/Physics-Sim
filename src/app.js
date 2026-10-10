@@ -1542,6 +1542,13 @@ function typing(e) {
   );
 }
 document.addEventListener("keydown", (e) => {
+  // Escape closes the constants menu even after focus has left it (Enter in
+  // a field blurs it, for example).
+  if (e.key === "Escape" && !$("material-menu").hidden) {
+    e.preventDefault();
+    closeMenu(true);
+    return;
+  }
   if (typing(e) || !$("material-menu").hidden) return;
   const key = e.key.toLowerCase();
   // Browser reload remains native, even if Ctrl is already controlling a drag.
