@@ -71,7 +71,7 @@ Beside Run/Pause, **Step** (or **.**) advances exactly one fixed 1/120 s step wh
 
 ### Presets, save and load
 
-**Presets** (header) opens a list of ready-made experiments grouped by topic (kinematics, energy and momentum, forces, rotation, oscillations, electricity and magnetism). Each shows a short description and **What to look for**, the textbook result the scene demonstrates. Choosing one replaces the current scene, fits the view to it and starts **paused** so you can read first; press Run (Space) to start.
+**Presets** (header) opens a list of ready-made experiments grouped by topic (kinematics, energy and momentum, forces, rotation, oscillations, electricity and magnetism). Each shows a small preview of its starting scene (drawn from the preset itself, with initial velocities as arrows), a short description and **What to look for**, the textbook result the scene demonstrates. Choosing one replaces the current scene, fits the view to it and starts **paused** so you can read first; press Run (Space) to start.
 
 **Save scene** (download icon) downloads the whole scene, including settings, floor material, bodies, connections and fields, as `physics-sim-scene.json`. **Load scene** (folder icon) opens such a file. A file that is not a valid scene shows a message and leaves the current scene untouched. Loaded scenes also start paused.
 

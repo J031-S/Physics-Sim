@@ -272,7 +272,7 @@ input[type="checkbox"] {
   position: fixed;
   z-index: 15;
   right: 20px;
-  top: 76px;
+  top: calc(var(--header-h) + 10px);
   width: min(440px, calc(100vw - 40px));
   max-height: calc(100dvh - 100px);
   overflow: auto;
@@ -307,7 +307,7 @@ input[type="checkbox"] {
   position: fixed;
   z-index: 14;
   right: 16px;
-  top: 76px;
+  top: calc(var(--header-h) + 10px);
   width: min(380px, calc(100vw - 32px));
   max-height: calc(100dvh - 92px);
   overflow: auto;
@@ -381,6 +381,8 @@ input[type="checkbox"] {
 
 :root {
   --ui-scale: 1;
+  /* Compact top bar; floating panels open just below it. */
+  --header-h: 46px;
   --panel: #fffefa;
   --canvas-bg: #f2f0e9;
 }
@@ -396,11 +398,11 @@ input[type="checkbox"] {
   background: var(--canvas-bg);
 }
 header {
-  height: calc(62px * var(--ui-scale));
+  height: calc(var(--header-h) * var(--ui-scale));
   background: var(--panel);
 }
 main {
-  height: calc(100dvh - 62px * var(--ui-scale));
+  height: calc(100dvh - var(--header-h) * var(--ui-scale));
   background: var(--canvas-bg);
 }
 button,
@@ -598,7 +600,9 @@ select {
 #settings-panel,
 #keys-panel,
 #presets-panel {
-  max-height: calc((100dvh - 92px) / var(--ui-scale));
+  max-height: calc(
+    (100dvh - (var(--header-h) + 26px) * var(--ui-scale)) / var(--ui-scale)
+  );
 }
 #material-menu {
   max-height: calc((100dvh - 20px) / var(--ui-scale));
@@ -941,7 +945,7 @@ button:disabled {
   position: fixed;
   z-index: 15;
   right: 16px;
-  top: 76px;
+  top: calc(var(--header-h) + 10px);
   width: min(420px, calc(100vw - 32px));
   overflow: auto;
   padding: 16px;
@@ -965,8 +969,8 @@ button:disabled {
 }
 #preset-list .preset {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: flex-start;
+  gap: 10px;
   width: 100%;
   margin-top: 6px;
   padding: 8px 10px;
@@ -1009,7 +1013,7 @@ button:disabled {
   position: fixed;
   z-index: 16;
   right: 16px;
-  top: 76px;
+  top: calc(var(--header-h) + 10px);
   width: min(300px, calc(100vw - 32px));
   padding: 14px 16px;
   border: 1px solid var(--line);
@@ -1260,4 +1264,51 @@ button:disabled {
 }
 :root[data-theme="dark"] .swatch.velocity {
   color: #6fa8ec;
+}
+/* Compact top bar: smaller buttons, icons and brand. */
+header {
+  padding: 0 14px;
+  gap: 14px;
+}
+.brand {
+  gap: 8px;
+  font-size: 14px;
+}
+.brand > span {
+  font-size: 24px;
+}
+.playback {
+  gap: 5px;
+}
+.playback button {
+  padding: 4px 9px;
+  min-height: 30px;
+  border-radius: 6px;
+}
+.playback .ui-icon {
+  width: 17px;
+  height: 17px;
+  flex-basis: 17px;
+}
+#pause {
+  min-width: 70px;
+}
+#speed {
+  height: 30px;
+}
+.header-divider {
+  margin: 4px 1px;
+}
+.preset-preview {
+  flex: 0 0 112px;
+  width: 112px;
+  height: 72px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.preset-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
 }

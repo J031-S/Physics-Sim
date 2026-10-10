@@ -1395,8 +1395,154 @@ $("presets-toggle").onclick = () => {
   const open = $("presets-panel").hidden;
   $("presets-panel").hidden = !open;
   $("presets-toggle").setAttribute("aria-expanded", String(open));
-  if (open) $("preset-list").querySelector("button")?.focus();
+  if (open) {
+    drawPresetPreviews();
+    $("preset-list").querySelector("button")?.focus();
+  }
 };
+// Thumbnails of each preset's starting scene, drawn from the preset itself
+// (built in a throwaway sandbox), so they can never drift from the scene.
+// Redrawn only when the theme changes.
+let previewTheme = null;
+function drawPresetPreviews() {
+  const dark = document.documentElement.dataset.theme === "dark";
+  if (previewTheme === dark) return;
+  previewTheme = dark;
+  for (const preset of presets) {
+    const el = document.querySelector(
+      `[data-preset="${preset.id}"] .preset-preview`,
+    );
+    const scene = new Sandbox();
+    try {
+      preset.setup(scene);
+      drawPreview(el, scene, dark);
+    } catch {
+      // A preview is decoration; the preset itself reports its own errors.
+    } finally {
+      scene.dispose();
+    }
+  }
+}
+function drawPreview(el, scene, dark) {
+  const g = el.getContext("2d"),
+    dpr = window.devicePixelRatio || 1,
+    w = 112,
+    h = 72;
+  if (!g?.setTransform) return;
+  el.width = w * dpr;
+  el.height = h * dpr;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const v = scene.viewport || { minX: -8, maxX: 8, minY: 0, maxY: 9 },
+    // Frame the experiment itself (bodies, connections, fields) and the
+    // floor below it, rather than the whole scene, so small bodies show.
+    points = [{ x: 0, y: -0.3 }];
+  for (const o of scene.objects.values())
+    for (const p of o.body.vertices)
+      points.push({ x: p.x / 100, y: -p.y / 100 });
+  for (const l of scene.links.values())
+    points.push(scene.endpoint(l, "a"), scene.endpoint(l, "b"));
+  for (const f of scene.fields.regions.values()) {
+    const r = Math.hypot(f.width, f.height) / 2;
+    points.push({ x: f.x - r, y: f.y - r }, { x: f.x + r, y: f.y + r });
+  }
+  const xs = points.map((p) => p.x),
+    ys = points.map((p) => p.y),
+    cx = (Math.min(...xs) + Math.max(...xs)) / 2,
+    cy = (Math.min(...ys) + Math.max(...ys)) / 2,
+    spanX = Math.max(3, Math.max(...xs) - Math.min(...xs)) * 1.25,
+    spanY = Math.max(2, Math.max(...ys) - Math.min(...ys)) * 1.25,
+    k = Math.min(w / spanX, h / spanY),
+    ox = w / 2 - cx * k,
+    oy = h / 2 + cy * k,
+    at = (p) => ({ x: ox + p.x * k, y: oy - p.y * k });
+  g.fillStyle = dark ? "#1c1a16" : "#f2f0e9";
+  g.fillRect(0, 0, w, h);
+  g.fillStyle = dark ? "#25332a" : "#e0e3d8";
+  g.fillRect(0, oy, w, h - oy);
+  g.strokeStyle = "#7f9076";
+  g.lineWidth = 1;
+  if (scene.settings.walls) {
+    const a = at({ x: v.minX, y: v.maxY });
+    g.strokeRect(a.x, a.y, (v.maxX - v.minX) * k, (v.maxY - v.minY) * k);
+  }
+  g.beginPath();
+  g.moveTo(0, oy);
+  g.lineTo(w, oy);
+  g.stroke();
+  for (const f of scene.fields.regions.values()) {
+    const c = at(f);
+    g.save();
+    g.translate(c.x, c.y);
+    g.rotate((-f.angle * Math.PI) / 180);
+    g.beginPath();
+    if (f.shape === "rectangle")
+      g.rect(
+        (-f.width * k) / 2,
+        (-f.height * k) / 2,
+        f.width * k,
+        f.height * k,
+      );
+    else
+      g.ellipse(0, 0, (f.width * k) / 2, (f.height * k) / 2, 0, 0, 2 * Math.PI);
+    g.fillStyle = f.type === "electric" ? "#dea73940" : "#9874cb40";
+    g.fill();
+    g.strokeStyle = f.type === "electric" ? "#c8902c" : "#9474c8";
+    g.stroke();
+    g.restore();
+  }
+  for (const l of scene.links.values()) {
+    const path =
+      l.type === "belt"
+        ? scene.mechanisms.beltGeometry(l).path
+        : l.type === "pulley"
+          ? scene.mechanisms.pulleyPath(l)
+          : [scene.endpoint(l, "a"), scene.endpoint(l, "b")];
+    g.beginPath();
+    path
+      .map(at)
+      .forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)));
+    g.strokeStyle = dark ? "#a9b89b" : "#6f7f63";
+    g.lineWidth = l.type === "rod" ? 1.5 : 1;
+    g.stroke();
+  }
+  for (const o of scene.objects.values()) {
+    g.beginPath();
+    o.body.vertices.forEach((p, i) => {
+      const q = at({ x: p.x / 100, y: -p.y / 100 });
+      i ? g.lineTo(q.x, q.y) : g.moveTo(q.x, q.y);
+    });
+    g.closePath();
+    g.fillStyle =
+      o.shape === "ball"
+        ? "#dba66b"
+        : o.shape === "wedge"
+          ? "#a2b889"
+          : "#8ca6bc";
+    g.fill();
+    g.strokeStyle = o.shape === "ball" ? "#a77943" : "#658199";
+    g.lineWidth = 0.75;
+    g.stroke();
+    // Initial velocity, so moving starts (projectile, collisions) read.
+    const s = scene.state(o.id),
+      speed = Math.hypot(s.vx, s.vy);
+    if (speed > 0.05) {
+      const p = at(s),
+        len = Math.min(18, 3 + speed * 2.5),
+        e = { x: p.x + (s.vx / speed) * len, y: p.y - (s.vy / speed) * len },
+        a = Math.atan2(e.y - p.y, e.x - p.x);
+      g.strokeStyle = dark ? "#6fa8ec" : "#497caa";
+      g.lineWidth = 1.2;
+      g.beginPath();
+      g.moveTo(p.x, p.y);
+      g.lineTo(e.x, e.y);
+      for (const t of [-0.5, 0.5]) {
+        g.moveTo(e.x, e.y);
+        g.lineTo(e.x - 4 * Math.cos(a + t), e.y - 4 * Math.sin(a + t));
+      }
+      g.stroke();
+    }
+  }
+}
 $("close-presets").onclick = () => {
   closePresets();
   canvas.focus();
@@ -1430,7 +1576,13 @@ $("presets-panel").addEventListener("keydown", (e) => {
       description.textContent = preset.description;
       expect.className = "preset-expect";
       expect.textContent = "What to look for: " + preset.expect;
-      button.append(title, description, expect);
+      const preview = document.createElement("canvas"),
+        text = document.createElement("span");
+      preview.className = "preset-preview";
+      preview.setAttribute("aria-hidden", "true");
+      text.className = "preset-text";
+      text.append(title, description, expect);
+      button.append(preview, text);
       button.onclick = () => {
         const next = new Sandbox();
         try {
