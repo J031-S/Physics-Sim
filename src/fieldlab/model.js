@@ -340,6 +340,145 @@ export class FieldLab {
 }
 
 // ---------------------------------------------------------------------------
+// Test charges: small positive charges released from rest in the electric
+// scene. They feel the field but do not add to it.
+
+export const TEST_CHARGE = { charge: 1e-9, mass: 1e-9 }; // +1 nC, 1 µg
+
+export class TestCharges {
+  constructor(lab, options = {}) {
+    this.lab = lab;
+    this.items = [];
+    this.nextId = 1;
+    this.limit = options.limit ?? 40;
+    // A test charge that comes this close to a negative charge has hit it.
+    this.captureRadius = options.captureRadius ?? 0.05;
+    // One that strays this far from the origin is stopped.
+    this.range = options.range ?? LIMITS.position;
+    this.trailSpacing = options.trailSpacing ?? 0.02;
+    this.trailLength = options.trailLength ?? 4000;
+  }
+
+  get moving() {
+    return this.items.filter((t) => t.moving).length;
+  }
+
+  add(x, y) {
+    if (
+      ![x, y].every((v) => Number.isFinite(v) && Math.abs(v) <= LIMITS.position)
+    )
+      throw new Error("That is outside the scene.");
+    if (this.items.length >= this.limit)
+      throw new Error(
+        `There are already ${this.limit} test charges. Clear them first.`,
+      );
+    for (const p of this.lab.compiled().charges)
+      if (Math.hypot(x - p.x, y - p.y) < this.captureRadius)
+        throw new Error("Place the test charge clear of the other charges.");
+    const item = {
+      id: this.nextId++,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      time: 0,
+      moving: true,
+      end: null,
+      trail: [[x, y]],
+    };
+    this.items.push(item);
+    return item.id;
+  }
+
+  clear() {
+    this.items = [];
+  }
+
+  // Advance every moving test charge by dt seconds: a = qE/m, integrated by
+  // velocity Verlet in substeps that shorten close to a point charge, where
+  // the field changes quickly.
+  step(dt) {
+    const lab = this.lab,
+      c = lab.compiled(),
+      ratio = TEST_CHARGE.charge / TEST_CHARGE.mass,
+      e = [0, 0];
+    for (const t of this.items) {
+      if (!t.moving) continue;
+      let left = dt;
+      for (let n = 0; n < 4000 && left > 1e-12 && t.moving; n++) {
+        let nearest = Infinity;
+        for (const p of c.charges)
+          nearest = Math.min(nearest, Math.hypot(t.x - p.x, t.y - p.y));
+        lab.electricField(t.x, t.y, 0, e);
+        const ax = ratio * e[0],
+          ay = ratio * e[1],
+          a = Math.hypot(ax, ay),
+          v = Math.hypot(t.vx, t.vy),
+          // Move at most this far in one substep.
+          reach = Math.max(1e-5, Math.min(0.02, 0.02 * nearest)),
+          h = Math.min(
+            left,
+            a > 0
+              ? (Math.sqrt(v * v + 2 * a * reach) - v) / a
+              : v > 0
+                ? reach / v
+                : left,
+          ),
+          nx = t.x + t.vx * h + 0.5 * ax * h * h,
+          ny = t.y + t.vy * h + 0.5 * ay * h * h;
+        // Landing on a plate: stop where the path meets it.
+        let hit = null;
+        for (const s of c.strips) {
+          const v0 = -(t.x - s.x) * s.sin + (t.y - s.y) * s.cos,
+            v1 = -(nx - s.x) * s.sin + (ny - s.y) * s.cos;
+          if (v0 === 0 || v0 * v1 > 0) continue;
+          const f = v0 / (v0 - v1),
+            hx = t.x + f * (nx - t.x),
+            hy = t.y + f * (ny - t.y);
+          if (Math.abs((hx - s.x) * s.cos + (hy - s.y) * s.sin) > s.a) continue;
+          if (!hit || f < hit.f) hit = { f, hx, hy };
+        }
+        lab.electricField(nx, ny, 0, e);
+        t.vx += 0.5 * (ax + ratio * e[0]) * h;
+        t.vy += 0.5 * (ay + ratio * e[1]) * h;
+        if (hit) {
+          t.x = hit.hx;
+          t.y = hit.hy;
+          t.time += h * hit.f;
+          t.moving = false;
+          t.end = "plate";
+        } else {
+          t.x = nx;
+          t.y = ny;
+          t.time += h;
+          left -= h;
+          for (const p of c.charges)
+            if (
+              p.q < 0 &&
+              Math.hypot(nx - p.x, ny - p.y) < this.captureRadius
+            ) {
+              t.moving = false;
+              t.end = "charge";
+            }
+          if (Math.abs(nx) > this.range || Math.abs(ny) > this.range) {
+            t.moving = false;
+            t.end = "away";
+          }
+        }
+        const last = t.trail[t.trail.length - 1];
+        if (
+          !t.moving ||
+          Math.hypot(t.x - last[0], t.y - last[1]) >= this.trailSpacing
+        ) {
+          t.trail.push([t.x, t.y]);
+          if (t.trail.length > this.trailLength) t.trail.shift();
+        }
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Electric field lines: integrate along E from the sources.
 
 function gapFill(angles, total, reference) {
@@ -807,8 +946,23 @@ export function equipotentialLines(lab, bounds, options = {}) {
     lo = sorted[Math.floor(0.03 * (sorted.length - 1))],
     hi = sorted[Math.ceil(0.97 * (sorted.length - 1))],
     scale = Math.max(Math.abs(lo), Math.abs(hi));
+  // The sampled potential itself is returned too, for shading the scene by
+  // sign and size; `scale` is the largest |V| outside that closest 3%.
+  const field = {
+    nx: grid.nx,
+    ny: grid.ny,
+    values: grid.values,
+    cell,
+    minX: bounds.minX,
+    minY: bounds.minY,
+  };
   if (!(hi - lo > 1e-9 * scale) || !(scale > 1e-12))
-    return { lines: [], step: 0 };
+    return {
+      lines: [],
+      step: 0,
+      grid: field,
+      scale: scale > 1e-12 ? scale : 0,
+    };
   // Round the step to 1, 2 or 5 × 10ⁿ volts.
   const raw = (hi - lo) / count,
     power = 10 ** Math.floor(Math.log10(raw)),
@@ -826,7 +980,7 @@ export function equipotentialLines(lab, bounds, options = {}) {
   for (let n = Math.ceil(lo / step); n <= Math.floor(hi / step); n++)
     for (const line of contourLines(grid.values, grid.nx, grid.ny, n * step))
       lines.push({ level: n * step, points: line.map(map) });
-  return { lines, step };
+  return { lines, step, grid: field, scale };
 }
 
 /**

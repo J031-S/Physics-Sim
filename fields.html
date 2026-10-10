@@ -152,6 +152,18 @@
               </svg>
               <span>Plate</span></button
             ><button
+              data-add="test"
+              data-for="electric"
+              aria-pressed="false"
+              title="Test charge: released from rest, it moves in the field (T)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 17c4 0 6-1 8.5-3.5" class="glyph-trail" />
+                <circle cx="15.5" cy="9.5" r="5.5" class="glyph-ring" />
+                <path d="M15.5 6.8v5.4M12.8 9.5h5.4" class="glyph-line" />
+              </svg>
+              <span>Test charge</span></button
+            ><button
               data-add="wire-out"
               data-for="magnetic"
               aria-pressed="false"
@@ -207,6 +219,10 @@
             ><input id="show-equipotentials" type="checkbox" /> Equipotentials
             <small id="equipotential-step"></small
           ></label>
+          <div id="potential-legend" class="fl-legend" hidden>
+            <span class="fl-ramp" aria-hidden="true"></span>
+            <span id="potential-legend-text"></span>
+          </div>
           <label class="fl-check"
             ><input id="show-forces" type="checkbox" />
             <span id="show-forces-text">Forces on charges</span></label
@@ -231,6 +247,15 @@
                 >1×</output
               ></span
             >
+          </div>
+          <div id="test-row" class="fl-tests" hidden>
+            <span id="test-status"></span
+            ><button
+              id="clear-tests"
+              title="Remove every test charge and trail"
+            >
+              Clear
+            </button>
           </div>
           <div class="fl-probe" aria-live="off">
             <strong>At the pointer</strong>
@@ -491,8 +516,8 @@
       <dl>
         <dt>Click</dt>
         <dd>
-          With a source chosen in the toolbar, places one. Otherwise selects the
-          source under the pointer.
+          With a source chosen in the toolbar, places one and returns to Grab.
+          Otherwise selects the source under the pointer.
         </dd>
         <dt>Drag</dt>
         <dd>Moves a source. Dragging empty space pans the view.</dd>
@@ -508,6 +533,11 @@
         <dd>Grab · Pan. Scroll to zoom; middle-drag pans in any tool.</dd>
         <dt>L · A · F</dt>
         <dd>Toggle field lines · field arrows · forces</dd>
+        <dt>T</dt>
+        <dd>
+          Test charge (electric scene): click to release one from rest. It moves
+          in the field and leaves a trail.
+        </dd>
         <dt>Z</dt>
         <dd>Toggle snapping to 0.25 m and 15°</dd>
         <dt>Escape</dt>

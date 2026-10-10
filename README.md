@@ -178,7 +178,7 @@ The floor is not selectable or editable. Gravity defaults to 9.81 m/s² and is c
 
 ## Electric & magnetic fields tool
 
-A separate page for static fields: place charges and currents, drag them about, and watch the field lines redraw. Nothing moves on its own here; it is a picture of the field, not a simulation in time. Open it from the drop-down at the left of the top bar.
+A separate page for static fields: place charges and currents, drag them about, and watch the field lines redraw. The sources stay where you put them; the only things that move are the test charges you release into the electric scene. Open it from the drop-down at the left of the top bar.
 
 It holds two independent scenes, switched with **Electric / Magnetic** in the toolbar (`E` / `M`). Each starts with one arrangement so that it does not open empty.
 
@@ -189,20 +189,30 @@ It holds two independent scenes, switched with **Electric / Magnetic** in the to
 | Magnetic | Straight wire, perpendicular to the screen            | Current; positive is out of the screen (⊙), negative into it (⊗)  | −100 to 100 A                             |
 | Magnetic | Bar magnet, which is also a solenoid in cross-section | Coil current nI (turns per metre × current), length, width, angle | −500 to 500 A/m, 0.2 to 20 m, 0.1 to 10 m |
 
-Choose a source in the toolbar and click the scene to place it. With Grab (`G`), drag a source to move it, Ctrl-drag a plate or magnet to turn it, and click a source to edit its values and exact position in the panel at the bottom right. Arrow keys nudge the selected source; `Delete` removes it. Dragging empty space, or the Pan tool (`H`), moves the view; scroll to zoom. `Z` snaps positions to 0.25 m and angles to 15°. Up to 40 sources per scene.
+Choose a source in the toolbar and click the scene to place it; the tool then returns to Grab, as in the mechanics sandbox, with the new source selected. With Grab (`G`), drag a source to move it, Ctrl-drag a plate or magnet to turn it, and click a source to edit its values and exact position in the panel at the bottom right. Arrow keys nudge the selected source; `Delete` removes it. Dragging empty space, or the Pan tool (`H`), moves the view; scroll to zoom. `Z` snaps positions to 0.25 m and angles to 15°. Up to 40 sources per scene.
 
 The **Display** panel chooses what is drawn:
 
 - **Field lines** (`L`), with arrows along the field.
 - **Field arrows** (`A`) on a grid. Length and opacity grow with the square root of the field strength relative to the strongest tenth on screen: a guide to strength, not a scale.
-- **Equipotentials** (electric scene only), dashed, at equal steps of a round number of volts shown beside the tick box. The 0 V line is solid.
+- **Equipotentials** (electric scene only), dashed, at equal steps of a round number of volts shown beside the tick box. The 0 V line is solid. The scene behind them is shaded by potential: red where V is positive, blue where it is negative, and more opaque the larger |V| is. The opacity is proportional to |V| up to the value shown in the key ("full at ±…"), which is the largest potential outside the 3% of the screen closest to the charges; nearer than that the shading stays at full strength.
 - **Forces** (`F`): the force on each point charge (in newtons), or on each metre of each wire (N/m), from every other source and the background field. Arrow lengths are in proportion to each other.
 - **Values**: the labels on the sources.
 - **Line density**: half to twice the usual number of lines.
 
 **At the pointer** reads out the field under the mouse: magnitude, direction (anticlockwise from +x) and, in the electric scene, potential. Use it to check a calculation.
 
-Settings adds a uniform **background field** to each scene, and holds the website preferences shared with the mechanics sandbox. **Presets** loads ready-made arrangements, each with the textbook result to check; the numbers quoted are tested against the model. **Clear scene** empties the scene on show only.
+Settings adds a uniform **background field** to each scene, and holds the website preferences shared with the mechanics sandbox. **Presets** loads ready-made arrangements, each with a preview picture drawn from the preset itself and the textbook result to check; the numbers quoted are tested against the model. **Clear scene** empties the scene on show only.
+
+### Test charges
+
+In the electric scene, choose **Test charge** (`T`) and click to release one from rest. It is a +1 nC, 1 µg particle, so its acceleration in m/s² equals the field in N/C (`a = qE/m`). It moves in real time, leaves a dotted trail, and shows its speed while Values is on. The Display panel counts the test charges and has a **Clear** button for them and their trails.
+
+- A test charge feels the field but does not add to it, and test charges do not affect each other.
+- It stops when it lands on a plate or reaches a negative charge, and is stopped if it strays 150 m away. Its trail stays.
+- **Its path is not a field line.** It has inertia, so it only follows a field line where the line is straight (from a single charge, between parallel plates, or along the line joining two charges). Elsewhere it overshoots the curve, and may miss a negative charge altogether and swing round it.
+- Energy is conserved along the path: the kinetic energy gained is `qΔV`, which the pointer readout lets you check. There is no gravity, drag or radiation.
+- Moving or changing a source while a test charge is in flight changes the field it feels from then on, which does not conserve its energy.
 
 ### What the picture means, and where it stops being exact
 
@@ -215,7 +225,7 @@ The screen is a flat slice through a three-dimensional arrangement.
 - **Electric field lines are the textbook convention**, which a flat picture of a three-dimensional field cannot make exact. Lines leave each positive charge evenly in angle, 8 per nanocoulomb at normal density, and each line follows E precisely. But their spacing is only a guide to strength, and the number arriving at a negative charge can differ from 8 per nanocoulomb: with +4 nC and −1 nC, the lines that leave within 60° of the line joining the charges arrive, which is 11 of 32, although only a quarter of the flux does. Plates and the background field are seeded by flux, so equal uniform fields do get equal spacing.
 - **A plate has no zero of potential at infinity**, because it never ends. Its potential is taken as zero about 1 m away, so only potential differences mean anything in a scene with plates.
 - **Equipotentials** stop short of the few percent of the screen closest to the charges, where they would merge.
-- **Statics only.** Sources stay where they are put: forces are shown but do not move anything, there is no induction, and the two scenes do not affect each other. No force is calculated on plates or magnets.
+- **The sources are static.** They stay where they are put: forces on them are shown but do not move them, there is no induction, and the two scenes do not affect each other. No force is calculated on plates or magnets. Only test charges move, and only in the electric scene: in the magnetic scene the field lies in the screen, so the force on a charge moving in the screen would point out of it.
 
 ## Right-click menu
 
@@ -260,7 +270,7 @@ npm ci
 npm run test:ui
 ```
 
-`tests/fieldlab.test.mjs` checks the fields tool against the textbook: inverse-square and 1/r laws, superposition and null points, E = −∇V and B = curl A, Gauss's and Ampère's laws by numerical integration, σ/ε₀ between plates, μ₀nI inside a solenoid, Coulomb's law, the force between parallel wires and BIℓ, field lines tangent to the field, equal flux between magnetic field lines, and every number quoted in the presets. `tests/fieldlab-smoke.mjs` drives `fields.html` through its controls and runs with `npm run test:ui`.
+`tests/fieldlab.test.mjs` checks the fields tool against the textbook: inverse-square and 1/r laws, superposition and null points, E = −∇V and B = curl A, Gauss's and Ampère's laws by numerical integration, σ/ε₀ between plates, μ₀nI inside a solenoid, Coulomb's law, the force between parallel wires and BIℓ, field lines tangent to the field, equal flux between magnetic field lines, test charges (½at² in a uniform field, kinetic energy gained equal to qΔV, fall time between plates), and every number quoted in the presets. `tests/fieldlab-smoke.mjs` drives `fields.html` through its controls and runs with `npm run test:ui`.
 
 Belts and pulley cables share iterative position and velocity solving, so one connection no longer overwrites a wheel angle already solved by the other. Guided springs use signed extension to remain continuous when an endpoint crosses its anchor.
 

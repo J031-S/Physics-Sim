@@ -10,6 +10,7 @@ import {
   electricFieldLines,
   equipotentialLines,
   magneticFieldLines,
+  TestCharges,
 } from "./model.js";
 import { presets } from "./presets.js";
 
@@ -39,6 +40,11 @@ const state = {
     labels: true,
   },
 };
+// Test charges live in the electric scene; they feel the field only.
+// One that strays 150 m away is stopped, so the scene can come to rest.
+const tests = new TestCharges(lab, { range: 150 });
+let lastFrame = 0,
+  previewTheme = null;
 let drag = null,
   computed = null,
   stale = true,
@@ -82,6 +88,11 @@ const ADD = {
     props: {},
     name: "Bar magnet / solenoid",
     help: "Click to place a bar magnet. It is also a solenoid seen in cross-section.",
+  },
+  test: {
+    kind: "test",
+    name: "Test charge",
+    help: "Click to release a +1 nC, 1 µg test charge from rest. It moves in the field without changing it.",
   },
 };
 const TOOL_HELP = {
@@ -273,10 +284,27 @@ function invalidate(recompute = true) {
   if (recompute) stale = true;
   if (queued) return;
   queued = true;
-  requestAnimationFrame(() => {
+  requestAnimationFrame((now) => {
     queued = false;
+    // Test charges move in real time while the electric scene is on show.
+    const animate = state.mode === "electric" && tests.moving > 0;
+    if (animate) {
+      const dt = lastFrame ? Math.min((now - lastFrame) / 1000, 1 / 30) : 0;
+      tests.captureRadius = SOURCE_RADIUS / view.scale;
+      tests.step(dt > 0 ? dt : 1 / 60);
+      updateTests();
+    }
+    lastFrame = animate ? now : 0;
     draw();
+    if (state.mode === "electric" && tests.moving > 0) invalidate(false);
   });
+}
+
+function updateTests() {
+  const n = tests.items.length;
+  $("test-row").hidden = state.mode !== "electric" || n === 0;
+  $("test-status").textContent =
+    `${n} test charge${n === 1 ? "" : "s"} · ${tests.moving} moving`;
 }
 
 const sources = () => lab.list(state.mode);
@@ -322,7 +350,7 @@ function viewBounds(margin) {
 
 function recompute() {
   const px = 1 / view.scale,
-    result = { lines: [], equipotentials: [], step: 0 };
+    result = { lines: [], equipotentials: [], step: 0, shade: null, scale: 0 };
   if (state.mode === "electric") {
     if (state.show.lines)
       result.lines = electricFieldLines(
@@ -342,6 +370,11 @@ function recompute() {
       });
       result.equipotentials = e.lines;
       result.step = e.step;
+      result.shade = potentialShade(e.grid, e.scale);
+      result.scale = e.scale;
+      $("potential-legend-text").textContent = e.scale
+        ? `full at ±${si(e.scale, "V")}`
+        : "";
     }
   } else if (state.show.lines)
     result.lines = magneticFieldLines(lab, viewBounds(10 * px), {
@@ -353,7 +386,48 @@ function recompute() {
     state.mode === "electric" && state.show.equipotentials && result.step
       ? "every " + tidy(result.step, 6) + " V"
       : "";
+  $("potential-legend").hidden = !result.scale;
   return result;
+}
+
+// The potential as a picture, one pixel per sample: red where V is positive,
+// blue where negative, and more opaque the larger |V| is, in proportion up
+// to `scale` (beyond which it stays at full strength).
+function potentialShade(grid, scale) {
+  if (!(scale > 0)) return null;
+  try {
+    const c = palette(),
+      rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)),
+      red = rgb(c.positive),
+      blue = rgb(c.negative),
+      image = document.createElement("canvas"),
+      g = image.getContext("2d"),
+      pixels = g.createImageData(grid.nx, grid.ny);
+    image.width = grid.nx;
+    image.height = grid.ny;
+    for (let j = 0; j < grid.ny; j++)
+      for (let i = 0; i < grid.nx; i++) {
+        const v = grid.values[j * grid.nx + i],
+          colour = v > 0 ? red : blue,
+          // Image rows run down the screen; grid rows run up.
+          k = 4 * ((grid.ny - 1 - j) * grid.nx + i);
+        pixels.data[k] = colour[0];
+        pixels.data[k + 1] = colour[1];
+        pixels.data[k + 2] = colour[2];
+        pixels.data[k + 3] = 165 * Math.min(1, Math.abs(v) / scale);
+      }
+    g.putImageData(pixels, 0, 0);
+    return {
+      image,
+      // Each pixel is centred on its sample.
+      x: grid.minX - grid.cell / 2,
+      y: grid.minY + (grid.ny - 0.5) * grid.cell,
+      width: grid.nx * grid.cell,
+      height: grid.ny * grid.cell,
+    };
+  } catch {
+    return null; // no canvas pixels here (the DOM test)
+  }
 }
 
 // ---------------------------------------------------------------- drawing
@@ -375,6 +449,7 @@ function palette() {
     neutral: dark ? "#8d8777" : "#9aa392",
     force: dark ? "#f2c14e" : "#b4530a",
     select: dark ? "#a9c49d" : "#4f7547",
+    test: dark ? "#8fd3a4" : "#2f7d4f",
   };
 }
 
@@ -712,6 +787,36 @@ function drawForces(c) {
   }
 }
 
+// Test charges and the paths they have taken.
+function drawTests(c) {
+  ctx.lineJoin = "round";
+  for (const t of tests.items) {
+    ctx.strokeStyle = c.test;
+    ctx.lineWidth = 1.6;
+    ctx.globalAlpha = 0.75;
+    ctx.setLineDash([2, 3]);
+    strokePath(t.trail, true);
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    const [x, y] = screen(t.x, t.y);
+    ctx.beginPath();
+    ctx.arc(x, y, 5.5, 0, 2 * Math.PI);
+    ctx.fillStyle = t.moving ? c.test : c.panel;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.strokeStyle = t.moving ? c.panel : c.test;
+    ctx.beginPath();
+    ctx.moveTo(x - 3, y);
+    ctx.lineTo(x + 3, y);
+    ctx.moveTo(x, y - 3);
+    ctx.lineTo(x, y + 3);
+    ctx.stroke();
+    if (state.show.labels && t.moving)
+      label(si(Math.hypot(t.vx, t.vy), "m/s"), x, y - 15, c);
+  }
+}
+
 function draw() {
   const r = canvas.getBoundingClientRect(),
     dpr = window.devicePixelRatio || 1;
@@ -747,6 +852,17 @@ function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, r.width, r.height);
   ctx.setLineDash([]);
+  if (computed.shade) {
+    const [sx, sy] = screen(computed.shade.x, computed.shade.y);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(
+      computed.shade.image,
+      sx,
+      sy,
+      computed.shade.width * view.scale,
+      computed.shade.height * view.scale,
+    );
+  }
   if (prefs.grid) drawGrid(c);
   if (computed.equipotentials.length) {
     ctx.strokeStyle = c.equipotential;
@@ -779,6 +895,7 @@ function draw() {
     for (const s of list)
       if (s.kind === kind) drawSource(s, c, s.id === chosen);
   if (state.show.forces) drawForces(c);
+  if (electric) drawTests(c);
   drawScaleBar(c);
   $("zoom-level").textContent =
     Math.round((view.scale / BASE_SCALE) * 100) + "%";
@@ -953,6 +1070,8 @@ function setMode(mode) {
   for (const b of document.querySelectorAll("[data-for]"))
     b.hidden = b.dataset.for !== mode;
   $("show-equipotentials-label").hidden = !electric;
+  lastFrame = 0;
+  updateTests();
   $("show-forces-text").textContent = electric
     ? "Forces on charges"
     : "Forces on wires";
@@ -1024,6 +1143,7 @@ function zoomAt(sx, sy, factor) {
 
 function loadPreset(preset) {
   lab.clear(preset.mode);
+  if (preset.mode === "electric") tests.clear();
   preset.build(lab);
   state.selected[preset.mode] = null;
   setMode(preset.mode);
@@ -1106,9 +1226,24 @@ canvas.addEventListener("pointerdown", (e) => {
     const at = state.snapping
       ? { x: snapTo(p.x, GRID), y: snapTo(p.y, GRID) }
       : p;
+    // As in the mechanics sandbox, placing something returns to Grab.
+    if (adding.kind === "test") {
+      if (
+        attempt(() => {
+          tests.captureRadius = SOURCE_RADIUS / view.scale;
+          tests.add(at.x, at.y);
+        })
+      ) {
+        setTool("grab");
+        updateTests();
+        invalidate(false);
+      }
+      return;
+    }
     attempt(() => {
       const id = lab.add(adding.kind, { ...adding.props, ...at });
       state.selected[state.mode] = id;
+      setTool("grab");
       buildForm();
       status();
       invalidate();
@@ -1223,6 +1358,7 @@ document.addEventListener("keydown", (e) => {
   else if (key === "l") toggleShow("show-lines");
   else if (key === "a") toggleShow("show-arrows");
   else if (key === "f") toggleShow("show-forces");
+  else if (key === "t" && state.mode === "electric") setTool("test");
   else if (key === "?") togglePanel("keys-panel");
   else if (key === "+" || key === "=")
     zoomAt(view.width / 2, view.height / 2, 1.25);
@@ -1277,20 +1413,27 @@ $("settings-toggle").addEventListener("click", () =>
 $("close-settings").addEventListener("click", () => closePanels());
 $("shortcuts").addEventListener("click", () => togglePanel("keys-panel"));
 $("close-keys").addEventListener("click", () => closePanels());
-$("presets-toggle").addEventListener("click", () =>
-  togglePanel("presets-panel"),
-);
+$("presets-toggle").addEventListener("click", () => {
+  if (togglePanel("presets-panel")) drawPresetPreviews();
+});
 $("close-presets").addEventListener("click", () => closePanels());
 $("clear").addEventListener("click", () => {
   $("clear-confirm-text").textContent =
     state.mode === "electric"
-      ? "Every charge and plate is removed from the electric scene, and its background field is set to zero. The magnetic scene is not affected."
+      ? "Every charge, plate and test charge is removed from the electric scene, and its background field is set to zero. The magnetic scene is not affected."
       : "Every wire and magnet is removed from the magnetic scene, and its background field is set to zero. The electric scene is not affected.";
   if (togglePanel("clear-confirm")) $("clear-no").focus();
 });
 $("clear-no").addEventListener("click", () => closePanels());
+$("clear-tests").addEventListener("click", () => {
+  tests.clear();
+  updateTests();
+  invalidate(false);
+});
 $("clear-yes").addEventListener("click", () => {
   lab.clear(state.mode);
+  if (state.mode === "electric") tests.clear();
+  updateTests();
   state.selected[state.mode] = null;
   closePanels();
   syncUniform();
@@ -1328,8 +1471,14 @@ for (const mode of ["electric", "magnetic"]) {
     title.textContent = preset.title;
     text.textContent = preset.text;
     expect.className = "preset-expect";
-    expect.textContent = preset.expect;
-    button.append(title, text, expect);
+    expect.textContent = "What to check: " + preset.expect;
+    const preview = document.createElement("canvas"),
+      words = document.createElement("span");
+    preview.className = "preset-preview";
+    preview.setAttribute("aria-hidden", "true");
+    words.className = "preset-text";
+    words.append(title, text, expect);
+    button.append(preview, words);
     button.addEventListener("click", () => {
       closePanels();
       loadPreset(preset);
@@ -1338,12 +1487,162 @@ for (const mode of ["electric", "magnetic"]) {
   }
 }
 
+// Thumbnails of each preset, drawn from the preset itself (built in a
+// throwaway scene), so they can never drift from what loads. Redrawn only
+// when the theme changes.
+function drawPresetPreviews() {
+  const dark = isDark();
+  if (previewTheme === dark) return;
+  previewTheme = dark;
+  for (const preset of presets)
+    try {
+      drawPreview(
+        document.querySelector(`[data-preset="${preset.id}"] .preset-preview`),
+        preset,
+      );
+    } catch {
+      // A preview is decoration; the preset itself reports its own errors.
+    }
+}
+function drawPreview(el, preset) {
+  const g = el.getContext("2d"),
+    dpr = window.devicePixelRatio || 1,
+    w = 112,
+    h = 72;
+  if (!g?.setTransform) return;
+  el.width = w * dpr;
+  el.height = h * dpr;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const scene = new FieldLab();
+  preset.build(scene);
+  const list = scene.list(),
+    c = palette(),
+    // Half-extent of a source along x and along y.
+    reach = (s, along, across) =>
+      s.kind === "plate" || s.kind === "magnet"
+        ? (Math.abs(along(s.angle)) * s.length +
+            Math.abs(across(s.angle)) * (s.width || 0)) /
+          2
+        : 0,
+    rx = (s) => reach(s, Math.cos, Math.sin),
+    ry = (s) => reach(s, Math.sin, Math.cos),
+    minX = Math.min(...list.map((s) => s.x - rx(s))),
+    maxX = Math.max(...list.map((s) => s.x + rx(s))),
+    minY = Math.min(...list.map((s) => s.y - ry(s))),
+    maxY = Math.max(...list.map((s) => s.y + ry(s))),
+    // Frame the sources with room for the field around them.
+    k = Math.min(w / (maxX - minX + 3), h / (maxY - minY + 2.4)),
+    cx = (minX + maxX) / 2,
+    cy = (minY + maxY) / 2,
+    at = (x, y) => [w / 2 + (x - cx) * k, h / 2 - (y - cy) * k],
+    bounds = (margin) => ({
+      minX: cx - w / 2 / k - margin,
+      maxX: cx + w / 2 / k + margin,
+      minY: cy - h / 2 / k - margin,
+      maxY: cy + h / 2 / k + margin,
+    }),
+    electric = preset.mode === "electric",
+    lines = electric
+      ? electricFieldLines(scene, bounds(30 / k), {
+          linesPerNC: 4,
+          step: 3 / k,
+          startRadius: 3 / k,
+        })
+      : magneticFieldLines(scene, bounds(2 / k), {
+          cell: 2 / k,
+          count: 9,
+          coreRadius: 5 / k,
+        }).lines;
+  g.fillStyle = c.dark ? "#1c1a16" : "#f2f0e9";
+  g.fillRect(0, 0, w, h);
+  const sign = (v) => (v > 0 ? c.positive : v < 0 ? c.negative : c.neutral),
+    magnet = (s, draw) => {
+      g.save();
+      g.translate(...at(s.x, s.y));
+      g.rotate(-s.angle);
+      draw((s.length / 2) * k, (s.width / 2) * k, s.sheetCurrent >= 0 ? 1 : -1);
+      g.restore();
+    };
+  for (const s of list)
+    if (s.kind === "magnet")
+      magnet(s, (half, tall, north) => {
+        g.globalAlpha = 0.55;
+        g.fillStyle = c.negative;
+        g.fillRect(north > 0 ? -half : 0, -tall, half, 2 * tall);
+        g.fillStyle = c.positive;
+        g.fillRect(north > 0 ? 0 : -half, -tall, half, 2 * tall);
+        g.globalAlpha = 1;
+      });
+  g.strokeStyle = electric ? c.electric : c.magnetic;
+  g.lineWidth = 0.9;
+  g.lineJoin = "round";
+  for (const line of lines) {
+    g.beginPath();
+    line.forEach((p, i) => {
+      const [x, y] = at(p[0], p[1]);
+      if (i) g.lineTo(x, y);
+      else g.moveTo(x, y);
+    });
+    g.stroke();
+  }
+  for (const s of list) {
+    const [x, y] = at(s.x, s.y);
+    if (s.kind === "magnet")
+      magnet(s, (half, tall) => {
+        g.strokeStyle = c.ink;
+        g.lineWidth = 0.8;
+        g.strokeRect(-half, -tall, 2 * half, 2 * tall);
+      });
+    else if (s.kind === "plate") {
+      const dx = (Math.cos(s.angle) * s.length * k) / 2,
+        dy = (Math.sin(s.angle) * s.length * k) / 2;
+      g.strokeStyle = sign(s.density);
+      g.lineWidth = 2.6;
+      g.lineCap = "round";
+      g.beginPath();
+      g.moveTo(x - dx, y + dy);
+      g.lineTo(x + dx, y - dy);
+      g.stroke();
+    } else {
+      const charge = s.kind === "charge";
+      g.beginPath();
+      g.arc(x, y, 4, 0, 2 * Math.PI);
+      g.fillStyle = charge ? sign(s.charge) : c.panel;
+      g.fill();
+      g.strokeStyle = charge ? "#fff" : c.ink;
+      g.lineWidth = 1.1;
+      g.lineCap = "round";
+      if (!charge) g.stroke();
+      g.beginPath();
+      const value = charge ? s.charge : s.current;
+      if (charge || value < 0) {
+        // + and − for charges; × for current into the screen.
+        const d = charge ? 2.2 : 1.9,
+          tilt = charge ? [1, 0, 0, 1] : [1, 1, 1, -1];
+        g.moveTo(x - d * tilt[0], y - d * tilt[1]);
+        g.lineTo(x + d * tilt[0], y + d * tilt[1]);
+        if (!charge || value > 0) {
+          g.moveTo(x - d * tilt[2], y - d * tilt[3]);
+          g.lineTo(x + d * tilt[2], y + d * tilt[3]);
+        }
+        g.stroke();
+      } else {
+        // A dot for current out of the screen.
+        g.fillStyle = c.ink;
+        g.arc(x, y, 1.4, 0, 2 * Math.PI);
+        g.fill();
+      }
+    }
+  }
+}
+
 prefs.onchange = () => {
   buildForm();
   updateProbe();
 };
 // Theme and grid are website preferences changed in the settings panel.
-$("settings-panel").addEventListener("change", () => invalidate(false));
+// (The potential shading uses theme colours, so it is rebuilt.)
+$("settings-panel").addEventListener("change", () => invalidate());
 window
   .matchMedia?.("(prefers-color-scheme: dark)")
   ?.addEventListener?.("change", () => invalidate(false));

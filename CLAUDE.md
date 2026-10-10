@@ -75,7 +75,7 @@ Per body: Lorentz velocity update → gravity force → exponential damping. The
 
 ## Fields tool (`src/fieldlab/`)
 
-Static fields only: nothing is integrated in time, and the canvas is redrawn on change, not every frame. `FieldLab` is independent of `Sandbox` and of Matter.
+The sources are static and the canvas is redrawn on change. The one thing integrated in time is `TestCharges` (electric scene): the frame loop runs only while a test charge is moving. `FieldLab` is independent of `Sandbox` and of Matter.
 
 - The model is **SI throughout** (C, C/m², A, A/m, T, V), y up, angles anticlockwise in radians. `app.js` converts to nC, nC/m², µT and degrees for display; `FIELDS` there mirrors `LIMITS` in `model.js`.
 - The screen is a slice through a 3D arrangement. Point charges are true 3D charges (`kq/r²`). Plates, wires and magnets extend into the screen without end, so they are 2D sources (logarithmic potentials). Both kinds are mirror-symmetric about the screen, which is why the in-plane field is the whole field there.
@@ -83,6 +83,9 @@ Static fields only: nothing is integrated in time, and the canvas is redrawn on 
 - **Magnetic lines are contours of `A_z`** at equal steps (marching squares), so equal flux lies between neighbours. Do not replace this with integration along B: lines would stop closing.
 - **Electric lines are integrated** (RK4 on the unit field) from positive charges, evenly in angle, then backwards from negative charges where too few arrived. Plates and the region's edge are seeded by flux. A line that reaches a plate is finished with a straight step, because RK4 samples beyond the plate see a different field.
 - Uniform angular seeding cannot agree with flux for 3D charges in a flat slice (see the README). This is a stated limit of the picture, not a bug to fix by changing counts.
+- `TestCharges.step(dt)` is velocity Verlet with substeps that shorten near point charges. A test charge is +1 nC and 1 µg (`TEST_CHARGE`), feels the field without adding to it, and stops on a plate, at a negative charge, or out of range. Its path is not a field line (inertia); do not "fix" that.
+- Equipotentials come with the sampled potential grid, which `app.js` turns into the red/blue shading (opacity ∝ |V| up to the returned `scale`).
+- Placing anything returns the tool to Grab, as in the sandbox.
 - New behaviour needs a test in `tests/fieldlab.test.mjs` against the formula. `tests/fieldlab-smoke.mjs` drives the page in happy-dom; its `// ---- checks ----` part uses only DOM calls, so it can also be run inside a real browser.
 
 ## Code style

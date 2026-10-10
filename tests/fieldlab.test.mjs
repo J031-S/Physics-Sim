@@ -513,3 +513,132 @@ test("presets build, and the numbers their descriptions quote are right", () => 
   close(B("solenoid", 0, 1), 5e-6, 0.1);
   close(built["wire-in-field"].forceOn(1).y, 20e-6, 1e-6);
 });
+
+test("test charge: constant acceleration qE/m in a uniform field", async () => {
+  const { TestCharges, TEST_CHARGE } = await import("../src/fieldlab/model.js");
+  const lab = new FieldLab();
+  lab.setUniform("electric", { x: 6, y: -8 });
+  const tests = new TestCharges(lab),
+    id = tests.add(1, 2);
+  for (let i = 0; i < 120; i++) tests.step(1 / 120);
+  const t = tests.items.find((x) => x.id === id),
+    a = (TEST_CHARGE.charge / TEST_CHARGE.mass) * 10; // |E| = 10 N/C
+  close(t.time, 1, 1e-9, "time");
+  // s = ½at² along the field; v = at.
+  close(t.x - 1, 0.5 * a * 0.6, 1e-6, "x");
+  close(t.y - 2, -0.5 * a * 0.8, 1e-6, "y");
+  close(Math.hypot(t.vx, t.vy), a, 1e-6, "speed");
+  assert.ok(t.trail.length > 50, "leaves a trail");
+});
+
+test("test charge: kinetic energy gained equals qΔV", async () => {
+  const { TestCharges, TEST_CHARGE } = await import("../src/fieldlab/model.js");
+  const ratio = TEST_CHARGE.charge / TEST_CHARGE.mass;
+  // Repelled from rest by a positive charge.
+  const lab = new FieldLab();
+  lab.add("charge", { x: 0, y: 0, charge: 2 * nC });
+  const tests = new TestCharges(lab);
+  tests.add(0.3, 0.4);
+  for (let i = 0; i < 240; i++) tests.step(1 / 120);
+  let t = tests.items[0];
+  close(
+    0.5 * (t.vx ** 2 + t.vy ** 2),
+    ratio * (lab.potential(0.3, 0.4) - lab.potential(t.x, t.y)),
+    2e-3,
+    "½v² = (q/m)ΔV",
+  );
+  near(t.x * 0.4 - t.y * 0.3, 0, 1e-6, "straight out along the radius");
+  // It can never exceed the speed set by the whole potential drop to infinity.
+  assert.ok(
+    Math.hypot(t.vx, t.vy) < Math.sqrt(2 * ratio * lab.potential(0.3, 0.4)),
+  );
+
+  // A curved path past two charges and a plate: energy is still conserved.
+  const mixed = new FieldLab();
+  mixed.add("charge", { x: -1.5, y: 0, charge: 2 * nC });
+  mixed.add("charge", { x: 1.5, y: 0.5, charge: 3 * nC });
+  mixed.add("plate", { x: 0, y: -3, length: 4, density: 0.3 * nC });
+  const m = new TestCharges(mixed);
+  m.add(-1.2, 0.6);
+  for (let i = 0; i < 180; i++) m.step(1 / 60);
+  t = m.items[0];
+  assert.equal(t.moving, true);
+  close(
+    0.5 * (t.vx ** 2 + t.vy ** 2),
+    ratio * (mixed.potential(-1.2, 0.6) - mixed.potential(t.x, t.y)),
+    2e-3,
+    "energy on a curved path",
+  );
+});
+
+test("test charge: lands on a plate after √(2d/a), is absorbed by a negative charge", async () => {
+  const { TestCharges, TEST_CHARGE } = await import("../src/fieldlab/model.js");
+  const ratio = TEST_CHARGE.charge / TEST_CHARGE.mass,
+    lab = new FieldLab(),
+    sigma = 0.2 * nC;
+  lab.add("plate", { x: 0, y: 0.1, length: 20, density: sigma });
+  lab.add("plate", { x: 0, y: -0.1, length: 20, density: -sigma });
+  const tests = new TestCharges(lab);
+  tests.add(0, 0.09);
+  for (let i = 0; i < 60 && tests.moving; i++) tests.step(1 / 120);
+  let t = tests.items[0];
+  assert.equal(t.moving, false);
+  assert.equal(t.end, "plate");
+  near(t.y, -0.1, 1e-9, "on the negative plate");
+  near(t.x, 0, 1e-6);
+  close(
+    t.time,
+    Math.sqrt((2 * 0.19) / ((ratio * sigma) / EPS0)),
+    0.01,
+    "fall time",
+  );
+  // Once stopped it stays put.
+  tests.step(1);
+  near(t.y, -0.1, 1e-9);
+
+  const dipole = new FieldLab();
+  dipole.add("charge", { x: -1.5, y: 0, charge: 2 * nC });
+  const negative = dipole.add("charge", { x: 1.5, y: 0, charge: -2 * nC });
+  const d = new TestCharges(dipole, { captureRadius: 0.1 });
+  // Released on the line joining them, it runs straight into the negative
+  // charge. (Released off that line it has inertia, leaves its field line,
+  // and can miss.)
+  d.add(-1, 0);
+  for (let i = 0; i < 2000 && d.moving; i++) d.step(1 / 120);
+  t = d.items[0];
+  assert.equal(t.end, "charge");
+  near(t.y, 0, 1e-9, "stays on the axis");
+  assert.ok(Math.abs(t.x - 1.5) < 0.1, "at the negative charge");
+  // Speed on arrival from energy: ½v² = (q/m)(V₀ − V).
+  close(
+    0.5 * t.vx ** 2,
+    ratio * (dipole.potential(-1, 0) - dipole.potential(t.x, 0)),
+    5e-3,
+    "arrival speed",
+  );
+  assert.ok(dipole.get(negative));
+  // The field is unchanged by the test charges.
+  close(dipole.electricField(0, 0)[0], (2 * K_E * 2 * nC) / 1.5 ** 2, 1e-9);
+  assert.throws(() => d.add(-1.5, 0.01), /clear of the other charges/);
+  d.clear();
+  assert.equal(d.items.length, 0);
+});
+
+test("equipotentials also return the sampled potential for shading", () => {
+  const lab = new FieldLab();
+  lab.add("charge", { x: -1.5, y: 0, charge: 2 * nC });
+  lab.add("charge", { x: 1.5, y: 0, charge: -2 * nC });
+  const { grid, scale } = equipotentialLines(lab, BOUNDS, { cell: 0.1 });
+  assert.equal(grid.values.length, grid.nx * grid.ny);
+  assert.ok(scale > 0);
+  // Node (i, j) is the potential at (minX + i·cell, minY + j·cell): positive
+  // on the positive charge's side, negative on the other, zero between.
+  const at = (x, y) =>
+    grid.values[
+      Math.round((y - grid.minY) / grid.cell) * grid.nx +
+        Math.round((x - grid.minX) / grid.cell)
+    ];
+  close(at(-3, 1), lab.potential(-3, 1), 1e-9);
+  assert.ok(at(-3, 1) > 0 && at(3, 1) < 0);
+  near(at(0, 2), 0, 1e-9);
+});

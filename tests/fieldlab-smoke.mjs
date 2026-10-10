@@ -152,14 +152,22 @@ key("ArrowLeft");
 key("z");
 assert.equal($("snap-toggle").checked, false);
 
-// Place a negative charge, then delete it with the keyboard.
+// Place a negative charge: it is selected and the tool returns to Grab, as
+// in the mechanics sandbox. Then delete it with the keyboard.
 document.querySelector('[data-add="negative"]').click();
 assert.equal($("tool-name").textContent, "Negative charge");
 click(at(0, 2));
 assert.equal(count(), 3);
 assert.equal(field("charge").value, "-1");
-key("Escape");
 assert.equal($("tool-name").textContent, "Grab");
+assert.equal(
+  document.querySelector('[data-add="negative"]').getAttribute("aria-pressed"),
+  "false",
+);
+// So a second click on the scene does not place another.
+click(at(3, 2.5));
+assert.equal(count(), 3);
+click(at(0, 2));
 key("Delete");
 assert.equal(count(), 2);
 assert.equal($("selection").hidden, true);
@@ -167,7 +175,7 @@ assert.equal($("selection").hidden, true);
 // A plate: place, rotate by Ctrl-drag and by its angle box.
 document.querySelector('[data-add="plate"]').click();
 click(at(0, -2));
-key("Escape");
+assert.equal($("tool-name").textContent, "Grab");
 assert.equal($("selected-name").textContent, "Charged plate");
 assert.equal(field("angle").value, "0");
 pointer("pointerdown", at(1, -2), { ctrlKey: true });
@@ -183,9 +191,13 @@ $("delete").click();
 assert.equal(count(), 2);
 
 // Display toggles and line density.
+assert.equal($("potential-legend").hidden, true);
 $("show-equipotentials").click();
 frame();
 assert.match($("equipotential-step").textContent, /^every [\d.]+ V$/);
+// The shading's key says where it reaches full strength.
+assert.equal($("potential-legend").hidden, false);
+assert.match($("potential-legend-text").textContent, /full at ±[\d.]+ V/);
 key("a");
 assert.equal($("show-arrows").checked, true);
 key("f");
@@ -228,9 +240,10 @@ assert.equal($("selected-name").textContent, "Straight wire");
 assert.match($("source-note").textContent, /10\.0 µN\/m at 0°/);
 set(field("current"), -10);
 assert.match($("source-note").textContent, /10\.0 µN\/m at 180°/);
+assert.equal(document.querySelector('[data-add="test"]').hidden, true);
 document.querySelector('[data-add="magnet"]').click();
 click(at(0, -2));
-key("Escape");
+assert.equal($("tool-name").textContent, "Grab");
 assert.equal($("selected-name").textContent, "Bar magnet / solenoid");
 assert.match($("source-note").textContent, /μ₀nI = 62\.8 µT/);
 assert.equal(count(), 3);
@@ -253,6 +266,12 @@ assert.equal($("uniform-electric-x").value, "10");
 $("presets-toggle").click();
 const buttons = [...document.querySelectorAll("#preset-list .preset")];
 assert.ok(buttons.length >= 12);
+// Every preset has a preview picture beside its text.
+for (const b of buttons) {
+  assert.equal(b.firstElementChild.tagName, "CANVAS");
+  assert.equal(b.firstElementChild.className, "preset-preview");
+  assert.ok(b.querySelector(".preset-text strong").textContent);
+}
 document.querySelector('[data-preset="solenoid"]').click();
 assert.equal($("presets-panel").hidden, true);
 assert.match($("scene-status").textContent, /Magnetic scene · 1 source/);
@@ -260,6 +279,33 @@ frame();
 document.querySelector('[data-preset="parallel-plates"]').click();
 assert.match($("scene-status").textContent, /Electric scene · 2 sources/);
 assert.equal($("uniform-electric-x").value, "0");
+frame();
+
+// Test charges: released from rest between the plates (6 m long, 1 m apart,
+// E ≈ 20 N/C downwards), one falls 0.5 m onto the negative plate in
+// √(2d/a) ≈ 0.22 s, with a = qE/m ≈ 20 m/s².
+assert.equal($("test-row").hidden, true);
+key("t");
+assert.equal($("tool-name").textContent, "Test charge");
+click(at(0, 0));
+assert.equal($("tool-name").textContent, "Grab");
+assert.equal(count(), 2, "a test charge is not a source");
+assert.equal($("test-row").hidden, false);
+assert.equal($("test-status").textContent, "1 test charge · 1 moving");
+for (let i = 0; i < 10; i++) frame(); // 1/60 s each
+assert.equal($("test-status").textContent, "1 test charge · 1 moving");
+for (let i = 0; i < 8; i++) frame();
+assert.equal($("test-status").textContent, "1 test charge · 0 moving");
+// It may not be dropped onto a charge, and Clear removes them all.
+document.querySelector('[data-add="test"]').click();
+click(at(1, 0.2));
+assert.equal($("test-status").textContent, "2 test charges · 1 moving");
+key("m");
+assert.equal($("test-row").hidden, true);
+key("e");
+assert.equal($("test-row").hidden, false);
+$("clear-tests").click();
+assert.equal($("test-row").hidden, true);
 frame();
 
 // View controls.
