@@ -54,9 +54,11 @@ The net force is `sim.netForce()` (gravity, contact, friction, rod, spring and c
 
 ### Readouts and scene energy
 
-Selecting a single body adds a collapsible **Readouts** section to the bottom-right panel, updated every frame: position x, y (m), velocity vx, vy and speed (m/s), acceleration ax, ay (m/s², the net force ÷ mass, using the same 6-step average as the net force arrow), momentum px, py (kg·m/s), kinetic energy (translational + rotational) and gravitational potential energy measured from the floor (J).
+Selecting a single body adds a collapsible **Readouts** section to the bottom-right panel, updated every frame: position x, y (m), velocity vx, vy and speed (m/s), acceleration ax, ay (m/s², the net force ÷ mass, using the same 6-step average as the net force arrow), momentum px, py (kg·m/s), kinetic energy (translational + rotational), gravitational potential energy measured from the floor, and, once the scene has a charged body, electric potential energy (J): the body's energy in the global uniform field plus half of each Coulomb pair it belongs to.
 
-The **Scene energy** box in the top-right corner shows the total mechanical energy and a stacked bar of its kinetic, gravitational and elastic (spring) parts, with each value listed beside it. A hatched segment is negative (for example gravitational energy with reversed gravity). Electric potential energy is not included. It appears once the scene has a body or connection and can be collapsed. All values use three significant figures in fixed-width digits so they do not jitter.
+The **Scene energy** box in the top-right corner shows the total mechanical energy and a stacked bar of its kinetic, gravitational and elastic (spring) parts, with each value listed beside it. A hatched segment is negative (for example gravitational energy with reversed gravity, or the electric energy of opposite charges). When the scene has a charged body an **Electric** part appears: potential energy in the global uniform field (zero at the origin) plus mutual Coulomb energy; it is often negative.
+
+Placed field **regions** have sharp edges, so their fields have no potential energy. Instead the box shows **Supplied by field regions**, the work they have done on charges so far, and **Total − supplied**. That last number is the one that stays constant (without friction, damping or inelastic impacts), so watch it when checking energy conservation with field regions. The graph offers **Electric PE** for the selected body and **Total − supplied by field regions** for the scene. It appears once the scene has a body or connection and can be collapsed. All values use three significant figures in fixed-width digits so they do not jitter.
 
 ### Graphs
 

@@ -1055,6 +1055,41 @@ for (const open of [
   key(" ");
   $("graph-panel").open = false;
 }
+// Electric energy: rows appear only with a charged body; field-region work
+// is reported separately and total − supplied stays constant.
+{
+  clearScene();
+  key("b");
+  click(500, 150);
+  frames(1);
+  for (const el of document.querySelectorAll(
+    '[data-row="electric"], .electric-row, .electric-option',
+  ))
+    assert.equal(el.hidden, true, "mechanics scenes hide electric rows");
+  assert.equal($("field-work").hidden, true);
+  $("presets-toggle").click();
+  document.querySelector('[data-preset="velocity-selector"]').click();
+  frames(1);
+  assert.equal($("energy-electric").hidden, false);
+  assert.equal($("field-work").hidden, true, "no work done yet");
+  const start = Number($("energy-total").textContent.split(" ")[0]);
+  key(" ");
+  frames(60);
+  key(" ");
+  frames(1);
+  assert.equal($("field-work").hidden, false);
+  assert.notEqual($("energy-field-work").textContent, "0.00");
+  assert.ok(
+    Math.abs(Number($("energy-conserved").textContent) - start) < 0.05,
+    `${$("energy-conserved").textContent} vs ${start}`,
+  );
+  $("presets-toggle").click();
+  document.querySelector('[data-preset="coulomb-orbit"]').click();
+  frames(1);
+  assert.ok(Number($("energy-electric").textContent) < 0, "attraction");
+  assert.equal(document.querySelector(".electric-option").hidden, false);
+  assert.equal(document.querySelector('[data-row="electric"]').hidden, false);
+}
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );

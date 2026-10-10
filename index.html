@@ -220,11 +220,19 @@
           class="energy-bar"
           role="img"
           id="energy-bar"
-          aria-label="Share of kinetic, gravitational and elastic energy"
+          aria-label="Share of kinetic, gravitational, elastic and electric energy"
         >
           <span class="kinetic" id="bar-kinetic"></span
           ><span class="gravitational" id="bar-gravitational"></span
-          ><span class="elastic" id="bar-elastic"></span>
+          ><span class="elastic" id="bar-elastic"></span
+          ><span class="electric" id="bar-electric"></span>
+        </div>
+        <div id="field-work" class="field-work" hidden>
+          <span>Supplied by field regions</span
+          ><span class="num" id="energy-field-work"></span
+          ><span class="unit">J</span> <span>Total − supplied</span
+          ><span class="num" id="energy-conserved"></span
+          ><span class="unit">J</span>
         </div>
         <div class="energy-rows">
           <span class="key kinetic" aria-hidden="true"></span
@@ -237,6 +245,10 @@
           <span class="key elastic" aria-hidden="true"></span
           ><span>Elastic</span><span class="num" id="energy-elastic"></span
           ><span class="unit">J</span>
+          <span class="key electric electric-row" aria-hidden="true"></span
+          ><span class="electric-row">Electric</span
+          ><span class="num electric-row" id="energy-electric"></span
+          ><span class="unit electric-row">J</span>
         </div>
       </details>
       <div id="vector-legend" class="vector-legend" hidden>
@@ -320,7 +332,13 @@
               <option value="vy">Velocity vy (m/s)</option>
               <option value="speed">Speed (m/s)</option>
               <option value="kinetic">Kinetic energy (J)</option>
+              <option value="electric" class="electric-option">
+                Electric PE (J)
+              </option>
               <option value="total">Total scene energy (J)</option>
+              <option value="conserved" class="electric-option">
+                Total − supplied by field regions (J)
+              </option>
             </select></label
           >
           <canvas

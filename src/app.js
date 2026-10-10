@@ -1850,7 +1850,9 @@ const GRAPH_SPAN = 20,
     vy: "m/s",
     speed: "m/s",
     kinetic: "J",
+    electric: "J",
     total: "J",
+    conserved: "J",
   },
   graphSamples = [];
 function sampleGraph() {
@@ -1862,7 +1864,8 @@ function sampleGraph() {
   // Time went backwards (Reset or a loaded scene): start again.
   if (last && t < last.t) graphSamples.length = 0;
   const s = sim.state(o.id),
-    m = sim.measure(o.id);
+    m = sim.measure(o.id),
+    e = sim.energy();
   graphSamples.push({
     t,
     x: s.x,
@@ -1871,7 +1874,9 @@ function sampleGraph() {
     vy: s.vy,
     speed: m.speed,
     kinetic: m.kinetic,
-    total: sim.energy().total,
+    electric: m.electric,
+    total: e.total,
+    conserved: e.total - e.fieldWork,
   });
   while (graphSamples[0].t < t - GRAPH_SPAN) graphSamples.shift();
 }
@@ -1997,27 +2002,38 @@ const READOUT_ROWS = [
   ["momentum", "Momentum px, py", 2, "kg·m/s"],
   ["kinetic", "Kinetic energy", 1, "J"],
   ["gravitational", "Gravitational PE", 1, "J"],
+  ["electric", "Electric PE", 1, "J"],
 ];
 {
   const grid = $("readout-grid");
   for (const [key, label, count, unit] of READOUT_ROWS) {
-    const name = document.createElement("span");
+    const name = document.createElement("span"),
+      cells = [name];
     name.textContent = label;
-    grid.append(name);
     for (let i = 0; i < 2; i++) {
       const value = document.createElement("span");
       value.className = "num";
       if (i < count) value.id = `readout-${key}-${i}`;
-      grid.append(value);
+      cells.push(value);
     }
     const units = document.createElement("span");
     units.className = "unit";
     units.textContent = unit;
-    grid.append(units);
+    cells.push(units);
+    for (const cell of cells) cell.dataset.row = key;
+    grid.append(...cells);
   }
 }
 function updateReadouts() {
-  const o = sim.objects.get(selected);
+  const o = sim.objects.get(selected),
+    // Electric rows only appear once the scene has a charged body.
+    charged = [...sim.objects.values()].some((b) => b.charge);
+  for (const el of document.querySelectorAll(
+    '[data-row="electric"], .electric-row, .electric-option',
+  ))
+    el.hidden = !charged;
+  if ($("graph-quantity").selectedOptions[0]?.hidden)
+    $("graph-quantity").value = "total";
   $("readout").hidden = !o || selectionSet.size > 1;
   $("graph-panel").hidden = $("readout").hidden;
   if (o && $("readout").open) {
@@ -2033,6 +2049,7 @@ function updateReadouts() {
         momentum: [m.momentum.x, m.momentum.y],
         kinetic: [m.kinetic],
         gravitational: [m.gravitational],
+        electric: [m.electric],
       };
     for (const [key, list] of Object.entries(values))
       list.forEach((v, i) => ($(`readout-${key}-${i}`).textContent = sig3(v)));
@@ -2041,9 +2058,14 @@ function updateReadouts() {
   $("energy-panel").hidden = empty;
   if (empty || !$("energy-panel").open) return;
   const e = sim.energy(),
-    parts = ["kinetic", "gravitational", "elastic"],
+    parts = ["kinetic", "gravitational", "elastic", "electric"],
     sum = parts.reduce((t, k) => t + Math.abs(e[k]), 0);
   $("energy-total").textContent = `${sig3(e.total)} J`;
+  // Field regions are not conservative: the energy they have supplied is
+  // reported separately, and total − supplied is the conserved quantity.
+  $("field-work").hidden = Math.abs(e.fieldWork) < 1e-9;
+  $("energy-field-work").textContent = sig3(e.fieldWork);
+  $("energy-conserved").textContent = sig3(e.total - e.fieldWork);
   for (const k of parts) {
     $("energy-" + k).textContent = sig3(e[k]);
     const bar = $("bar-" + k);
