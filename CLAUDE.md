@@ -25,6 +25,7 @@ No bundler, no framework, no runtime dependencies. `index.html` loads `vendor/ma
 | --- | --- |
 | `src/physics.js` | `Sandbox`: bodies, global settings, locks, grab/throw, resize, springs, rods, spring guides, the fixed-step `step()` |
 | `src/contacts.js` | Contact response: Coulomb friction, restitution, exact circle contact. Replaces Matter's velocity resolver; runs a resting-contact pass before `Engine.update` |
+| `src/presets.js` | Ready-made experiment scenes, each built through the public `Sandbox` API and checked against its textbook result in `tests/scenes.test.mjs` |
 | `src/fields.js` | Field regions, gradient profiles, superposition, Lorentz velocity update, pairwise Coulomb forces |
 | `src/mechanisms.js` | Belts, conveyor contact, delegation to pulley cables |
 | `src/pulley.js` | Tangent cable geometry and the coupled position/velocity cable solver |
@@ -48,6 +49,17 @@ No bundler, no framework, no runtime dependencies. `index.html` loads `vendor/ma
 - Inertia comes from `Sandbox.momentOfInertia(o)` (textbook disc / rectangle / right triangle), never from Matter, which scales polygon inertia by 4. Call it after any change to mass or dimensions.
 - Position lock = `inverseMass 0` plus anchor restore; rotation lock = infinite inertia. `o.mass` and `o.freeInertia` hold the real values, so restore from those, never from the body.
 - Link records live in `sim.links` with `type` of `spring`, `rod`, `belt` or `pulley`. Only rods use a Matter `Constraint`; the others are solved by this code.
+
+## Engine API for UI features
+
+These exist on `Sandbox` and are covered by tests; the UI should call them rather than reach into Matter bodies.
+
+- `updateFloor({ friction, restitution })`, `floorMaterial`: floor and walls share one material.
+- `exportScene()` → plain JSON; `Sandbox.fromScene(json)` → new sandbox (throws a readable `Error` on a bad file). Use this pair for save/load, presets and reset-to-start.
+- `setPose(id, { x, y, angle })`, `setVelocity(id, { vx, vy, omega })`: exact placement for building scenes.
+- `netForce(id)` → `{ x, y }` in newtons over the last step, including contact, friction, rod and cable forces.
+- `measure(id)` → speed, momentum, kinetic (translational + rotational) and gravitational energy; `energy()` → scene totals including springs.
+- `step()` advances exactly one 1/120 s step and can be called while paused.
 
 ## Order of operations in `step()`
 
