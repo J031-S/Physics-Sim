@@ -682,14 +682,63 @@ $("material-menu").addEventListener("keydown", (e) => {
   }
 });
 $("material-menu").addEventListener("contextmenu", (e) => e.preventDefault());
+// A press outside an open panel closes it: the constants menu and category
+// drop-downs on any outside press, Settings and Keys on a press on the scene.
+// A scene press that closed something is swallowed (through its pointerup or
+// context menu) so it does not also place an object or start a drag.
+let swallowed = null;
 document.addEventListener(
   "pointerdown",
   (e) => {
+    swallowed = null;
+    let closed = false;
     if (!$("material-menu").hidden && !$("material-menu").contains(e.target)) {
       if ($("material-menu").contains(document.activeElement))
         document.activeElement.blur();
       closeMenu();
+      closed = true;
     }
+    for (const group of document.querySelectorAll(".tool-category"))
+      if (
+        !group.querySelector(".category-menu").hidden &&
+        !group.contains(e.target)
+      ) {
+        closeCategories();
+        closed = true;
+      }
+    if (e.target === canvas)
+      for (const panel of ["settings-panel", "keys-panel"])
+        if (!$(panel).hidden) {
+          if (panel === "settings-panel") closeSettings();
+          else $(panel).hidden = true;
+          closed = true;
+        }
+    if (closed && e.target === canvas) {
+      e.stopPropagation();
+      e.preventDefault();
+      canvas.focus();
+      swallowed = { id: e.pointerId, button: e.button };
+    }
+  },
+  true,
+);
+document.addEventListener(
+  "pointerup",
+  (e) => {
+    if (!swallowed || e.pointerId !== swallowed.id) return;
+    e.stopPropagation();
+    // A right-button press still has its context menu to come.
+    if (swallowed.button !== 2) swallowed = null;
+  },
+  true,
+);
+document.addEventListener(
+  "contextmenu",
+  (e) => {
+    if (!swallowed || e.target !== canvas) return;
+    e.stopPropagation();
+    e.preventDefault();
+    swallowed = null;
   },
   true,
 );

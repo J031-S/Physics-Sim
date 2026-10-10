@@ -796,6 +796,23 @@ frames(2);
 key(" ");
 assert.equal($("pause").dataset.icon, "play");
 assert.equal($("selected-name").textContent, "Wedge");
+// A scene press closes open panels without placing anything.
+for (const open of [
+  () => $("settings-toggle").click(),
+  () => $("shortcuts").click(),
+  () => $("category-bodies").click(),
+]) {
+  $("clear").click();
+  key("b");
+  open();
+  click(500, 250);
+  assert.equal($("settings-panel").hidden, true);
+  assert.equal($("keys-panel").hidden, true);
+  assert.equal($("menu-bodies").hidden, true);
+  assert.equal($("selection").hidden, true, "closing press placed nothing");
+  click(500, 250);
+  assert.equal($("selected-name").textContent, "Ball", "next press places");
+}
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );
