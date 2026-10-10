@@ -42,6 +42,7 @@ const view = { scale: 65, x: 0, y: 0, width: 0, height: 0 };
 function toast(message) {
   $("toast").textContent = message;
   $("toast").classList.add("show");
+  placeToast();
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => $("toast").classList.remove("show"), 3000);
 }
@@ -1632,9 +1633,18 @@ document.addEventListener("visibilitychange", () => {
   last = 0;
   accumulator = 0;
 });
+// Switch the header to icon-only buttons when its full labels do not fit.
+function fitHeader() {
+  const header = document.querySelector("header");
+  document.body.classList.remove("compact-header");
+  if (header.scrollWidth > header.clientWidth)
+    document.body.classList.add("compact-header");
+}
 window.addEventListener("resize", () => {
   if (menuId) positionMenu();
+  fitHeader();
 });
+$("ui-size").addEventListener("input", fitHeader);
 function impulseVector() {
   const gain = Number($("impulse-gain").value);
   const factor = Number.isFinite(gain)
@@ -2065,6 +2075,67 @@ function updateReadouts() {
     bar.classList.toggle("negative", e[k] < 0);
   }
 }
+// Keep the floating panels from covering each other. The top toolbar and the
+// tool-options strip are centred in the free space between the edit bar and
+// the energy box; if they do not fit there, the energy box drops below them.
+// Positions are set in CSS px, which the panels' GUI-size zoom multiplies.
+function layoutOverlays() {
+  const zoom = prefs.size / 100,
+    main = canvas.getBoundingClientRect(),
+    toolbar = document.querySelector(".tools"),
+    options = $("tool-settings"),
+    energy = $("energy-panel"),
+    edit = document.querySelector(".edit-tools").getBoundingClientRect(),
+    bar = toolbar.getBoundingClientRect();
+  options.style.top = toolbar.offsetTop + toolbar.offsetHeight + 8 + "px";
+  if (!bar.width) return; // no layout (e.g. the DOM test)
+  const left = edit.right - main.left + 8;
+  let right = main.width - 8;
+  energy.style.top = "";
+  const box = energy.hidden ? null : energy.getBoundingClientRect(),
+    beside = box && box.left - main.left - 8 - left >= bar.width;
+  if (beside) right = box.left - main.left - 8;
+  const centre = (left + right) / 2;
+  toolbar.style.left = centre / zoom + "px";
+  options.style.left = centre / zoom + "px";
+  options.style.maxWidth = Math.max(200, right - left) / zoom + "px";
+  if (box && !beside) {
+    const below = Math.max(
+      bar.bottom,
+      options.hidden ? 0 : options.getBoundingClientRect().bottom,
+    );
+    energy.style.top = (below - main.top + 8) / zoom + "px";
+  }
+}
+// Toasts sit low in the middle of the scene; raise one above any bottom
+// panel it would otherwise cover.
+function placeToast() {
+  const el = $("toast"),
+    main = canvas.getBoundingClientRect();
+  el.style.bottom = "";
+  for (let pass = 0; pass < 3; pass++) {
+    const t = el.getBoundingClientRect();
+    if (!t.width) return;
+    let bottom = null;
+    for (const other of [
+      document.querySelector(".camera-controls"),
+      $("vector-legend"),
+      $("selection"),
+    ]) {
+      if (other.hidden) continue;
+      const o = other.getBoundingClientRect();
+      if (
+        o.left < t.right &&
+        o.right > t.left &&
+        o.top < t.bottom &&
+        o.bottom > t.top
+      )
+        bottom = Math.max(bottom ?? 0, main.top + main.height - o.top + 8);
+    }
+    if (bottom === null) return;
+    el.style.bottom = bottom + "px";
+  }
+}
 function draw() {
   const r = canvas.getBoundingClientRect(),
     dpr = window.devicePixelRatio || 1;
@@ -2098,17 +2169,7 @@ function draw() {
       maxY: view.y / view.scale,
     });
   $("zoom-level").textContent = Math.round((view.scale / 65) * 100) + "%";
-  const toolbar = document.querySelector(".tools"),
-    editBar = document.querySelector(".edit-tools");
-  $("tool-settings").style.top =
-    toolbar.offsetTop + toolbar.offsetHeight + 8 + "px";
-  // Keep the centred options strip clear of the left-hand edit bar.
-  $("tool-settings").style.maxWidth =
-    Math.max(
-      200,
-      canvas.clientWidth / (prefs.size / 100) -
-        2 * (editBar.offsetLeft + editBar.offsetWidth + 8),
-    ) + "px";
+  layoutOverlays();
   const dark = document.documentElement.dataset.theme === "dark";
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, r.width, r.height);
@@ -2458,5 +2519,6 @@ for (const [key, t] of Object.entries({
 chooseTool("grab");
 snapStatus();
 updateVectorLegend();
+fitHeader();
 draw();
 requestAnimationFrame(frame);

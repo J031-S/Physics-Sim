@@ -1004,20 +1004,22 @@ button:disabled {
     display: none;
   }
 }
-/* Narrow windows: header buttons keep their icon, tooltip and accessible
-   name; only Run/Pause keeps its visible label. */
-@media (max-width: 1000px) {
-  .playback button:not(#pause) > span {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-  }
-  .playback {
-    gap: 4px;
-  }
+/* When the header does not fit (narrow window or large GUI size; set by
+   fitHeader() in app.js), header buttons keep their icon, tooltip and
+   accessible name; only Run/Pause keeps its visible label. */
+.compact-header .playback button:not(#pause) > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+.compact-header .playback {
+  gap: 4px;
+}
+.compact-header .subtitle {
+  display: none;
 }
 #clear-confirm {
   position: fixed;
@@ -1246,4 +1248,7 @@ button:disabled {
 .field-work > span:nth-child(4),
 .field-work > span:nth-child(5) {
   font-weight: 600;
+}
+.playback button {
+  white-space: nowrap;
 }
