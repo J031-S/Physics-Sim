@@ -8,6 +8,7 @@ export function drawFields(
   scale,
   selected,
   visible = null,
+  dark = false,
 ) {
   const arrow = (x, y, dx, dy, size = 5) => {
     ctx.beginPath();
@@ -39,7 +40,15 @@ export function drawFields(
     else ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, 2 * Math.PI);
     ctx.fillStyle = f.type === "electric" ? "#dea73918" : "#9874cb18";
     ctx.fill();
-    ctx.strokeStyle = f.type === "electric" ? "#ae7d24" : "#8060ae";
+    // Lighter outlines and indicators on the dark theme for contrast.
+    ctx.strokeStyle =
+      f.type === "electric"
+        ? dark
+          ? "#e0a94a"
+          : "#ae7d24"
+        : dark
+          ? "#a891e0"
+          : "#8060ae";
     ctx.lineWidth = selected(f.id) ? 2.5 : 1;
     ctx.setLineDash([6, 4]);
     ctx.stroke();

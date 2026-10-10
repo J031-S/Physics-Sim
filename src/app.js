@@ -1833,7 +1833,8 @@ function lockGlyph(o, p, dark, size) {
 // view cluster, averaged over the last few steps because a collision is a
 // single-step spike; long force arrows are capped and marked with a break.
 const VELOCITY_PX = 12,
-  VELOCITY_COLOUR = "#497caa",
+  // Velocity arrows; the dark theme gets a lighter blue for contrast.
+  VELOCITY_COLOUR = { light: "#497caa", dark: "#6fa8ec" },
   FORCE_CAP = 180,
   FORCE_STEPS = 6,
   forceHistory = new Map();
@@ -2393,7 +2394,15 @@ function draw() {
     x += labelStep
   )
     ctx.fillText(x + " m", screen({ x, y: 0 }).x + 4, view.y + 16);
-  drawFields(ctx, sim.fields, screen, view.scale, highlighted, { min, max });
+  drawFields(
+    ctx,
+    sim.fields,
+    screen,
+    view.scale,
+    highlighted,
+    { min, max },
+    dark,
+  );
   for (const l of sim.links.values()) {
     if (["belt", "pulley"].includes(l.type)) {
       const path = linkPath(l).map(screen);
@@ -2429,12 +2438,16 @@ function draw() {
         );
       }
     ctx.lineTo(b.x, b.y);
-    ctx.strokeStyle = highlighted(l.id) ? "#566b91" : "#879579";
+    ctx.strokeStyle = highlighted(l.id)
+      ? dark
+        ? "#8fa8d8"
+        : "#566b91"
+      : "#879579";
     ctx.lineWidth = l.type === "rod" ? 3 : 1.8;
     ctx.stroke();
     if (l.type === "spring" && l.lockAngle) {
       ctx.font = "10px system-ui";
-      ctx.fillStyle = "#46553e";
+      ctx.fillStyle = dark ? "#a9c49d" : "#46553e";
       ctx.fillText("axis locked", (a.x + b.x) / 2 + 8, (a.y + b.y) / 2 - 12);
     }
     for (const [id, p] of [
@@ -2444,7 +2457,7 @@ function draw() {
       if (!id) {
         ctx.beginPath();
         ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = "#65775c";
+        ctx.fillStyle = dark ? "#a9c49d" : "#65775c";
         ctx.fill();
       }
   }
@@ -2474,7 +2487,14 @@ function draw() {
     ctx.stroke();
     drawRuler(o, s);
     if (o.charge) {
-      ctx.fillStyle = o.charge > 0 ? "#bd5948" : "#467cb8";
+      ctx.fillStyle =
+        o.charge > 0
+          ? dark
+            ? "#f08a78"
+            : "#bd5948"
+          : dark
+            ? "#7fb2f0"
+            : "#467cb8";
       ctx.font = "bold 11px system-ui";
       ctx.fillText(
         (o.charge > 0 ? "+" : "") + o.charge + " C",
@@ -2497,7 +2517,7 @@ function draw() {
           p,
           s.vx * VELOCITY_PX,
           s.vy * VELOCITY_PX,
-          VELOCITY_COLOUR,
+          VELOCITY_COLOUR[dark ? "dark" : "light"],
           highlighted(o.id) && fixed(speed) + " m/s",
         );
     }
@@ -2557,14 +2577,15 @@ function draw() {
         };
       const end = screen({ x: o.x + delta.x, y: o.y + delta.y }),
         a = Math.atan2(end.y - start.y, end.x - start.x);
-      line(start, end, "#c16145", 3);
+      const impulseColour = dark ? "#e9826e" : "#c16145";
+      line(start, end, impulseColour, 3);
       line(
         end,
         {
           x: end.x - 10 * Math.cos(a - 0.45),
           y: end.y - 10 * Math.sin(a - 0.45),
         },
-        "#c16145",
+        impulseColour,
         3,
       );
       line(
@@ -2573,11 +2594,11 @@ function draw() {
           x: end.x - 10 * Math.cos(a + 0.45),
           y: end.y - 10 * Math.sin(a + 0.45),
         },
-        "#c16145",
+        impulseColour,
         3,
       );
       const v = impulseVector();
-      ctx.fillStyle = "#c16145";
+      ctx.fillStyle = impulseColour;
       ctx.font = "12px system-ui";
       ctx.fillText(
         Math.hypot(v.x, v.y).toFixed(2) +

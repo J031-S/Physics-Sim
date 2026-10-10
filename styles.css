@@ -1244,3 +1244,20 @@ button:disabled {
 :root[data-theme="dark"] .tools {
   border-color: var(--line);
 }
+/* Data colours re-stepped for the dark surface (validated as a stacked bar:
+   lightness, chroma, adjacent colour-blind separation, 3:1 contrast). */
+:root[data-theme="dark"] .kinetic {
+  background: #3987e5;
+}
+:root[data-theme="dark"] .gravitational {
+  background: #199e70;
+}
+:root[data-theme="dark"] .elastic {
+  background: #c98500;
+}
+:root[data-theme="dark"] .electric {
+  background: #d55181;
+}
+:root[data-theme="dark"] .swatch.velocity {
+  color: #6fa8ec;
+}
