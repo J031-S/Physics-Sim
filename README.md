@@ -195,10 +195,12 @@ The **Display** panel chooses what is drawn:
 
 - **Field lines** (`L`), with arrows along the field.
 - **Field arrows** (`A`) on a grid. Length and opacity grow with the square root of the field strength relative to the strongest tenth on screen: a guide to strength, not a scale.
-- **Equipotentials** (electric scene only), dashed, at equal steps of a round number of volts shown beside the tick box. The 0 V line is solid. The scene behind them is shaded by potential: red where V is positive, blue where it is negative, and more opaque the larger |V| is. The opacity is proportional to |V| up to the value shown in the key ("full at ±…"), which is the largest potential outside the 3% of the screen closest to the charges; nearer than that the shading stays at full strength.
+- **Equipotentials** (electric scene only), thin green lines at equal steps of a round number of volts shown beside the tick box. The 0 V line is heavier. The scene behind them is shaded by potential: red where V is positive, blue where it is negative, and more opaque the larger |V| is. The opacity is proportional to |V| up to the value shown in the key ("full at ±…"), which is the largest potential outside the 3% of the screen closest to the charges; nearer than that the shading stays at full strength.
 - **Forces** (`F`): the force on each point charge (in newtons), or on each metre of each wire (N/m), from every other source and the background field. Arrow lengths are in proportion to each other.
 - **Values**: the labels on the sources.
 - **Line density**: half to twice the usual number of lines.
+
+Moving the view does not change the picture: the lines, their arrows, the equipotential step and the shading stay fixed to the scene. They are worked out again when you zoom or change a source.
 
 **At the pointer** reads out the field under the mouse: magnitude, direction (anticlockwise from +x) and, in the electric scene, potential. Use it to check a calculation.
 

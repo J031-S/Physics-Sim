@@ -702,3 +702,65 @@ test("test charge grid: one per intersection, all evolving together", async () =
   );
   assert.equal(d.items.length, 4);
 });
+
+test("the picture does not depend on which region is drawn", () => {
+  // Background field alone: straight lines a fixed distance apart, in the
+  // same places in the world wherever the region's edges are.
+  const lab = new FieldLab();
+  lab.setUniform("electric", { x: 10, y: 0 });
+  const quantum = nC / (EPS0 * 16),
+    heights = (bounds) =>
+      electricFieldLines(lab, bounds, { linesPerNC: 8 })
+        .map((l) => l[0][1])
+        .sort((a, b) => a - b),
+    one = heights(BOUNDS),
+    two = heights({ minX: -9.37, maxX: 6.2, minY: -6, maxY: 6 });
+  assert.ok(one.length >= 15);
+  for (let i = 1; i < one.length; i++)
+    close(
+      one[i] - one[i - 1],
+      quantum / 10,
+      1e-9,
+      "spacing = flux per line / E",
+    );
+  assert.equal(two.length, one.length);
+  one.forEach((y, i) => near(two[i], y, 1e-9, "same lines"));
+  // ψ = E·y is a half-whole number of quanta on each.
+  for (const y of one) near(((((10 * y) / quantum) % 1) + 1) % 1, 0.5, 1e-9);
+
+  // Contours: the same circles round a wire from two overlapping regions,
+  // when the step is taken from a shared reference region.
+  const wire = new FieldLab();
+  wire.add("wire", { x: 0, y: 0, current: 10 });
+  const reference = { minX: -5, maxX: 5, minY: -4, maxY: 4 },
+    radii = (bounds) =>
+      magneticFieldLines(wire, bounds, {
+        cell: 0.04,
+        coreRadius: 0.2,
+        reference,
+      })
+        .lines.filter((l) => l[0][0] === l.at(-1)[0] && l[0][1] === l.at(-1)[1])
+        .map(
+          (l) => l.reduce((a, p) => a + Math.hypot(p[0], p[1]), 0) / l.length,
+        )
+        .sort((a, b) => a - b),
+    here = radii({ minX: -4, maxX: 4, minY: -3, maxY: 3 }),
+    there = radii({ minX: -4.713, maxX: 5.1, minY: -3.33, maxY: 3.9 });
+  assert.ok(here.length >= 5);
+  here.forEach((r, i) => near(there[i], r, 1e-9, "same circle"));
+  // Equipotentials likewise keep their step and shading scale.
+  const charge = new FieldLab();
+  charge.add("charge", { x: 0, y: 0, charge: 2 * nC });
+  const a = equipotentialLines(
+      charge,
+      { minX: -4, maxX: 4, minY: -3, maxY: 3 },
+      { reference },
+    ),
+    b = equipotentialLines(
+      charge,
+      { minX: -1, maxX: 7.3, minY: -2.1, maxY: 4 },
+      { reference },
+    );
+  assert.equal(a.step, b.step);
+  assert.equal(a.scale, b.scale);
+});

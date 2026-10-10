@@ -348,6 +348,52 @@ function viewBounds(margin) {
   };
 }
 
+// Regions that do not move with the view, so that panning redraws the same
+// lines. `anchoredBounds` surrounds the sources by `margin` and takes in
+// whatever is on screen; `referenceBounds` is the sources with half a screen
+// round them, used to choose contour steps.
+function sourceBox(margin) {
+  const list = sources();
+  if (!list.length) return null;
+  const reach = (s) =>
+    s.kind === "plate" || s.kind === "magnet" ? s.length / 2 : 0;
+  return {
+    minX: Math.min(...list.map((s) => s.x - reach(s))) - margin,
+    maxX: Math.max(...list.map((s) => s.x + reach(s))) + margin,
+    minY: Math.min(...list.map((s) => s.y - reach(s))) - margin,
+    maxY: Math.max(...list.map((s) => s.y + reach(s))) + margin,
+  };
+}
+function snappedView() {
+  // The view, widened outwards to a coarse lattice (512 px).
+  const v = viewBounds(12 / view.scale),
+    lattice = 512 / view.scale;
+  return {
+    minX: Math.floor(v.minX / lattice) * lattice,
+    maxX: Math.ceil(v.maxX / lattice) * lattice,
+    minY: Math.floor(v.minY / lattice) * lattice,
+    maxY: Math.ceil(v.maxY / lattice) * lattice,
+  };
+}
+function anchoredBounds() {
+  const v = snappedView(),
+    box = sourceBox((1.2 * Math.max(view.width, view.height)) / view.scale);
+  return box
+    ? {
+        minX: Math.min(v.minX, box.minX),
+        maxX: Math.max(v.maxX, box.maxX),
+        minY: Math.min(v.minY, box.minY),
+        maxY: Math.max(v.maxY, box.maxY),
+      }
+    : v;
+}
+function referenceBounds() {
+  return (
+    sourceBox((0.5 * Math.max(view.width, view.height)) / view.scale) ||
+    snappedView()
+  );
+}
+
 function recompute() {
   const px = 1 / view.scale,
     result = { lines: [], equipotentials: [], step: 0, shade: null, scale: 0 };
@@ -356,7 +402,7 @@ function recompute() {
       result.lines = electricFieldLines(
         lab,
         // Lines that leave the screen and come back are followed this far.
-        viewBounds(0.4 * Math.max(view.width, view.height) * px),
+        anchoredBounds(),
         {
           linesPerNC: Math.max(1, Math.round(8 * state.density)),
           step: 7 * px,
@@ -367,6 +413,7 @@ function recompute() {
       const e = equipotentialLines(lab, viewBounds(12 * px), {
         cell: 6 * px,
         count: Math.round(14 * state.density),
+        reference: referenceBounds(),
       });
       result.equipotentials = e.lines;
       result.step = e.step;
@@ -381,6 +428,7 @@ function recompute() {
       cell: 5 * px,
       count: Math.round(16 * state.density),
       coreRadius: 14 * px,
+      reference: referenceBounds(),
     }).lines;
   $("equipotential-step").textContent =
     state.mode === "electric" && state.show.equipotentials && result.step
@@ -477,28 +525,47 @@ function arrowHead(x, y, angle, size) {
 }
 
 // A field line with direction arrows every so often along its length.
+// Arrows sit where the line crosses a lattice fixed in the world (vertical
+// lattice lines where the line runs mostly sideways, horizontal ones where
+// it runs mostly up or down), so they stay on the same spot of the line
+// however the view is moved or the line was traced.
 function fieldLine(points, pointSources) {
   if (points.length < 2) return;
   const path = points.map((p) => screen(p[0], p[1]));
   strokePath(path);
-  let travelled = 0,
-    next = 80;
-  for (let i = 1; i < path.length; i++) {
-    const [x0, y0] = path[i - 1],
-      [x1, y1] = path[i],
-      d = Math.hypot(x1 - x0, y1 - y0);
-    while (d > 0 && travelled + d >= next) {
-      const f = (next - travelled) / d,
-        x = x0 + f * (x1 - x0),
-        y = y0 + f * (y1 - y0);
-      next += 190;
-      if (x < -10 || y < -10 || x > view.width + 10 || y > view.height + 10)
-        continue;
-      if (pointSources.some((s) => Math.hypot(x - s[0], y - s[1]) < 22))
-        continue;
-      arrowHead(x, y, Math.atan2(y1 - y0, x1 - x0), 5.5);
-    }
-    travelled += d;
+  const spacing = GRID * 2 ** Math.round(Math.log2(170 / (GRID * view.scale))),
+    cellOf = (v) => Math.floor(v / spacing - 0.5),
+    arrows = [];
+  for (let i = 1; i < points.length; i++) {
+    const [x0, y0] = points[i - 1],
+      [x1, y1] = points[i],
+      sideways = Math.abs(x1 - x0) >= Math.abs(y1 - y0),
+      a = sideways ? x0 : y0,
+      b = sideways ? x1 : y1;
+    if (cellOf(a) === cellOf(b)) continue;
+    const f = ((Math.max(cellOf(a), cellOf(b)) + 0.5) * spacing - a) / (b - a),
+      [sx0, sy0] = path[i - 1],
+      [sx1, sy1] = path[i];
+    arrows.push([
+      sx0 + f * (sx1 - sx0),
+      sy0 + f * (sy1 - sy0),
+      Math.atan2(sy1 - sy0, sx1 - sx0),
+      sideways,
+    ]);
+  }
+  const tooClose = 0.45 * spacing * view.scale;
+  for (const [x, y, angle, sideways] of arrows) {
+    if (x < -10 || y < -10 || x > view.width + 10 || y > view.height + 10)
+      continue;
+    if (pointSources.some((s) => Math.hypot(x - s[0], y - s[1]) < 22)) continue;
+    // Where the line turns through 45° the two kinds can fall together;
+    // the sideways one is kept.
+    if (
+      !sideways &&
+      arrows.some((o) => o[3] && Math.hypot(x - o[0], y - o[1]) < tooClose)
+    )
+      continue;
+    arrowHead(x, y, angle, 5.5);
   }
 }
 
@@ -898,14 +965,12 @@ function draw() {
   if (prefs.grid) drawGrid(c);
   if (computed.equipotentials.length) {
     ctx.strokeStyle = c.equipotential;
-    ctx.lineWidth = 1.1;
-    ctx.setLineDash([5, 4]);
+    // Solid, not dashed: dashes would crawl along the line as the view
+    // moves. The zero-volt line is heavier, as the reference.
     for (const line of computed.equipotentials) {
-      // The zero-volt line is drawn solid, as the reference.
-      ctx.setLineDash(line.level === 0 ? [] : [5, 4]);
+      ctx.lineWidth = line.level === 0 ? 1.8 : 0.9;
       strokePath(line.points, true);
     }
-    ctx.setLineDash([]);
   }
   for (const s of list) if (s.kind === "magnet") drawMagnetBody(s, c);
   const colour = electric ? c.electric : c.magnetic;

@@ -782,33 +782,29 @@ export function electricFieldLines(lab, bounds, options = {}) {
   //    field brings them in from far away.
   const uniform = lab.uniform.electric;
   if (uniform.x || uniform.y) {
-    const N = 120,
-      w = bounds.maxX - bounds.minX,
+    // They start where the background field's own stream function
+    // ψ = E_x y − E_y x passes (k + ½) quanta of flux: places fixed in the
+    // world, whichever region is being drawn.
+    const w = bounds.maxX - bounds.minX,
       hgt = bounds.maxY - bounds.minY,
+      psi = (x, y) => uniform.x * y - uniform.y * x,
       edges = [
         [bounds.minX, bounds.minY, 0, hgt, 1, 0],
         [bounds.maxX, bounds.minY, 0, hgt, -1, 0],
         [bounds.minX, bounds.minY, w, 0, 0, 1],
         [bounds.minX, bounds.maxY, w, 0, 0, -1],
-      ],
-      flux = [],
-      at = [];
-    for (const [x0, y0, dx, dy, nx, ny] of edges)
-      for (let i = 0; i < N; i++) {
-        const f = (i + 0.5) / N,
-          x = x0 + dx * f + nx * hMin,
-          y = y0 + dy * f + ny * hMin;
-        lab.electricField(x, y, 0, e);
-        flux.push(
-          Math.max(0, e[0] * nx + e[1] * ny) * (Math.hypot(dx, dy) / N),
-        );
-        at.push([x0, y0, dx, dy, nx, ny]);
+      ];
+    let budget = 160;
+    for (const [x0, y0, dx, dy, nx, ny] of edges) {
+      if (!(uniform.x * nx + uniform.y * ny > 0)) continue;
+      const p0 = psi(x0, y0),
+        p1 = psi(x0 + dx, y0 + dy),
+        from = Math.ceil(Math.min(p0, p1) / quantum - 0.5),
+        to = Math.floor(Math.max(p0, p1) / quantum - 0.5);
+      for (let k = from; k <= to && budget > 0; k++, budget--) {
+        const f = ((k + 0.5) * quantum - p0) / (p1 - p0);
+        launch(x0 + dx * f + nx * hMin, y0 + dy * f + ny * hMin, 1);
       }
-    for (const seed of fluxSeeds(flux, quantum, 160)) {
-      const i = Math.min(flux.length - 1, Math.floor(seed)),
-        [x0, y0, dx, dy, nx, ny] = at[i],
-        f = ((i % N) + (seed - i)) / N;
-      launch(x0 + dx * f + nx * hMin, y0 + dy * f + ny * hMin, 1);
     }
   }
   // 2. Out of every positive charge.
@@ -956,31 +952,66 @@ export function contourLines(values, nx, ny, level) {
   return lines;
 }
 
+// Samples on a lattice fixed in the world (whole multiples of `cell`), so
+// that moving the bounds does not move the sample points.
 function sample(fn, bounds, cell) {
-  const nx = Math.max(2, Math.ceil((bounds.maxX - bounds.minX) / cell) + 1),
-    ny = Math.max(2, Math.ceil((bounds.maxY - bounds.minY) / cell) + 1),
+  const minX = Math.floor(bounds.minX / cell) * cell,
+    minY = Math.floor(bounds.minY / cell) * cell,
+    nx = Math.max(2, Math.ceil((bounds.maxX - minX) / cell) + 1),
+    ny = Math.max(2, Math.ceil((bounds.maxY - minY) / cell) + 1),
     values = new Float64Array(nx * ny);
   for (let j = 0; j < ny; j++)
     for (let i = 0; i < nx; i++)
-      values[j * nx + i] = fn(bounds.minX + i * cell, bounds.minY + j * cell);
-  return { nx, ny, values };
+      values[j * nx + i] = fn(minX + i * cell, minY + j * cell);
+  return { nx, ny, values, minX, minY, cell };
 }
 
-const toWorld = (bounds, cell) => (p) => [
-  bounds.minX + p[0] * cell,
-  bounds.minY + p[1] * cell,
+const toWorld = (grid) => (p) => [
+  grid.minX + p[0] * grid.cell,
+  grid.minY + p[1] * grid.cell,
 ];
+
+// A coarse sample of `reference`, for choosing levels from a region that
+// stays put while the drawn region moves.
+const coarse = (fn, reference) =>
+  sample(
+    fn,
+    reference,
+    Math.max(reference.maxX - reference.minX, reference.maxY - reference.minY) /
+      200,
+  );
+
+// Smallest and largest sample farther than `radius` from every wire.
+function rangeOutsideCores(grid, wires, radius) {
+  let lo = Infinity,
+    hi = -Infinity;
+  for (let j = 0; j < grid.ny; j++)
+    for (let i = 0; i < grid.nx; i++) {
+      const x = grid.minX + i * grid.cell,
+        y = grid.minY + j * grid.cell;
+      if (wires.some((w) => Math.hypot(x - w.x, y - w.y) < radius)) continue;
+      const v = grid.values[j * grid.nx + i];
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+  return [lo, hi];
+}
 
 /**
  * Equipotentials at equal steps of potential, so close lines mean a strong
  * field. The step is a round number of volts chosen to give about `count`
  * lines; the few percent of the region closest to the charges, where the
- * lines would merge, is left clear.
+ * lines would merge, is left clear. With `options.reference` (bounds), the
+ * step and limits come from that region instead of the drawn one, so they
+ * do not change as the drawn region is moved about.
  */
 export function equipotentialLines(lab, bounds, options = {}) {
-  const { cell = 0.06, count = 14 } = options,
-    grid = sample((x, y) => lab.potential(x, y), bounds, cell),
-    sorted = Float64Array.from(grid.values).sort(),
+  const { cell = 0.06, count = 14, reference } = options,
+    potential = (x, y) => lab.potential(x, y),
+    grid = sample(potential, bounds, cell),
+    sorted = Float64Array.from(
+      reference ? coarse(potential, reference).values : grid.values,
+    ).sort(),
     lo = sorted[Math.floor(0.03 * (sorted.length - 1))],
     hi = sorted[Math.ceil(0.97 * (sorted.length - 1))],
     scale = Math.max(Math.abs(lo), Math.abs(hi));
@@ -991,8 +1022,8 @@ export function equipotentialLines(lab, bounds, options = {}) {
     ny: grid.ny,
     values: grid.values,
     cell,
-    minX: bounds.minX,
-    minY: bounds.minY,
+    minX: grid.minX,
+    minY: grid.minY,
   };
   if (!(hi - lo > 1e-9 * scale) || !(scale > 1e-12))
     return {
@@ -1014,7 +1045,7 @@ export function equipotentialLines(lab, bounds, options = {}) {
             ? 5
             : 10),
     lines = [],
-    map = toWorld(bounds, cell);
+    map = toWorld(grid);
   for (let n = Math.ceil(lo / step); n <= Math.floor(hi / step); n++)
     for (const line of contourLines(grid.values, grid.nx, grid.ny, n * step))
       lines.push({ level: n * step, points: line.map(map) });
@@ -1028,29 +1059,30 @@ export function equipotentialLines(lab, bounds, options = {}) {
  * lines across the region outside `coreRadius` of each wire.
  */
 export function magneticFieldLines(lab, bounds, options = {}) {
-  const { cell = 0.06, count = 14, coreRadius = 0.15 } = options,
+  const { cell = 0.06, count = 14, coreRadius = 0.15, reference } = options,
     wires = lab.compiled().wires,
-    grid = sample((x, y) => lab.vectorPotential(x, y), bounds, cell);
-  let lo = Infinity,
-    hi = -Infinity;
-  for (let j = 0; j < grid.ny; j++)
-    for (let i = 0; i < grid.nx; i++) {
-      const x = bounds.minX + i * cell,
-        y = bounds.minY + j * cell;
-      if (wires.some((w) => Math.hypot(x - w.x, y - w.y) < coreRadius))
-        continue;
-      const v = grid.values[j * grid.nx + i];
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
-    }
-  const scale = Math.max(Math.abs(lo), Math.abs(hi));
-  if (!(hi - lo > 1e-9 * scale) || !(scale > 1e-18))
+    potential = (x, y) => lab.vectorPotential(x, y),
+    grid = sample(potential, bounds, cell),
+    [lo, hi] = rangeOutsideCores(grid, wires, coreRadius);
+  // The step comes from `options.reference` (bounds) when given, so that it
+  // does not change as the drawn region is moved about.
+  let [low, high] = [lo, hi];
+  if (reference) {
+    const wide = coarse(potential, reference);
+    [low, high] = rangeOutsideCores(
+      wide,
+      wires,
+      Math.max(coreRadius, 1.5 * wide.cell),
+    );
+  }
+  const scale = Math.max(Math.abs(low), Math.abs(high));
+  if (!(high - low > 1e-9 * scale) || !(scale > 1e-18) || !(hi > lo))
     return { lines: [], step: 0 };
   // Step from a ladder of ten values per decade, so the picture does not
   // jump while a source is dragged.
-  const step = 10 ** (Math.ceil(10 * Math.log10((hi - lo) / count)) / 10),
+  const step = 10 ** (Math.ceil(10 * Math.log10((high - low) / count)) / 10),
     lines = [],
-    map = toWorld(bounds, cell),
+    map = toWorld(grid),
     b = [0, 0];
   for (let n = Math.ceil(lo / step - 0.5); (n + 0.5) * step <= hi; n++) {
     const level = (n + 0.5) * step;

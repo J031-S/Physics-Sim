@@ -86,6 +86,7 @@ The sources are static and the canvas is redrawn on change. The one thing integr
 - `TestCharges.step(dt)` is velocity Verlet with substeps that shorten near point charges. A test charge is +1 nC and 1 µg (`TEST_CHARGE`), feels the field without adding to it, and stops on a plate, at a negative charge, or out of range. Its path is not a field line (inertia); do not "fix" that. `fillGrid(bounds, spacing)` replaces them all with one per grid point (the Test grid button); trails are then drawn as a single path, so keep them short.
 - Equipotentials come with the sampled potential grid, which `app.js` turns into the red/blue shading (opacity ∝ |V| up to the returned `scale`).
 - Placing anything returns the tool to Grab, as in the sandbox.
+- **Panning must not change the picture.** Line tracing uses `anchoredBounds()` and contour steps use `referenceBounds()` (both tied to the sources, not the view); contour samples sit on a world lattice; background-field lines start at fixed values of its stream function; arrows sit where a line crosses a world lattice. Do not place anything by distance along a polyline or by the view's edges.
 - New behaviour needs a test in `tests/fieldlab.test.mjs` against the formula. `tests/fieldlab-smoke.mjs` drives the page in happy-dom; its `// ---- checks ----` part uses only DOM calls, so it can also be run inside a real browser.
 
 ## Code style
