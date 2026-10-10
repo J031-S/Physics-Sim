@@ -2,7 +2,7 @@
 
 Interactive 2D mechanics and electromagnetism sandbox for teaching high-school / introductory physics (kinematics, forces, springs, pulleys, electric and magnetic fields). Students use it to check their intuition against "what really happens", so **physical correctness matters more than visual polish**: a result that looks plausible but disagrees with the textbook formula is a bug.
 
-The site has two pages, switched from the drop-down at the left of the top bar (`src/nav.js`): the mechanics sandbox (`index.html`) and the electric & magnetic fields tool (`fields.html`, code in `src/fieldlab/`). Most of this file is about the sandbox; the fields tool has its own section below.
+The site has three pages, switched from the drop-down at the left of the top bar (`src/nav.js`): the mechanics sandbox (`index.html`), the electric & magnetic fields tool (`fields.html`, code in `src/fieldlab/`) and the orbits & gravitation tool (`orbits.html`, code in `src/orbitlab/`). Most of this file is about the sandbox; the other two tools each have their own section below.
 
 `README.md` is the user-facing manual (controls, feature behaviour, model assumptions). Keep it in sync when behaviour changes.
 
@@ -17,7 +17,7 @@ node --test tests/wedge.test.mjs                       # one file
 node --test --test-name-pattern="Atwood" tests/*.test.mjs   # one test
 ```
 
-Run `npm run check && npm test` before finishing any change. Run `npm run test:ui` as well when touching `src/app.js`, `index.html`, `fields.html`, `src/fieldlab/app.js`, or anything a control binds to. Node 20.11+.
+Run `npm run check && npm test` before finishing any change. Run `npm run test:ui` as well when touching `src/app.js`, `index.html`, `fields.html`, `src/fieldlab/app.js`, `orbits.html`, `src/orbitlab/app.js`, or anything a control binds to. Node 20.11+.
 
 ## Architecture
 
@@ -34,11 +34,14 @@ No bundler, no framework, no runtime dependencies. `index.html` loads `vendor/ma
 | `src/group-move.js` | Layout translation of connected assemblies (Select tool) |
 | `src/field-view.js` | Field rendering and field drag/rotate/resize gestures |
 | `src/app.js` | Canvas drawing, pointer/keyboard input, menus, settings panel, the `requestAnimationFrame` loop |
-| `src/preferences.js`, `src/icons.js` | Persistent website preferences (localStorage key `physics-sim-ui`), icon sets. Shared by both pages, so every control they touch is optional |
-| `src/nav.js` | The drop-down of links that switches between the two pages |
+| `src/preferences.js`, `src/icons.js` | Persistent website preferences (localStorage key `physics-sim-ui`), icon sets. Shared by every page, so every control they touch is optional |
+| `src/nav.js` | The drop-down of links that switches between the pages. The links themselves are written out in each page's HTML: a new page is added to all of them |
 | `src/fieldlab/model.js` | `FieldLab`: sources, E, V, B, A_z, forces, field-line tracing, contours. No DOM |
 | `src/fieldlab/presets.js` | Field arrangements with the textbook result each one shows |
 | `src/fieldlab/app.js` | The fields page: drawing, input, panels |
+| `src/orbitlab/model.js` | `OrbitLab`: central body, satellites, the leapfrog integrator, orbital elements from the state vector, predicted paths, swept areas, third-law points. No DOM |
+| `src/orbitlab/presets.js` | Ready-made launches with the textbook result each one shows |
+| `src/orbitlab/app.js` | The orbits page: drawing, input, panels, graphs, the frame loop |
 | `server.mjs` | Tiny static server for local use only |
 | `vendor/` | Third-party code and licences. Do not edit `vendor/matter.js` |
 
@@ -88,6 +91,23 @@ The sources are static and the canvas is redrawn on change. The one thing integr
 - Placing anything returns the tool to Grab, as in the sandbox.
 - **Panning must not change the picture.** Line tracing uses `anchoredBounds()` and contour steps use `referenceBounds()` (both tied to the sources, not the view); contour samples sit on a world lattice; background-field lines start at fixed values of its stream function; arrows sit where a line crosses a world lattice. Do not place anything by distance along a polyline or by the view's edges.
 - New behaviour needs a test in `tests/fieldlab.test.mjs` against the formula. `tests/fieldlab-smoke.mjs` drives the page in happy-dom; its `// ---- checks ----` part uses only DOM calls, so it can also be run inside a real browser.
+
+## Orbits tool (`src/orbitlab/`)
+
+One fixed central body and up to 8 satellites of negligible mass under `F = GMm/r²`. `OrbitLab` is independent of `Sandbox`, `FieldLab` and Matter. `orbits.html` loads `styles.css`, then `fields.css` for the shared `.fl-*` panel pieces, then `orbits.css`.
+
+- The model is **SI throughout** (m, kg, s, J), y up, anticlockwise positive, `G = 6.674e-11`. `app.js` converts to km, km/s, minutes/hours/days and prefixed joules for display; the forms there mirror `LIMITS` in `model.js`. The scene is ~10⁷ m across, so the view scale is pixels per metre of order 10⁻⁵.
+- The launch point is on +y at distance `radius` from the centre; `angle` is the velocity's direction above the local horizontal, which there is +x. A horizontal launch therefore goes **clockwise** and has negative angular momentum; the page shows its magnitude.
+- **`orbitElements(mu, state, bodyRadius)` is the single source of every orbit readout and of the predicted path** (`orbitPath`): specific energy, angular momentum and the eccentricity vector. Do not measure elements from the trail.
+- **The integrator is a leapfrog in a stretched time** (`leap()` and the comment on `#advance`): `dt = (r/μ) ds`, fixed `ds` per flight, set at launch from `stepFraction`. For one attracting body every step ends exactly on the conic, so energy, angular momentum and the orbit's shape are conserved to rounding and only timing has error (about 10⁻⁷ of a period per orbit). This depends on `binding` being exactly `μ/r₀ − v₀²/2` at launch. Do not replace it with an Euler step (it fails every conservation test: orbits spiral outward) or with a scheme that steps in fixed seconds (it fails the test that the path stays on the launch conic to 10⁻⁹, and needs far smaller steps near periapsis).
+- `advance(dt)` returns the seconds actually advanced. It stops short when `maxSteps` is reached rather than lengthening steps; `app.js` tunes `maxSteps` to about 6 ms of work per frame and reports the achieved warp.
+- A step that ends below the surface is redone by bisection on its length so that the satellite stops on `r = R` (status `impact`). `SKIM` keeps an orbit that touches `r = R` from landing through rounding.
+- An unbound satellite is dropped from the integration beyond `rangeFactor` launch radii (status `escaped`).
+- Swept areas (`sweep.sectors`) and the timed period (`measuredPeriod`, from the angle swept) are **measured** from the integrated motion, which is what makes them a check on Kepler's laws. `thirdLaw` gets one point per satellite, on its first completed orbit, and survives `clear()`.
+- A closed orbit's trail is recorded for one turn only (`trailEnd`); `history` holds (time, distance, speed) for the graphs at 400 samples per period.
+- `setBody` removes the satellites and resets the clock; it refuses a body whose surface escape speed exceeds `LIMITS.speed`.
+- Stated limits (fixed body, point-mass gravity, no drag, no spin, no third bodies) are listed in the README. They are the model, not bugs.
+- New behaviour needs a test in `tests/orbitlab.test.mjs` against the formula. `tests/orbitlab-smoke.mjs` drives the page in happy-dom; its `// ---- checks ----` part uses only DOM calls and `await frame()`, so it can also be run inside a real browser. It finds the launch point and arrow handle from `canvas.dataset.launchPoint` / `aimHandle`.
 
 ## Code style
 

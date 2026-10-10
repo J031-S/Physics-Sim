@@ -12,7 +12,7 @@ npm start
 
 Open http://localhost:3000. Running the app needs no package installation or build step. The bundled Matter.js 0.20.0 engine includes its MIT licence. Any ordinary static server also works; opening via `file://` does not.
 
-The site has two tools. The drop-down at the left of the top bar switches between them: the **Mechanics sandbox** (`index.html`, described first below) and **Electric & magnetic fields** (`fields.html`, described in its own section).
+The site has three tools. The drop-down at the left of the top bar switches between them: the **Mechanics sandbox** (`index.html`, described first below), **Electric & magnetic fields** (`fields.html`) and **Orbits & gravitation** (`orbits.html`), each of the last two described in its own section.
 
 ## Controls
 
@@ -231,6 +231,96 @@ The screen is a flat slice through a three-dimensional arrangement.
 - **Equipotentials** stop short of the few percent of the screen closest to the charges, where they would merge.
 - **The sources are static.** They stay where they are put: forces on them are shown but do not move them, there is no induction, and the two scenes do not affect each other. No force is calculated on plates or magnets. Only test charges move, and only in the electric scene: in the magnetic scene the field lies in the screen, so the force on a charge moving in the screen would point out of it.
 
+## Orbits & gravitation tool
+
+A separate page for Newton's law of gravitation, `F = GMm/r²`. A central body (the Earth to begin with) sits at the centre. You choose where a satellite starts, how fast and in which direction it is launched, and watch the path it takes. Raising the launch speed takes it from falling to the ground, through an ellipse, a circle and a larger ellipse, to escape. Open it from the drop-down at the left of the top bar.
+
+### Setting up a launch
+
+The **Launch** panel holds the values; each has a slider and a box to type in.
+
+| Quantity                    | Meaning                                                                                               | Range                                            |
+| --------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Central body                | Earth, Moon, Mars, Jupiter or Sun, or type your own mass and radius                                   | 10¹⁵ to 10³² kg, 1 km to 10⁷ km                  |
+| Altitude and orbital radius | Height above the surface, and distance from the centre: two views of the same number                  | from the surface out to 10¹¹ km                  |
+| Launch speed                | Speed at launch                                                                                       | 0 to 30 000 km/s (a tenth of the speed of light) |
+| Launch angle                | Direction above the local horizontal: 0 is horizontal, 90° straight up, negative below the horizontal | −180° to 180°                                    |
+
+The launch point is at the top of the body, and "horizontal" there points to the right. On the scene, **drag the arrow** on the launch point to set speed and direction together (hold Shift to keep the direction), and **drag the launch point** up or down to change the altitude. The arrow is 64 px long at the circular orbit speed.
+
+Beside the speed are the two speeds to compare it with, both for the current distance from the centre: the **circular orbit speed** `√(GM/r)` and the **escape speed** `√(2GM/r)`. **Use** sets the launch speed to exactly that value. The line under them gives your speed as a multiple of each.
+
+The strip at the top of the scene says what the launch will do, and the dashed line shows the path it predicts. Both come from the launch position and velocity alone (see below), before anything has moved.
+
+**Launch** (`L`) releases the satellite. Up to 8 can be in flight at once, each in its own colour; launch again with different values to compare orbits. Click a satellite, or its chip under the Launch button, to choose which one the readouts and graphs describe; the × on a chip removes it. Changing the central body removes the satellites in flight, because their orbits belonged to the old one.
+
+**Presets** loads a ready-made launch: low Earth orbit (400 km), geostationary orbit, the Moon's orbit, Newton's cannon, and an eccentric ellipse. Each sets a suitable time warp and says what to check.
+
+### Running it
+
+- **Run / Pause** (`Space`). Run with nothing in flight launches the satellite that is set up.
+- **Step** (`.`) advances one frame of simulated time while paused: the time warp × 1/60 s.
+- **Reset** (`R`) removes every satellite and sets the clock to zero. The launch values and the third-law points are kept.
+- **Time warp** (`[` and `]`): simulated seconds per real second, from 1× to 10 000 000×. A low orbit takes 92 minutes and the Moon 27 days, so the presets choose a warp that shows an orbit in ten or twenty seconds. If a warp asks for more than the computer can do accurately in a frame, the simulation runs slower than asked, and says so beside the clock, rather than taking longer steps.
+- **View**: drag empty space to pan, scroll or `+` / `−` to zoom. **Keep orbit in view** (`A`) follows the whole scene as orbits grow; panning or zooming turns it off, and **Fit scene** fits once.
+- **Trails** (`T`) draw the path taken; **Clear trails** (`C`) erases them. A closed orbit retraces itself exactly, so its trail is drawn for one turn.
+
+### Display
+
+- **Velocity** (`V`) and **Gravity force** (`G`) arrows on each satellite. All velocity arrows share one scale, and so do all force arrows: 64 px for the circular orbit speed, and for the force, at the launch point's distance. A force arrow that would be longer than 190 px is shortened and marked so.
+- **Predicted orbit** (`P`): the conic worked out at launch, as a faint line. The trail then lies on top of it.
+- **Equal areas** (`K`): Kepler's second law, below.
+- **Values**: the numbers beside the arrows and the names on the scene.
+- **SI base units**: readouts in m, m/s, s and J instead of km, km/s, minutes/hours/days and GJ. Either way, hovering over a readout shows the SI value to seven figures.
+
+### Readouts and graphs
+
+The **Readouts** panel shows, for the chosen satellite (or, before launch, for the launch that is set up): time since launch, distance from the centre, altitude, speed, kinetic energy `½mv²`, gravitational potential energy `−GMm/r` (zero at infinity, so always negative), their total, how much that total has changed since launch, and angular momentum. Below them are the orbit's type, semi-major axis, eccentricity, period, periapsis and apoapsis, and the period as timed by the simulation once an orbit has been completed.
+
+Energies, angular momentum and force are for a satellite of the mass set in **Settings** (1000 kg to begin with). The path does not depend on that mass.
+
+**Graphs against time** plot the three energies together, the distance and the speed, over the last few orbits. Kinetic and potential energy trade places as the satellite moves in and out while the total stays flat.
+
+### Kepler's laws
+
+- **Second law.** With **Equal areas** on, the orbit is divided into twelve equal intervals of time (twelfths of the period), and the area swept by the line from the centre to the satellite in each is shaded and numbered, alternately dark and light. The **Kepler's laws** panel lists the twelve areas, how far the largest and smallest differ, and the theoretical value `½(L/m)Δt`. The areas are measured from the simulated motion, not taken from the formula.
+- **Third law.** Each satellite adds one point to the plot of `T²` against `a³` when it completes its first orbit: its timed period squared against its semi-major axis cubed. After a few launches at different speeds or altitudes the points lie on a straight line through the origin. The panel gives the slope of the best such line beside Newton's prediction `4π²/GM`, and a tick box draws that line. Points from a different central mass lie on a different line. **Clear points** empties the plot; Reset does not.
+
+### How the orbit is worked out
+
+The readouts and the predicted path are not measured from the trail. They come from the satellite's position and velocity at one instant, through three quantities that gravity conserves (each per kilogram of satellite, with μ = GM):
+
+- energy `ε = v²/2 − μ/r`, which gives the semi-major axis `a = −μ/2ε`;
+- angular momentum `h = r × v`, which gives `p = h²/μ`;
+- the eccentricity vector `e = ((v² − μ/r) r − (r·v) v)/μ`, whose length is the eccentricity and which points at periapsis.
+
+The path is then the conic `r = p/(1 + e cos ν)`, periapsis is `p/(1 + e)`, apoapsis `2a − periapsis`, and the period `2π√(a³/μ)`.
+
+| ε        | e             | Type                                |
+| -------- | ------------- | ----------------------------------- |
+| negative | below 0.001   | circular                            |
+| negative | 0.001 up to 1 | elliptical                          |
+| zero     | 1             | parabolic: exactly the escape speed |
+| positive | above 1       | hyperbolic: it keeps `v∞ = √(2ε)`   |
+
+Any of these is an **impact** instead if the path meets the surface: periapsis is inside the body and the satellite is bound, or already heading inward. The satellite stops where its path meets the surface and the strip reports when, how far round from the launch point, and how fast.
+
+The motion itself is integrated numerically, in SI units, with `G = 6.674 × 10⁻¹¹ N·m²/kg²`. The integrator is a leapfrog (drift, kick, drift), which is symplectic and time-reversible, so energy and angular momentum do not drift as they do with a simple Euler step. Its step is not a fixed number of seconds: it is fixed in a stretched time `s` with `dt = (r/μ) ds`, so a step lasts longer when the satellite is far away and slow, and is short when it is close and fast. The step size is chosen at launch so that the satellite never moves more than 0.2% of its distance from the centre in one step (about 3100 steps round a circular orbit, 7500 round an ellipse of eccentricity 0.7). For a single attracting body this scheme has a useful exact property: every step ends on the true conic, whatever its length, so the only numerical error is a small one in timing. The steps do not depend on the frame rate or the time warp; at low warps, where a frame is shorter than a step, a step is cut short to end on the frame, which is still on the conic.
+
+### Where it stops being exact
+
+- **The central body is held still.** That is right when the satellite's mass is negligible, and wrong for the Moon: with the Earth fixed, the Moon's-orbit preset takes 27.45 days, where the real Moon takes 27.32, because the Earth and Moon both go round their common centre of mass (`T = 2π√(r³/G(M + m))`). The panel warns when the satellite mass you set is more than a millionth of the body's.
+- **Gravity is that of a point mass**, which is exact outside a perfectly spherical body. The real Earth is slightly flattened, which makes real low orbits slowly turn in space; here they do not.
+- **No atmosphere.** A real satellite at 400 km loses height over months, and Newton's cannonball would be slowed by air. Here nothing takes energy away.
+- **The body does not spin.** Speeds are measured against the non-rotating body, so a launch gets no help from the Earth's rotation, and a geostationary satellite is not shown hovering over one place.
+- **Nothing else pulls.** No Sun, Moon or other planets, and satellites neither attract nor collide with each other.
+- **Everything is in one plane**, and the Moon's-orbit preset is a circle at the Moon's average distance (the real orbit has eccentricity 0.055).
+- **The surface is a smooth sphere** of the body's mean radius: no mountains, and an orbit may skim it exactly.
+- **Newtonian gravity only.** Speeds are limited to a tenth of the speed of light, and a body so compact that its escape speed would exceed that is refused.
+- **Constants are rounded.** With `G = 6.674 × 10⁻¹¹` and `M = 5.972 × 10²⁴ kg`, the geostationary radius comes to 42 163 km; the usual 42 164 km uses the more precisely known product GM.
+- **"Circular" is a label** for eccentricity below 0.001, and "parabolic" for total energy that is zero to rounding. Typing the escape speed to four figures gives a very long ellipse or a hyperbola, correctly; **Use** gives the parabola.
+- **An escaping satellite is followed out to 200 launch radii** and then left. The graphs keep the most recent few orbits.
+
 ## Right-click menu
 
 Right-click the **ground** (anywhere at or below y = 0 that is not an object) for the **Floor** menu: **Surface friction μ** and **Restitution e**, both 0–1 (defaults 0.5 and 0). The scene walls share the floor's material. Where two surfaces touch, the contact uses the lower friction and the higher restitution of the two, so a bouncy ball still bounces on a dead floor. The floor material is saved with the scene and reset by Clear scene.
@@ -275,6 +365,8 @@ npm run test:ui
 ```
 
 `tests/fieldlab.test.mjs` checks the fields tool against the textbook: inverse-square and 1/r laws, superposition and null points, E = −∇V and B = curl A, Gauss's and Ampère's laws by numerical integration, σ/ε₀ between plates, μ₀nI inside a solenoid, Coulomb's law, the force between parallel wires and BIℓ, field lines tangent to the field, equal flux between magnetic field lines, test charges (½at² in a uniform field, kinetic energy gained equal to qΔV, fall time between plates), and every number quoted in the presets. `tests/fieldlab-smoke.mjs` drives `fields.html` through its controls and runs with `npm run test:ui`.
+
+`tests/orbitlab.test.mjs` checks the orbits tool against the textbook: surface gravity and escape speed of each preset body, orbital elements recovered from a state vector, the change of orbit type with launch speed, low Earth orbit (7.67 km/s, 92.4 min, radius constant over 100 orbits), the geostationary and Moon's orbits, conservation of energy and angular momentum over 100 orbits at eccentricity 0.7 at the highest time warp, timed periods against `2π√(a³/GM)`, the escape speed (zero energy, no return) and just below it (return), `v∞` on a hyperbola, equal areas in equal times, the integrated path against the predicted conic, independence of frame length and time warp, Newton's cannon (landing point, time of flight from Kepler's equation and landing speed), a vertical launch, other central bodies, validation, and every number quoted in the presets. `tests/orbitlab-smoke.mjs` drives `orbits.html` through its controls and runs with `npm run test:ui`.
 
 Belts and pulley cables share iterative position and velocity solving, so one connection no longer overwrites a wheel angle already solved by the other. Guided springs use signed extension to remain continuous when an endpoint crosses its anchor.
 
