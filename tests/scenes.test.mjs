@@ -149,9 +149,10 @@ test("energy and momentum readouts match the textbook expressions", () => {
   near(m.rotational, 0.5 * inertia * 9, 1e-9);
   near(m.momentum.x, 2, 1e-9);
   near(m.momentum.y, -4, 1e-9);
-  near(m.gravitational, 2 * g * 6, 1e-9);
+  // Potential energy is taken half a step back, where the velocity applies.
+  near(m.gravitational, 2 * g * (6 + 2 / 240), 1e-9);
   const before = s.energy();
-  near(before.elastic, 0, 1e-9);
+  near(before.elastic, 0, 0.01); // endpoints taken half a step back
   run(s, 5);
   const after = s.energy();
   assert.ok(after.elastic > 0);
@@ -331,13 +332,22 @@ test("presets show the results they claim", () => {
     const v0 = Math.hypot(s.state(ids[1]).vx, s.state(ids[1]).vy);
     run(s, 1);
     const v1 = Math.hypot(s.state(ids[1]).vx, s.state(ids[1]).vy),
-      theta = (20 * Math.PI) / 180;
-    near(v1 - v0, g * (Math.sin(theta) - 0.3 * Math.cos(theta)), 0.01);
-    // The fix the description suggests really does hold the block.
-    s.updateConstants(ids[1], { friction: 0.4 });
-    run(s, 3);
-    near(Math.hypot(s.state(ids[1]).vx, s.state(ids[1]).vy), 0, 1e-3);
+      theta = (25 * Math.PI) / 180,
+      a = g * (Math.sin(theta) - 0.3 * Math.cos(theta));
+    near(v1 - v0, a, 0.01);
+    // The net force arrow: 4 kg × a ≈ 5.9 N, pointing down the slope.
+    const f = s.netForce(ids[1]);
+    near(Math.hypot(f.x, f.y), 4 * a, 0.02);
+    near(Math.atan2(-f.y, -f.x), theta, 0.01);
     s.dispose();
+    // The fix the description suggests really does hold the block.
+    const again = load("incline-friction");
+    again.s.updateConstants(again.ids[1], { friction: 0.5 });
+    const start = again.s.state(again.ids[1]);
+    run(again.s, 3);
+    const end = again.s.state(again.ids[1]);
+    near(Math.hypot(end.x - start.x, end.y - start.y), 0, 2e-3);
+    again.s.dispose();
   }
   {
     const { s, ids } = load("rolling");
@@ -455,7 +465,11 @@ test("electric potential energy balances the books for uniform fields and Coulom
   s.setVelocity(id, { vx: 1, vy: 2 });
   const p0 = s.state(id),
     before = s.energy();
-  near(before.electric, -0.5 * (4 * p0.x - 3 * p0.y), 1e-9);
+  near(
+    before.electric,
+    -0.5 * (4 * (p0.x - 1 / 240) - 3 * (p0.y - 2 / 240)),
+    1e-9,
+  );
   near(s.measure(id).electric, before.electric, 1e-9);
   run(s, 2);
   const after = s.energy();

@@ -190,8 +190,8 @@ export class Fields {
       for (let j = i + 1; j < charged.length; j++) {
         const a = charged[i],
           b = charged[j],
-          pa = sim.state(a.id),
-          pb = sim.state(b.id);
+          pa = sim.potentialPoint(a.id),
+          pb = sim.potentialPoint(b.id);
         pairs.push({
           a: a.id,
           b: b.id,

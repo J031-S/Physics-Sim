@@ -38,6 +38,7 @@ let sim = new Sandbox(),
   toastTimer;
 sim.updateSettings({ walls: true });
 const prefs = setupPreferences($);
+prefs.onchange = () => showDimensions();
 const view = { scale: 65, x: 0, y: 0, width: 0, height: 0 };
 function toast(message) {
   $("toast").textContent = message;
@@ -222,7 +223,13 @@ function showDimensions() {
     $("dimensions").textContent =
       o.shape === "ball"
         ? `Ø ${(o.radius * 2).toFixed(2)} m`
-        : `${o.width.toFixed(2)} × ${o.height.toFixed(2)} m${o.shape === "wedge" ? " · slope " + ((Math.atan2(o.height, o.width) * 180) / Math.PI).toFixed(1) + "°" : ""}`;
+        : `${o.width.toFixed(2)} × ${o.height.toFixed(2)} m${o.shape === "wedge" ? " · slope " + formatAngle(Math.atan2(o.height, o.width)) + " · " + formatAngle(Math.atan2(o.width, o.height)) : ""}`;
+}
+// Angles are held in radians; the Website setting chooses how they are shown.
+function formatAngle(radians) {
+  return prefs.angleUnit === "radians"
+    ? radians.toFixed(3) + " rad"
+    : ((radians * 180) / Math.PI).toFixed(1) + "°";
 }
 function linkPath(l) {
   if (l.type === "belt") return sim.mechanisms.beltGeometry(l).path;
@@ -2453,6 +2460,59 @@ function drawRuler(o, s) {
   });
   ctx.restore();
 }
+// A wedge shows the size of both acute corners: a small arc at each, with the
+// angle written inside the corner where it fits and just outside it where the
+// corner is too narrow. Skipped only when the wedge is tiny on screen.
+function drawWedgeAngles(o, dark) {
+  const corners = o.body.vertices.map((v) =>
+      screen({ x: v.x / 100, y: -v.y / 100 }),
+    ),
+    inside = dark ? "#1d2a1f" : "#2f4630",
+    outside = dark ? "#cfd8c8" : "#46553e";
+  ctx.save();
+  ctx.font = "600 10px ui-monospace, monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 1.25;
+  corners.forEach((c, i) => {
+    const a = corners[(i + 1) % 3],
+      b = corners[(i + 2) % 3],
+      toA = Math.atan2(a.y - c.y, a.x - c.x),
+      toB = Math.atan2(b.y - c.y, b.x - c.x);
+    let sweep = toB - toA;
+    if (sweep > Math.PI) sweep -= 2 * Math.PI;
+    if (sweep < -Math.PI) sweep += 2 * Math.PI;
+    const angle = Math.abs(sweep);
+    if (angle > Math.PI / 2 - 1e-3) return; // the right angle
+    const reach = Math.min(
+      Math.hypot(a.x - c.x, a.y - c.y),
+      Math.hypot(b.x - c.x, b.y - c.y),
+    );
+    if (reach < 36) return;
+    const label = formatAngle(angle),
+      width = ctx.measureText(label)?.width || label.length * 6,
+      // The label must clear both edges whichever way the wedge is turned,
+      // so fit the circle around it into the corner.
+      clearance = Math.hypot(width / 2, 6) + 2,
+      radius = Math.min(26, reach * 0.3),
+      fit = Math.max(radius + clearance, clearance / Math.sin(angle / 2)),
+      // Kept in the corner's own half of the edge, clear of the lock badge.
+      fits = fit < reach * 0.45,
+      distance = fits ? fit : -(clearance + 4),
+      middle = toA + sweep / 2;
+    ctx.strokeStyle = inside;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, radius, toA, toB, sweep < 0);
+    ctx.stroke();
+    ctx.fillStyle = fits ? inside : outside;
+    ctx.fillText(
+      label,
+      c.x + distance * Math.cos(middle),
+      c.y + distance * Math.sin(middle),
+    );
+  });
+  ctx.restore();
+}
 function draw() {
   const r = canvas.getBoundingClientRect(),
     dpr = window.devicePixelRatio || 1;
@@ -2638,6 +2698,7 @@ function draw() {
     ctx.lineWidth = highlighted(o.id) ? 2.5 : 1.5;
     ctx.stroke();
     drawRuler(o, s);
+    if (o.shape === "wedge") drawWedgeAngles(o, dark);
     if (o.charge) {
       ctx.fillStyle =
         o.charge > 0

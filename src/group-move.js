@@ -129,11 +129,6 @@ export class GroupMove {
     }
     for (const { link, side, point } of this.anchors) {
       link[side + "Point"] = { x: point.x + x, y: point.y + y };
-      if (link.constraint)
-        link.constraint[side === "a" ? "pointA" : "pointB"] = {
-          x: (point.x + x) * S,
-          y: -(point.y + y) * S,
-        };
     }
     for (const l of this.sim.links.values())
       if (l.type === "belt" && this.ids.has(l.a))

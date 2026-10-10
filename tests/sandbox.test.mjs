@@ -171,11 +171,20 @@ test("rod keeps its length; pinning both ends is safe and unlocking reattaches i
   s.setLock(b, "position", true);
   run(s, 1);
   finite(s);
-  assert.equal(s.links.get(id).attached, false);
+  // Both ends pinned: nothing for the rod to solve, and nothing moves.
+  const pinned = s.state(b);
+  run(s, 1);
+  close(s.state(b).x, pinned.x, 1e-9);
+  close(s.state(b).y, pinned.y, 1e-9);
   s.setLock(b, "position", false);
-  assert.equal(s.links.get(id).attached, true);
   run(s, 1);
   finite(s);
+  // Unlocked again, the rod goes straight back to holding its length.
+  close(
+    Math.hypot(s.state(a).x - s.state(b).x, s.state(a).y - s.state(b).y),
+    2,
+    1e-6,
+  );
   s.dispose();
 });
 test("spring pulls its endpoints; deleting a body removes its connections", () => {

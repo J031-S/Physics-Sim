@@ -15,6 +15,7 @@ export function setupPreferences($) {
       ? Math.max(80, Math.min(140, saved.size))
       : 100,
     grid: saved.grid !== false,
+    angleUnit: saved.angleUnit === "radians" ? "radians" : "degrees",
   };
   const media = window.matchMedia?.("(prefers-color-scheme: dark)");
   const apply = () => {
@@ -31,6 +32,7 @@ export function setupPreferences($) {
     $("ui-size").value = prefs.size;
     $("ui-size-value").textContent = prefs.size + "%";
     $("ui-grid").checked = prefs.grid;
+    $("ui-angle-unit").value = prefs.angleUnit;
     try {
       window.localStorage.setItem("physics-sim-ui", JSON.stringify(prefs));
     } catch {}
@@ -52,6 +54,11 @@ export function setupPreferences($) {
   $("ui-grid").onchange = (e) => {
     prefs.grid = e.target.checked;
     apply();
+  };
+  $("ui-angle-unit").onchange = (e) => {
+    prefs.angleUnit = e.target.value === "radians" ? "radians" : "degrees";
+    apply();
+    prefs.onchange?.();
   };
   media?.addEventListener?.("change", apply);
   apply();
