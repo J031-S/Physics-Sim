@@ -1,6 +1,68 @@
 // Indicator spacing uses a bounded logarithmic scale so both weak and strong fields remain readable.
 export const fieldSpacing = (strength) =>
   Math.max(14, 80 / Math.sqrt(1 + 3 * Math.log1p(Math.abs(strength))));
+// Shade a non-uniform region by its local strength: the falloff profile is
+// sampled on a coarse grid into a small offscreen image, which the canvas
+// scales up with smoothing, so the tint fades continuously. Cached until the
+// region or the zoom changes. Returns false where no DOM canvas is available.
+const shadeCache = new Map();
+function shadeRegion(ctx, fields, f, scale, a, dark) {
+  if (typeof document === "undefined") return false;
+  const cell = 6,
+    w = f.width * scale,
+    h = f.height * scale,
+    nx = Math.max(2, Math.min(400, Math.ceil(w / cell) + 1)),
+    ny = Math.max(2, Math.min(400, Math.ceil(h / cell) + 1)),
+    key = JSON.stringify([f, nx, ny, dark]);
+  let image = shadeCache.get(f.id);
+  if (image?.key !== key) {
+    const canvas = document.createElement("canvas"),
+      g = canvas.getContext("2d");
+    if (!g?.createImageData) return false;
+    canvas.width = nx;
+    canvas.height = ny;
+    const data = g.createImageData(nx, ny);
+    if (!data?.data) return false;
+    const [r, gr, b] =
+        f.type === "electric"
+          ? dark
+            ? [224, 169, 74]
+            : [222, 167, 57]
+          : dark
+            ? [168, 145, 224]
+            : [152, 116, 203],
+      peak = dark ? 70 : 60;
+    for (let j = 0; j < ny; j++)
+      for (let i = 0; i < nx; i++) {
+        // Local (unrotated) offsets in metres, then into world coordinates.
+        const lx = ((i / (nx - 1) - 0.5) * w) / scale,
+          ly = -((j / (ny - 1) - 0.5) * h) / scale,
+          level = Math.min(
+            1,
+            Math.abs(
+              fields.profile(f, {
+                x: f.x + lx * Math.cos(a) - ly * Math.sin(a),
+                y: f.y + lx * Math.sin(a) + ly * Math.cos(a),
+              }),
+            ),
+          ),
+          k = 4 * (j * nx + i);
+        data.data[k] = r;
+        data.data[k + 1] = gr;
+        data.data[k + 2] = b;
+        data.data[k + 3] = Math.round(peak * level);
+      }
+    g.putImageData(data, 0, 0);
+    image = { key, canvas };
+    shadeCache.set(f.id, image);
+  }
+  ctx.save();
+  ctx.clip();
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(image.canvas, -w / 2, -h / 2, w, h);
+  ctx.restore();
+  return true;
+}
 export function drawFields(
   ctx,
   fields,
@@ -38,8 +100,13 @@ export function drawFields(
     ctx.beginPath();
     if (f.shape === "rectangle") ctx.rect(-w / 2, -h / 2, w, h);
     else ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, 2 * Math.PI);
-    ctx.fillStyle = f.type === "electric" ? "#dea73918" : "#9874cb18";
-    ctx.fill();
+    if (
+      f.gradient === "uniform" ||
+      !shadeRegion(ctx, fields, f, scale, a, dark)
+    ) {
+      ctx.fillStyle = f.type === "electric" ? "#dea73918" : "#9874cb18";
+      ctx.fill();
+    }
     // Lighter outlines and indicators on the dark theme for contrast.
     ctx.strokeStyle =
       f.type === "electric"
@@ -94,10 +161,13 @@ export function drawFields(
         for (let x = left; x < right; x += spacing) {
           const sample = fields.sample(f, toWorld(x + spacing / 2, y));
           if (!sample.strength) continue;
+          // Fade with the local strength all the way to zero, so a gradient
+          // reads as a smooth dropoff rather than stopping abruptly.
           ctx.globalAlpha = Math.min(
             1,
-            0.18 + 0.82 * Math.sqrt(Math.abs(sample.strength / f.strength)),
+            Math.sqrt(Math.abs(sample.strength / f.strength)),
           );
+          if (ctx.globalAlpha < 0.03) continue;
           ctx.beginPath();
           ctx.moveTo(x, y);
           ctx.lineTo(Math.min(right, x + spacing), y);
@@ -120,10 +190,13 @@ export function drawFields(
             y = oy + r * dy,
             sample = fields.sample(f, toWorld(x, y));
           if (!sample.strength) continue;
+          // Fade with the local strength all the way to zero, so a gradient
+          // reads as a smooth dropoff rather than stopping abruptly.
           ctx.globalAlpha = Math.min(
             1,
-            0.18 + 0.82 * Math.sqrt(Math.abs(sample.strength / f.strength)),
+            Math.sqrt(Math.abs(sample.strength / f.strength)),
           );
+          if (ctx.globalAlpha < 0.03) continue;
           ctx.beginPath();
           ctx.moveTo(x, y);
           ctx.lineTo(x + spacing * dx, y + spacing * dy);
@@ -137,21 +210,22 @@ export function drawFields(
           const x = i * spacing,
             y = j * spacing,
             sample = fields.sample(f, toWorld(x, y));
-          const density = Math.sqrt(Math.abs(sample.strength / f.strength));
-          const hash =
-            (((Math.sin(i * 127.1 + j * 311.7) * 43758.5453) % 1) + 1) % 1;
-          if (!sample.strength || hash > density) continue;
-          ctx.globalAlpha = 0.35 + 0.65 * density;
+          // Every grid point keeps its marker; opacity and size follow the
+          // local strength, so weaker field fades out evenly.
+          const level = Math.sqrt(Math.abs(sample.strength / f.strength));
+          if (level < 0.03) continue;
+          ctx.globalAlpha = Math.min(1, level);
+          const size = 0.5 + 0.5 * Math.min(1, level);
           if (sample.bz > 0) {
             ctx.beginPath();
-            ctx.arc(x, y, 2, 0, 2 * Math.PI);
+            ctx.arc(x, y, 2 * size, 0, 2 * Math.PI);
             ctx.fill();
           } else {
             ctx.beginPath();
-            ctx.moveTo(x - 3, y - 3);
-            ctx.lineTo(x + 3, y + 3);
-            ctx.moveTo(x + 3, y - 3);
-            ctx.lineTo(x - 3, y + 3);
+            ctx.moveTo(x - 3 * size, y - 3 * size);
+            ctx.lineTo(x + 3 * size, y + 3 * size);
+            ctx.moveTo(x + 3 * size, y - 3 * size);
+            ctx.lineTo(x - 3 * size, y + 3 * size);
             ctx.stroke();
           }
         }
