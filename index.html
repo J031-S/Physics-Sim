@@ -763,11 +763,18 @@
         <dt>Z</dt>
         <dd>Toggle snapping for all geometry edits (also in Settings)</dd>
         <dt>Shift + drag</dt>
-        <dd>
-          Move; paused simulation also permits moving position-locked objects
-        </dd>
+        <dd>Move. A position-locked object moves only while paused.</dd>
         <dt>Ctrl + drag</dt>
-        <dd>Rotate around the centre; pause to edit rotation-locked objects</dd>
+        <dd>
+          Rotate around the centre. A rotation-locked object rotates only while
+          paused.
+        </dd>
+        <dt>Locked objects</dt>
+        <dd>
+          With both locks on, an object ignores dragging while running. Paused,
+          a plain drag moves it and Ctrl-drag rotates it; the locks then hold
+          the new pose.
+        </dd>
         <dt>Alt + drag</dt>
         <dd>
           Refit rod / cable lengths; combine with Shift to move and change

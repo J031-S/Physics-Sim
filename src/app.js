@@ -83,7 +83,7 @@ function chooseTool(next) {
   $("tool-help").textContent = {
     select:
       "Drag a box to select · Shift-box adds · drag a selected body to move its assembly · Z toggles snapping",
-    grab: "Drag to move · Shift moves · Ctrl rotates · R resizes · Alt refits · Z snaps · ? shortcuts",
+    grab: "Drag to move · Shift moves · Ctrl rotates · R resizes · Alt refits · Z snaps · pause to move locked objects",
     resize:
       "Drag a body or field to resize around its centre. Z toggles dimension snapping. G returns to Grab.",
     belt: "Click two balls to wrap a belt around them. Their centres will be pinned. Escape cancels.",
@@ -99,7 +99,7 @@ function chooseTool(next) {
     ball: "Click to add a ball. Z toggles grid snapping.",
     block: "Click to add a block. Z toggles grid snapping.",
     wedge:
-      "Click to add a pinned ramp. Pause + Shift-drag to move; Ctrl rotates; R changes width and height. Right-click for friction.",
+      "Click to add a ramp with both locks on. Pause, then drag to move it or Ctrl-drag to rotate it; R changes width and height. Right-click for friction.",
     spring:
       "Click two objects, or an empty anchor point and an object. Escape cancels.",
     rod: "Click two objects, or an empty anchor point and an object. Escape cancels.",
@@ -380,7 +380,9 @@ function openMenu(id, x, y) {
         ? "Ideal no-slip belt. Crossed / drive controls are in the selected-item panel. Wheel mass and damping are edited on each ball."
         : l?.type === "pulley"
           ? "Taut cable with freely angled ends. Wheel mass and radius determine inertia. Alt-drag refits length; select the wheel to unlock its axle."
-          : "Changes apply while the simulation runs.";
+          : o?.shape === "ball"
+            ? "A ball is modelled as a uniform disc (I = ½mr²), so it rolls down a slope with acceleration (2/3) g sin θ, not the (5/7) g sin θ of a solid sphere. Changes apply while the simulation runs."
+            : "Changes apply while the simulation runs.";
   const fields = floor
     ? [
         [
@@ -916,7 +918,10 @@ canvas.addEventListener("pointerdown", (e) => {
     select(id || linkAt(pointer) || null);
     if (id) {
       if (resizeHeld || tool === "resize") sim.beginResize(id, pointer);
-      else sim.beginGrab(id, pointer, performance.now(), grabOptions());
+      else {
+        refusalShown = false;
+        sim.beginGrab(id, pointer, performance.now(), grabOptions());
+      }
     }
     return;
   }
@@ -995,7 +1000,30 @@ canvas.addEventListener("pointermove", (e) => {
   syncModifiers(e);
   if (marquee) marquee.end = { ...pointer };
   updateInteraction();
+  refusedDragToast();
 });
+// While running, a drag that only asks for locked motion does nothing: a
+// fully locked object, Shift-move of a pinned one, Ctrl-rotate of a
+// rotation-locked one. Say why, once per drag.
+let refusalShown = false;
+function refusedDragToast() {
+  const g = sim.grab,
+    o = g && sim.objects.get(g.id);
+  if (!o || !running || refusalShown) return;
+  if (
+    Math.hypot(pointer.x - g.startPoint.x, pointer.y - g.startPoint.y) *
+      view.scale <
+    4
+  )
+    return;
+  const refused =
+    (o.lockPosition && o.lockRotation) ||
+    (shift && o.lockPosition) ||
+    (ctrl && !shift && o.lockRotation);
+  if (!refused) return;
+  refusalShown = true;
+  toast("Pause to move a locked object");
+}
 canvas.addEventListener("pointerup", (e) => {
   if (panDrag) {
     panDrag = null;

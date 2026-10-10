@@ -1196,6 +1196,39 @@ for (const open of [
   frames(1);
   assert.match($("time").textContent, /^\d+\.\d\d s$/);
 }
+// Small corrections: disc note, lock hints and the refused-drag message.
+{
+  clearScene();
+  if ($("pause").textContent === "Run") key(" ");
+  key("b");
+  click(500, 150);
+  menu(500, 150);
+  assert.match($("menu-note").textContent, /uniform disc/);
+  assert.match($("menu-note").textContent, /\(2\/3\) g sin θ/);
+  $("close-menu").click();
+  key("w");
+  assert.doesNotMatch($("tool-help").textContent, /Shift-drag/);
+  key("g");
+  key("n");
+  click(700, 150);
+  for (const id of ["lock-position", "lock-rotation"]) {
+    $(id).checked = true;
+    $(id).dispatchEvent(new window.Event("change"));
+  }
+  $("toast").textContent = "";
+  pointer("pointerdown", 700, 150);
+  pointer("pointermove", 760, 150);
+  pointer("pointerup", 760, 150);
+  assert.equal($("toast").textContent, "Pause to move a locked object");
+  // Paused, the same drag is allowed and says nothing.
+  key(" ");
+  $("toast").textContent = "";
+  pointer("pointerdown", 700, 150);
+  pointer("pointermove", 760, 150);
+  pointer("pointerup", 760, 150);
+  assert.equal($("toast").textContent, "");
+  key(" ");
+}
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );
