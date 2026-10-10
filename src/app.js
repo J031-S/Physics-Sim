@@ -2212,6 +2212,94 @@ function placeToast() {
     el.style.bottom = bottom + "px";
   }
 }
+// Ruler markings rotate with the body, so spin is visible on any shape. Tick
+// lengths and spacing are fixed in metres, so a large body is marked exactly
+// like a small one (ticks still scale with zoom, like the body itself).
+const TICK = { gap: 0.025, minor: 0.075, mid: 0.1, major: 0.13 },
+  RULER_INK = "#fff7e9";
+function distanceToSegment(p, a, b) {
+  const dx = b.x - a.x,
+    dy = b.y - a.y,
+    t = Math.max(
+      0,
+      Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)),
+    );
+  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+}
+function drawRuler(o, s) {
+  if (o.shape === "ball") {
+    // Degree ticks: the finest of these steps whose arc spacing is at least
+    // 0.065 m (10° on the default 0.4 m radius) and 5 px on screen. Long
+    // ticks every 30°, medium every 10°.
+    const outer = o.radius - Math.min(TICK.gap, o.radius * 0.1),
+      room = Math.min(1, (o.radius * 0.45) / TICK.major),
+      step =
+        [1, 2, 5, 10, 15, 30, 90].find((d) => {
+          const arc = (o.radius * d * Math.PI) / 180;
+          return arc >= 0.065 && arc * view.scale >= 5;
+        }) ?? 90;
+    for (let degrees = 0; degrees < 360; degrees += step) {
+      const angle = s.angle + (degrees * Math.PI) / 180,
+        level =
+          degrees % 30 === 0 ? "major" : degrees % 10 === 0 ? "mid" : "minor",
+        inner = outer - (TICK[level] - TICK.gap) * room,
+        c = Math.cos(angle),
+        si = Math.sin(angle);
+      line(
+        screen({ x: s.x + inner * c, y: s.y + inner * si }),
+        screen({ x: s.x + outer * c, y: s.y + outer * si }),
+        RULER_INK,
+        level === "major" ? 2 : 1,
+      );
+    }
+    return;
+  }
+  // Straight edges carry length ticks: 0.1 m apart with long ones every
+  // 0.5 m, coarser when zoomed out so ticks never merge.
+  const minor = [0.1, 0.5, 1, 5].find((m) => m * view.scale >= 5) ?? 10,
+    every = minor === 0.5 ? 2 : 5,
+    corners = o.body.vertices.map((v) => ({ x: v.x / 100, y: -v.y / 100 })),
+    edges = corners.map((a, i) => [a, corners[(i + 1) % corners.length]]);
+  ctx.save();
+  ctx.clip(); // the body outline is still the current path
+  edges.forEach(([a, b], i) => {
+    const length = Math.hypot(b.x - a.x, b.y - a.y),
+      ux = (b.x - a.x) / length,
+      uy = (b.y - a.y) / length,
+      // Inward normal: towards the centre of mass.
+      side = (s.x - a.x) * -uy + (s.y - a.y) * ux > 0 ? 1 : -1,
+      nx = -uy * side,
+      ny = ux * side;
+    for (let k = 1; k * minor < length - 1e-6; k++) {
+      const major = k % every === 0,
+        x = a.x + ux * k * minor,
+        y = a.y + uy * k * minor,
+        to = major ? TICK.major : TICK.minor,
+        tip = { x: x + nx * to, y: y + ny * to };
+      // Near a corner a tick would run into the next edge's ticks; leave the
+      // corner clear instead (both edges skip, so corners stay symmetric).
+      if (
+        edges.some(
+          (e, j) =>
+            j !== i &&
+            Math.min(
+              distanceToSegment(tip, ...e),
+              distanceToSegment({ x, y }, ...e),
+            ) <
+              TICK.major + TICK.gap,
+        )
+      )
+        continue;
+      line(
+        screen({ x: x + nx * TICK.gap, y: y + ny * TICK.gap }),
+        screen(tip),
+        RULER_INK,
+        major ? 2 : 1,
+      );
+    }
+  });
+  ctx.restore();
+}
 function draw() {
   const r = canvas.getBoundingClientRect(),
     dpr = window.devicePixelRatio || 1;
@@ -2384,59 +2472,7 @@ function draw() {
         : "#658199";
     ctx.lineWidth = highlighted(o.id) ? 2.5 : 1.5;
     ctx.stroke();
-    // Ruler markings rotate with the body, so spin is visible on any shape.
-    // Balls carry degree ticks; straight edges carry length ticks in metres.
-    if (o.shape === "ball") {
-      for (let degrees = 0; degrees < 360; degrees += 10) {
-        const angle = s.angle + (degrees * Math.PI) / 180;
-        const outer = o.radius * 0.95,
-          inner = o.radius * (degrees % 30 === 0 ? 0.74 : 0.85);
-        line(
-          screen({
-            x: s.x + inner * Math.cos(angle),
-            y: s.y + inner * Math.sin(angle),
-          }),
-          screen({
-            x: s.x + outer * Math.cos(angle),
-            y: s.y + outer * Math.sin(angle),
-          }),
-          "#fff7e9",
-          degrees % 30 === 0 ? 2 : 1,
-        );
-      }
-    } else {
-      const half = Math.min(o.width, o.height) / 2,
-        // Coarser spacing when zoomed out, so ticks never merge.
-        minor = [0.1, 0.5, 1, 5].find((m) => m * view.scale >= 5) ?? 10,
-        every = minor === 0.5 ? 2 : 5,
-        corners = o.body.vertices.map((v) => ({ x: v.x / 100, y: -v.y / 100 }));
-      ctx.save();
-      ctx.clip(); // the body outline is still the current path
-      corners.forEach((a, i) => {
-        const b = corners[(i + 1) % corners.length],
-          length = Math.hypot(b.x - a.x, b.y - a.y),
-          ux = (b.x - a.x) / length,
-          uy = (b.y - a.y) / length,
-          // Inward normal: towards the centre of mass.
-          side = (s.x - a.x) * -uy + (s.y - a.y) * ux > 0 ? 1 : -1,
-          nx = -uy * side,
-          ny = ux * side;
-        for (let k = 1; k * minor < length - 1e-6; k++) {
-          const major = k % every === 0,
-            x = a.x + ux * k * minor,
-            y = a.y + uy * k * minor,
-            from = half * 0.05,
-            to = half * (major ? 0.26 : 0.15);
-          line(
-            screen({ x: x + nx * from, y: y + ny * from }),
-            screen({ x: x + nx * to, y: y + ny * to }),
-            "#fff7e9",
-            major ? 2 : 1,
-          );
-        }
-      });
-      ctx.restore();
-    }
+    drawRuler(o, s);
     if (o.charge) {
       ctx.fillStyle = o.charge > 0 ? "#bd5948" : "#467cb8";
       ctx.font = "bold 11px system-ui";
