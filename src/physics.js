@@ -1196,11 +1196,15 @@ export class Sandbox {
       gravitational = 0,
       elastic = 0,
       electric = 0;
+    // Not measure(): that would recompute every Coulomb pair for each body.
     for (const [id, o] of this.objects) {
-      const m = this.measure(id);
-      kinetic += m.kinetic;
-      gravitational += m.gravitational;
-      electric += this.fields.uniformEnergy(o, this.state(id));
+      const s = this.state(id),
+        inertia = o.freeInertia / (SCALE * SCALE);
+      kinetic +=
+        0.5 * o.mass * (s.vx * s.vx + s.vy * s.vy) +
+        0.5 * inertia * s.omega * s.omega;
+      gravitational += o.mass * this.settings.gravity * s.y;
+      electric += this.fields.uniformEnergy(o, s);
     }
     for (const pair of this.fields.pairEnergies()) electric += pair.energy;
     for (const l of this.links.values())
