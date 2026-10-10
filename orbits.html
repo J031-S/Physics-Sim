@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Physics Sim · Orbits &amp; gravitation</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="fields.css" />
+    <link rel="stylesheet" href="orbits.css" />
+  </head>
+  <body class="orbit-lab">
+    <header>
+      <a class="brand" href="./"><span>φ</span> Physics Sim</a>
+      <nav class="site-nav" aria-label="Simulations">
+        <button
+          id="nav-toggle"
+          class="nav-toggle"
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-controls="nav-menu"
+          title="Switch simulation"
+        >
+          Orbits &amp; gravitation
+        </button>
+        <div id="nav-menu" class="nav-menu" hidden>
+          <a href="./"
+            ><strong>Mechanics sandbox</strong
+            ><small>Kinematics, forces, springs and pulleys</small></a
+          >
+          <a href="fields.html"
+            ><strong>Electric &amp; magnetic fields</strong
+            ><small>Charges, currents and their field lines</small></a
+          >
+          <a href="orbits.html" aria-current="page"
+            ><strong>Orbits &amp; gravitation</strong
+            ><small>Satellites, escape speed and Kepler's laws</small></a
+          >
+        </div>
+      </nav>
+      <div class="playback">
+        <button
+          id="settings-toggle"
+          title="Settings"
+          aria-expanded="false"
+          aria-controls="settings-panel"
+        >
+          Settings</button
+        ><button
+          id="shortcuts"
+          title="Keyboard shortcuts (?)"
+          aria-expanded="false"
+          aria-controls="keys-panel"
+        >
+          Keys ?</button
+        ><span class="header-divider" aria-hidden="true"></span
+        ><button
+          id="reset"
+          title="Reset: remove every satellite and set the clock to zero (R)"
+          disabled
+        >
+          Reset</button
+        ><button id="pause" title="Run / pause (Space)">Run</button
+        ><button id="step" title="Advance one frame of simulated time (.)">
+          Step</button
+        ><select
+          id="warp"
+          title="Time warp: simulated seconds per real second ([ and ])"
+          aria-label="Time warp"
+        ></select
+        ><span class="header-divider" aria-hidden="true"></span
+        ><button
+          id="presets-toggle"
+          title="Ready-made launches"
+          aria-expanded="false"
+          aria-controls="presets-panel"
+        >
+          Presets
+        </button>
+      </div>
+    </header>
+    <main>
+      <canvas
+        id="canvas"
+        tabindex="0"
+        aria-label="Orbit scene. Set the launch in the panel on the left, or drag the arrow on the satellite, then press Launch. Drag empty space to pan; scroll to zoom."
+      ></canvas>
+      <div class="ol-top">
+        <div class="ol-left">
+          <details id="launch-panel" class="ol-panel" open>
+            <summary>Launch</summary>
+            <label class="select-row" for="body-preset"
+              >Central body
+              <select id="body-preset">
+                <option value="earth">Earth</option>
+                <option value="moon">Moon</option>
+                <option value="mars">Mars</option>
+                <option value="jupiter">Jupiter</option>
+                <option value="sun">Sun</option>
+                <option value="custom" hidden>Custom</option>
+              </select></label
+            >
+            <form id="body-form" class="fl-form"></form>
+            <p id="body-note" class="fl-note"></p>
+            <form id="launch-form" class="fl-form"></form>
+            <div class="ol-speeds" role="group" aria-label="Reference speeds">
+              <span>Circular orbit speed here</span
+              ><span class="num" id="circular-speed"></span
+              ><button
+                id="use-circular"
+                title="Set the launch speed to the circular orbit speed at this distance: v = √(GM/r)"
+              >
+                Use</button
+              ><span>Escape speed here</span
+              ><span class="num" id="escape-speed"></span
+              ><button
+                id="use-escape"
+                title="Set the launch speed to the escape speed at this distance: v = √(2GM/r)"
+              >
+                Use
+              </button>
+            </div>
+            <p id="speed-compare" class="fl-note"></p>
+            <div class="ol-actions">
+              <button
+                id="launch"
+                title="Launch a satellite with these values (L)"
+              >
+                Launch</button
+              ><button
+                id="clear-trails"
+                title="Erase the paths drawn so far; the satellites keep going (C)"
+              >
+                Clear trails
+              </button>
+            </div>
+            <div
+              id="launch-list"
+              class="ol-list"
+              role="group"
+              aria-label="Satellites in flight"
+            ></div>
+          </details>
+          <details id="display-panel" class="ol-panel" open>
+            <summary>Display</summary>
+            <div class="ol-checks">
+              <label class="fl-check"
+                ><input id="show-velocity" type="checkbox" checked /> Velocity
+                <span class="swatch velocity" aria-hidden="true"></span
+              ></label>
+              <label
+                class="fl-check"
+                title="The gravitational force on the satellite, F = GMm/r² (G)"
+                ><input id="show-force" type="checkbox" /> Gravity force
+                <span class="swatch force" aria-hidden="true"></span
+              ></label>
+              <label class="fl-check"
+                ><input id="show-prediction" type="checkbox" checked />
+                Predicted orbit</label
+              >
+              <label class="fl-check"
+                ><input id="show-trails" type="checkbox" checked />
+                Trails</label
+              >
+              <label
+                class="fl-check"
+                title="Kepler's second law: shade the areas swept in equal times (K)"
+                ><input id="show-areas" type="checkbox" /> Equal areas</label
+              >
+              <label
+                class="fl-check"
+                title="Numbers beside the arrows and names on the scene"
+                ><input id="show-labels" type="checkbox" checked />
+                Values</label
+              >
+              <label
+                class="fl-check"
+                title="Keep the whole orbit in view as it changes (A)"
+                ><input id="auto-fit" type="checkbox" checked /> Keep orbit in
+                view</label
+              >
+              <label
+                class="fl-check"
+                title="Show the readouts in metres, metres per second, seconds and joules"
+                ><input id="si-units" type="checkbox" /> SI base units</label
+              >
+            </div>
+          </details>
+        </div>
+        <div class="fl-centre">
+          <div id="tool-settings" class="fl-hint" aria-live="polite">
+            <strong id="tool-name"></strong>
+            <span id="tool-help"></span>
+          </div>
+        </div>
+        <div class="ol-side">
+          <details id="graph-panel" class="ol-panel" open>
+            <summary>Graphs against time</summary>
+            <div class="ol-legend" aria-hidden="true">
+              <span class="key kinetic"></span> Kinetic
+              <span class="key gravitational"></span> Potential
+              <span class="key total"></span> Total
+            </div>
+            <canvas
+              id="energy-graph"
+              class="ol-graph ol-graph-tall"
+              role="img"
+              aria-label="Kinetic, gravitational potential and total energy of the selected satellite against time"
+            ></canvas>
+            <canvas
+              id="distance-graph"
+              class="ol-graph"
+              role="img"
+              aria-label="Distance of the selected satellite from the centre against time"
+            ></canvas>
+            <canvas
+              id="speed-graph"
+              class="ol-graph"
+              role="img"
+              aria-label="Speed of the selected satellite against time"
+            ></canvas>
+          </details>
+          <details id="readout" class="ol-panel" open>
+            <summary>Readouts <small id="readout-subject"></small></summary>
+            <div id="readout-grid" class="ol-readout-grid"></div>
+          </details>
+          <details id="kepler-panel" class="ol-panel">
+            <summary>Kepler's laws</summary>
+            <strong class="ol-subhead">2nd law: equal areas</strong>
+            <p id="areas-note" class="fl-note"></p>
+            <div id="areas-list" class="ol-areas"></div>
+            <strong class="ol-subhead">3rd law: T² against a³</strong>
+            <canvas
+              id="third-law-graph"
+              class="ol-graph ol-graph-tall"
+              role="img"
+              aria-label="Period squared against semi-major axis cubed, one point for each satellite that has completed an orbit"
+            ></canvas>
+            <p id="third-law-note" class="fl-note"></p>
+            <div class="ol-actions">
+              <label class="fl-check"
+                ><input id="show-third-line" type="checkbox" /> Line T² =
+                (4π²/GM)·a³</label
+              ><button
+                id="clear-third-law"
+                title="Remove every point from this plot"
+              >
+                Clear points
+              </button>
+            </div>
+          </details>
+        </div>
+      </div>
+      <div class="camera-controls" role="toolbar" aria-label="View">
+        <button id="zoom-out" title="Zoom out (−)">−</button
+        ><span id="zoom-level"></span
+        ><button id="zoom-in" title="Zoom in (+)">+</button
+        ><button id="fit-scene" title="Fit the orbits in view">
+          Fit scene
+        </button>
+      </div>
+      <div class="status">
+        <span id="scene-status"></span><span id="time"></span>
+      </div>
+      <div id="toast" role="status" aria-live="polite"></div>
+    </main>
+    <section id="settings-panel" hidden aria-labelledby="settings-title">
+      <div class="menu-header">
+        <strong id="settings-title">Settings</strong
+        ><button id="close-settings" aria-label="Close settings">×</button>
+      </div>
+      <p>Changes apply immediately.</p>
+      <details class="settings-section" open>
+        <summary>Satellite</summary>
+        <div class="prop-row">
+          <label
+            for="satellite-mass"
+            title="Used for the energies, angular momentum and force. The path does not depend on it."
+            >Satellite mass</label
+          ><span></span
+          ><span class="prop-value"
+            ><input
+              id="satellite-mass"
+              type="number"
+              min="0.001"
+              max="1e12"
+              step="any"
+              value="1000"
+            /><span class="unit">kg</span></span
+          >
+        </div>
+        <small id="mass-note"></small>
+      </details>
+      <details class="settings-section" open>
+        <summary>Website</summary>
+        <label class="select-row"
+          >Theme
+          <select id="ui-theme">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="system">System</option>
+          </select></label
+        >
+        <div class="prop-row">
+          <label for="ui-size">GUI size</label
+          ><input
+            id="ui-size"
+            type="range"
+            min="80"
+            max="140"
+            step="5"
+            value="100"
+          /><span class="prop-value"
+            ><output id="ui-size-value" for="ui-size">100%</output></span
+          >
+        </div>
+        <label class="setting-toggle"
+          ><input id="ui-grid" type="checkbox" checked /> Show grid</label
+        >
+        <label class="select-row"
+          >Angle unit
+          <select id="ui-angle-unit">
+            <option value="degrees">Degrees (°)</option>
+            <option value="radians">Radians (rad)</option>
+          </select></label
+        >
+        <small
+          >Website preferences are remembered on this browser and shared with
+          the other simulations.</small
+        >
+      </details>
+    </section>
+    <section id="presets-panel" hidden aria-labelledby="presets-title">
+      <div class="menu-header">
+        <strong id="presets-title">Presets</strong
+        ><button id="close-presets" aria-label="Close presets">×</button>
+      </div>
+      <p>
+        Ready-made launches. Loading one removes the satellites in flight, sets
+        the launch values and a suitable time warp, and launches. Each says what
+        to check in the readouts.
+      </p>
+      <div id="preset-list"></div>
+    </section>
+    <section id="keys-panel" hidden aria-label="Keyboard shortcuts">
+      <div class="menu-header">
+        <strong>Keyboard &amp; mouse</strong
+        ><button id="close-keys" aria-label="Close shortcuts">×</button>
+      </div>
+      <dl>
+        <dt>Drag the arrow</dt>
+        <dd>
+          Sets the launch speed and direction. Hold Shift to keep the direction
+          and change only the speed.
+        </dd>
+        <dt>Drag the launch point</dt>
+        <dd>Moves it up or down, changing the launch altitude.</dd>
+        <dt>Click a satellite</dt>
+        <dd>Selects it for the readouts and graphs.</dd>
+        <dt>Drag · scroll</dt>
+        <dd>Pan and zoom the view. Either turns off “keep in view”.</dd>
+        <dt>L</dt>
+        <dd>Launch a satellite</dd>
+        <dt>Space · .</dt>
+        <dd>Run or pause · advance one frame while paused</dd>
+        <dt>[ · ]</dt>
+        <dd>Slower · faster time warp</dd>
+        <dt>R · C</dt>
+        <dd>Reset (remove every satellite) · clear trails</dd>
+        <dt>Arrow keys</dt>
+        <dd>
+          Up and down change the launch speed by 1% of the circular speed; left
+          and right turn the launch direction by 1°.
+        </dd>
+        <dt>V · G · P · T · K</dt>
+        <dd>
+          Toggle velocity · gravitational force · predicted orbit · trails ·
+          equal areas
+        </dd>
+        <dt>A · + · −</dt>
+        <dd>Keep the whole orbit in view · zoom in · zoom out</dd>
+        <dt>Escape</dt>
+        <dd>Closes any open panel</dd>
+      </dl>
+      <p>
+        Gravity is Newton's law, F = GMm/r², with G = 6.674 × 10⁻¹¹ N·m²/kg².
+        The central body is held fixed, which is accurate while the satellite's
+        mass is negligible beside it. There is no atmosphere, the body does not
+        spin, and nothing else pulls on the satellite.
+      </p>
+    </section>
+    <script type="module" src="src/orbitlab/app.js"></script>
+  </body>
+</html>

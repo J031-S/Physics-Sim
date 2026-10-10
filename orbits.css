@@ -1,0 +1,305 @@
+/* Orbits & gravitation page. Shared pieces come from styles.css (header,
+   panels, property rows, readout numbers, energy colours) and fields.css
+   (.fl-centre, .fl-hint, .fl-form, .fl-check, .fl-note). */
+.orbit-lab {
+  --total: #354438;
+}
+:root[data-theme="dark"] .orbit-lab {
+  --total: #ebe5d6;
+}
+/* One row across the top of the scene: the launch panel, the outcome strip,
+   and the column of display, readout and graph panels. Only its children
+   take pointer input. */
+.ol-top {
+  position: absolute;
+  inset: 12px 16px 50px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  pointer-events: none;
+  zoom: var(--ui-scale);
+}
+.ol-top > * {
+  pointer-events: auto;
+}
+.ol-top > .fl-centre {
+  pointer-events: none;
+}
+.ol-panel {
+  padding: 6px 10px 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 11px;
+}
+.ol-panel > summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 2px 0;
+}
+.ol-panel > summary small {
+  font-weight: 400;
+  opacity: 0.7;
+}
+.ol-left,
+.ol-side {
+  flex: 0 0 304px;
+  width: 304px;
+  max-height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ol-side {
+  flex-basis: 292px;
+  width: 292px;
+}
+.ol-left > *,
+.ol-side > * {
+  flex: none;
+}
+/* Display toggles, two to a row. */
+.ol-checks {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0 10px;
+}
+.ol-checks .fl-check {
+  white-space: nowrap;
+}
+.ol-checks .swatch {
+  width: 16px;
+  margin-right: 4px;
+}
+.ol-panel label.select-row {
+  display: grid;
+  grid-template-columns: 7.6em 1fr;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+.ol-panel label.select-row select {
+  padding: 4px;
+}
+.ol-panel .fl-form {
+  margin-top: 6px;
+}
+.ol-panel .fl-form .prop-row {
+  grid-template-columns: 7.6em minmax(40px, 1fr) auto;
+}
+.ol-panel .fl-form input[type="number"] {
+  width: 98px;
+}
+.ol-panel .fl-form .unit {
+  min-width: 2.6em;
+}
+.ol-panel input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  accent-color: #58784f;
+}
+.ol-panel .fl-note {
+  margin: 6px 0 0;
+}
+/* The two reference speeds beside the launch speed, each with a button
+   that sets the launch speed to it. */
+.ol-speeds {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid var(--line);
+}
+.ol-speeds button,
+.ol-actions button,
+.ol-list button {
+  padding: 3px 9px;
+  font-size: 11px;
+}
+.ol-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid var(--line);
+}
+.ol-actions .fl-check {
+  margin-top: 0;
+}
+#launch {
+  flex: 1;
+  padding: 6px 12px;
+  background: #435d49;
+  border-color: #435d49;
+  color: white;
+  font-weight: 600;
+}
+#launch:hover {
+  background: #37503d;
+}
+/* Satellites in flight: a colour chip that selects, and a remove button. */
+.ol-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.ol-list:empty {
+  display: none;
+}
+.ol-chip {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.ol-chip button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 0;
+  padding: 3px 7px;
+  background: transparent;
+}
+.ol-chip button[aria-pressed="true"] {
+  background: #e5eedf;
+}
+:root[data-theme="dark"] .ol-chip button[aria-pressed="true"] {
+  background: #3b4c3f;
+  color: #ecf5e8;
+}
+.ol-chip .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+.ol-chip .remove {
+  padding: 3px 6px;
+  border-left: 1px solid var(--line);
+  opacity: 0.7;
+}
+.ol-readout-grid {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 2px 6px;
+  margin-top: 4px;
+  font-size: 10.5px;
+  align-items: baseline;
+}
+.ol-readout-grid .unit {
+  opacity: 0.65;
+  font-size: 10px;
+  min-width: 3.2em;
+}
+.ol-readout-grid .heading {
+  grid-column: 1 / -1;
+  margin-top: 5px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+  font-weight: 600;
+}
+.ol-readout-grid .wide {
+  grid-column: 2 / -1;
+  text-align: right;
+}
+.ol-graph {
+  display: block;
+  width: 100%;
+  height: 80px;
+  margin-top: 4px;
+}
+.ol-graph-tall {
+  height: 120px;
+}
+.ol-legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  font-size: 10px;
+}
+.ol-legend .key {
+  margin-left: 6px;
+}
+.ol-legend .key:first-child {
+  margin-left: 0;
+}
+.key.total {
+  background: var(--total);
+}
+.ol-subhead {
+  display: block;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+.ol-panel > summary + .ol-subhead {
+  margin-top: 2px;
+  padding-top: 2px;
+  border-top: 0;
+}
+.ol-panel .ol-subhead + .fl-note {
+  margin-top: 2px;
+  padding-top: 0;
+  border-top: 0;
+}
+.ol-areas {
+  display: grid;
+  grid-template-columns: repeat(3, auto 1fr);
+  gap: 1px 6px;
+  margin-top: 4px;
+  font-size: 10.5px;
+}
+.ol-areas:empty {
+  display: none;
+}
+.ol-areas > span:nth-child(odd) {
+  opacity: 0.7;
+}
+#warp {
+  height: 30px;
+  width: 104px;
+  padding: 0 4px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+.orbit-lab #zoom-level {
+  min-width: 96px;
+}
+/* The view cluster sits beside the left-hand panels, not under them. */
+.orbit-lab .camera-controls {
+  left: 326px;
+}
+.orbit-lab #settings-panel .prop-row input[type="number"] {
+  width: 84px;
+}
+.orbit-lab canvas:focus-visible {
+  outline-offset: -2px;
+}
+/* Narrow screens: the panels stack and start folded (see app.js). */
+@media (max-width: 900px) {
+  .orbit-lab .camera-controls {
+    left: 16px;
+  }
+  .ol-top {
+    flex-wrap: wrap;
+    align-content: flex-start;
+  }
+  .ol-left,
+  .ol-side {
+    flex-basis: auto;
+    width: min(304px, 100%);
+  }
+  .ol-top > .fl-centre {
+    order: 3;
+    flex-basis: 100%;
+  }
+}

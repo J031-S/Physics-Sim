@@ -91,7 +91,7 @@ assert.equal(nav.getAttribute("aria-expanded"), "true");
 const links = [...$("nav-menu").querySelectorAll("a")];
 assert.deepEqual(
   links.map((a) => a.getAttribute("href")),
-  ["./", "fields.html"],
+  ["./", "fields.html", "orbits.html"],
 );
 assert.equal(links[1].getAttribute("aria-current"), "page");
 nav.click();
