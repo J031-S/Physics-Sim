@@ -44,6 +44,7 @@ No bundler, no framework, no runtime dependencies. `index.html` loads `vendor/ma
 - Force N → Matter: `F * SCALE / 1e6` (see `applyForce`). Inertia kg·m² ↔ Matter: multiply/divide by `SCALE²`.
 - Always read motion through `sim.state(id)` (returns SI `x, y, vx, vy, angle, omega`) rather than raw `body.velocity`.
 - Engine gravity is disabled (`engine.gravity.scale = 0`); gravity, damping, springs, Coulomb and field forces are applied explicitly in `Sandbox.step()`.
+- Inertia comes from `Sandbox.momentOfInertia(o)` (textbook disc / rectangle / right triangle), never from Matter, which scales polygon inertia by 4. Call it after any change to mass or dimensions.
 - Position lock = `inverseMass 0` plus anchor restore; rotation lock = infinite inertia. `o.mass` and `o.freeInertia` hold the real values, so restore from those, never from the body.
 - Link records live in `sim.links` with `type` of `spring`, `rod`, `belt` or `pulley`. Only rods use a Matter `Constraint`; the others are solved by this code.
 
@@ -70,11 +71,10 @@ Per body: Lorentz velocity update → gravity force → exponential damping. The
 Measured against analytic results (October 2026). Do not assume these behave correctly, and do not write tests that enshrine them:
 
 - **Contact friction is not Coulomb friction.** Matter's friction is a velocity clamp that ignores normal force: blocks stick on inclines far beyond `tan θ = μ`, sliding deceleration is roughly 10× `μg` and independent of `g`, and a resting block barely moves under a force several times `μmg`. Only `μ = 0` is correct. Conveyor traction in `mechanisms.js` has the same character.
-- **Moments of inertia are 4× too large** for every shape (Matter's `Body._inertiaScale = 4`). Affects rolling, pulley wheels, belts, toppling and spin.
 - **Rods dissipate energy** in proportion to angular speed² (pendulums and circular motion decay with all damping set to zero). Springs conserve energy well.
 - **Restitution** is `max(e₁, e₂)` for a pair, is about 1–2% low, and collisions slower than about 1.35 m/s are treated as perfectly inelastic.
 - **Air resistance and linear damping are rates (s⁻¹), not forces**, so terminal velocity is independent of mass and size.
-- **Pulley cables cannot go slack** (they push like a rod), and rolling balls experience a spurious rolling resistance of about 0.2 m/s².
+- **Pulley cables cannot go slack** (they push like a rod), and rolling balls experience a spurious rolling resistance of about 0.2–0.4 m/s² (a ball on a 20° incline accelerates at 1.96 m/s² against 2.24 for a disc).
 - **A magnetic field removes speed from a charged body that is sliding on a surface or held by a rod**, because the rotated velocity component is discarded by the contact/constraint.
 - **No continuous collision detection**: bodies tunnel through the 0.5 m floor/walls above roughly 100 m/s, and through thin bodies from about 30 m/s.
 - New bodies default to angular damping 0.05 s⁻¹ and new springs to damping 0.3 N·s/m, so default scenes are not energy-conserving.

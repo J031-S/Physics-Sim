@@ -146,6 +146,16 @@ export class Sandbox {
   endGroup() {
     this.group = null;
   }
+  // Matter multiplies every polygon inertia by an internal stability factor of
+  // 4. Use the textbook value about the centre of mass instead (engine units).
+  momentOfInertia(o) {
+    const k =
+      o.shape === "ball"
+        ? (o.radius * o.radius) / 2
+        : (o.width * o.width + o.height * o.height) /
+          (o.shape === "wedge" ? 18 : 12);
+    return o.mass * k * SCALE * SCALE;
+  }
   add(shape, point) {
     if (!["ball", "block", "wedge"].includes(shape))
       throw new Error("Only balls, blocks and wedges are supported.");
@@ -213,6 +223,8 @@ export class Sandbox {
         angleAnchor: body.angle,
         freeInertia: body.inertia,
       };
+    object.freeInertia = this.momentOfInertia(object);
+    Body.setInertia(body, object.freeInertia);
     this.objects.set(id, object);
     Composite.add(this.engine.world, body);
     if (shape === "wedge") {
@@ -355,12 +367,10 @@ export class Sandbox {
       )
         throw new Error("Invalid " + key + ".");
     if (patch.mass !== undefined) {
-      // Restore finite inertia before changing mass; retain independent locks.
-      Body.setInertia(o.body, o.freeInertia);
       Body.setMass(o.body, patch.mass);
-      o.freeInertia = o.body.inertia;
     }
     Object.assign(o, patch);
+    if (patch.mass !== undefined) o.freeInertia = this.momentOfInertia(o);
     o.body.friction = o.friction;
     // Discard warm-start friction from the old material value. Otherwise a
     // resting contact can stay stuck even after its coefficient becomes zero.
@@ -378,6 +388,7 @@ export class Sandbox {
         }
       }
     o.body.restitution = o.restitution;
+    // Independent locks survive a mass change; inertia is restored from o.
     o.body.inverseMass = o.lockPosition ? 0 : 1 / o.mass;
     Body.setInertia(o.body, o.lockRotation ? Infinity : o.freeInertia);
   }
@@ -516,10 +527,10 @@ export class Sandbox {
       height / (o.shape === "ball" ? o.radius * 2 : o.height),
     );
     Body.setMass(b, o.mass);
-    o.freeInertia = b.inertia;
     o.width = width;
     o.height = height;
     if (o.shape === "ball") o.radius = width / 2;
+    o.freeInertia = this.momentOfInertia(o);
     Body.setAngle(b, angle);
     b.inverseMass = o.lockPosition ? 0 : 1 / o.mass;
     Body.setInertia(b, o.lockRotation ? Infinity : o.freeInertia);
