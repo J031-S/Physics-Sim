@@ -14,6 +14,12 @@ import { iconSetNames } from "./icons.js";
 const root = new URL("../../", import.meta.url);
 export const DEV_KEY = "physium-developer";
 export const SCHEMES_KEY = "physium-schemes";
+const CSS_KEY = "physium-scheme-css";
+const forget = (key) => {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {}
+};
 
 const ICON_LABELS = {
   material: "Material Rounded",
@@ -93,6 +99,7 @@ function applyToPage(scheme) {
   if (!scheme || isDefault(scheme)) {
     setOverrides();
     style?.remove();
+    forget(CSS_KEY);
   } else {
     setOverrides(scheme);
     if (!style) {
@@ -111,6 +118,11 @@ function applyToPage(scheme) {
       }),
       scheme.css,
     ].join("\n");
+    // For src/site/boot.js, which puts it back before the next page is
+    // first drawn.
+    try {
+      window.localStorage.setItem(CSS_KEY, style.textContent);
+    } catch {}
     // Canvas text is drawn at once; ask for the canvas font so later frames
     // have it.
     if (value("font-canvas") !== "default")

@@ -99,6 +99,9 @@ export function setupSite() {
   setupNav();
   const prefs = setupPreferences($);
   setupDeveloper(prefs);
+  // Shown now that the shell and its icons are built (src/site/boot.js
+  // hides the page until then).
+  document.documentElement.removeAttribute("data-booting");
   return prefs;
 }
 

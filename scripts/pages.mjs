@@ -24,6 +24,7 @@ export function stubFor(tool) {
     <link rel="stylesheet" href="../styles/tokens.css" />
     <link rel="stylesheet" href="../styles/base.css" />
     <link rel="stylesheet" href="../styles/minitools.css" />
+    <script src="../src/site/boot.js"></script>
   </head>
   <body class="doc-page" data-page="minitools">
     <header>
