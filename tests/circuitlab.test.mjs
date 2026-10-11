@@ -819,7 +819,7 @@ test("an EMF may be a function of time: RC driven by a ramp and by a sine", () =
 test("values are validated at the boundary, atomically, with readable messages", () => {
   const lab = new CircuitLab(),
     r = lab.add("resistor", { resistance: 10, nodes: ["a", "b"] });
-  assert.throws(() => lab.add("inductor", {}), /Unknown component/);
+  assert.throws(() => lab.add("diode", {}), /Unknown component/);
   assert.throws(() => lab.add("resistor", { resistance: -1 }), /Resistance/);
   assert.throws(() => lab.add("resistor", { resistance: NaN }), /Resistance/);
   assert.throws(
@@ -1017,8 +1017,9 @@ test("random circuits: never NaN, never unsolvable, current conserved at every n
     kinds = [
       ..."cell cell resistor resistor resistor variable lamp".split(" "),
       ..."switch switch2 wire ammeter voltmeter capacitor capacitor".split(" "),
+      ..."inductor inductor source".split(" "),
     ];
-  for (let trial = 0; trial < 400; trial++) {
+  for (let trial = 0; trial < 600; trial++) {
     const lab = new CircuitLab(),
       names = Array.from(
         { length: 2 + Math.floor(random() * 7) },
@@ -1040,6 +1041,13 @@ test("random circuits: never NaN, never unsolvable, current conserved at every n
         capacitor: () => ({
           capacitance: 10 ** (random() * 6 - 9),
           initialVoltage: random() < 0.5 ? 0 : random() * 10,
+        }),
+        inductor: () => ({ inductance: 10 ** (random() * 5 - 5) }),
+        source: () => ({
+          amplitude: Math.round(random() * 20),
+          frequency: 10 ** (random() * 3 + 1),
+          phase: random() * 6 - 3,
+          internal: random() < 0.5 ? 0 : random() * 5,
         }),
       };
     for (let i = 1 + Math.floor(random() * 14); i > 0; i--) {
@@ -1159,4 +1167,363 @@ test("presets: each builds a sound circuit and shows its stated readings", () =>
   const find = (name) => divider.list().find((i) => i.name === name).id;
   divider.update(find("R2"), { resistance: 2e3 });
   close(divider.solve().of(find("V1")).voltage, 6, STEADY);
+});
+
+// ------------------------------------------------------------ inductors, AC
+
+test("inductor: current grows as (V/R)(1 − e^(−tR/L)), from V_L = V at the start", () => {
+  const lab = new CircuitLab(),
+    cell = lab.add("cell", { emf: 10, nodes: ["p", "n"] }),
+    r = lab.add("resistor", { resistance: 100, nodes: ["p", "m"] }),
+    coil = lab.add("inductor", { inductance: 0.5, nodes: ["m", "n"] });
+  // τ = L/R = 5 ms.
+  close(lab.timeConstants()[0], 5e-3, STEADY, "time constant L/R");
+  close(lab.timeConstants(coil)[0], 5e-3, STEADY);
+  close(lab.timestep, 5e-3 / STEPS_PER_TAU, STEADY);
+  let s = solved(lab);
+  // No current can flow at first, so the whole EMF is across the inductor.
+  assert.equal(s.of(coil).current, 0);
+  close(s.of(coil).voltage, 10, STEADY, "initial p.d. across the inductor");
+  assert.equal(s.of(r).voltage, 0);
+  lab.advance(5e-3);
+  s = solved(lab, "ok", 10 ** 2 / 100);
+  close(s.of(coil).current, 0.1 * (1 - Math.exp(-1)), TIMED, "I at one τ");
+  close(s.of(coil).current, 0.1 * (1 - Math.exp(-1)), 1e-4);
+  close(s.of(coil).voltage, 10 * Math.exp(-1), TIMED, "V_L at one τ");
+  close(s.of(coil).energy, 0.5 * 0.5 * s.of(coil).current ** 2, STEADY, "½LI²");
+  lab.advance(0.1); // 20 time constants
+  s = solved(lab, "ok", 1);
+  close(s.of(coil).current, 0.1, TIMED, "final current V/R");
+  near(s.of(coil).voltage, 0, 1e-6, "no p.d. across it once steady");
+  // Energy: the cell supplied what the resistor dissipated plus ½LI².
+  close(
+    s.of(cell).supplied,
+    s.of(r).heat + s.of(coil).energy,
+    1e-9,
+    "energy is accounted for",
+  );
+  assert.equal(lab.get(coil).name, "L1");
+});
+
+test("inductor: its current carries on through a change-over, and stops dead if the circuit is broken", () => {
+  // Charge through 100 Ω, then switch the inductor onto 100 Ω alone.
+  const lab = new CircuitLab();
+  lab.add("cell", { emf: 10, nodes: ["p", "n"] });
+  const sw = lab.add("switch2", { position: "a", nodes: ["c", "p", "n"] }),
+    r = lab.add("resistor", { resistance: 100, nodes: ["c", "m"] }),
+    coil = lab.add("inductor", { inductance: 0.5, nodes: ["m", "n"] });
+  lab.advance(0.1);
+  const steady = lab.solve().of(coil).current;
+  close(steady, 0.1, TIMED);
+  lab.toggle(sw);
+  let s = solved(lab, "ok", 1);
+  assert.equal(s.of(coil).current, steady, "current unchanged by the switch");
+  assert.equal(lab.takeEvents().length, 0);
+  // It now drives that current through the resistor: V_L = −IR.
+  close(s.of(coil).voltage, -steady * 100, STEADY, "back-EMF at the change");
+  lab.advance(5e-3);
+  s = lab.solve();
+  close(s.of(coil).current, steady * Math.exp(-1), TIMED, "decay in one τ");
+  assert.ok(s.of(r).current > 0);
+
+  // Opening a plain switch in series leaves the current nowhere to go.
+  const broken = new CircuitLab();
+  broken.add("cell", { emf: 10, nodes: ["p", "n"] });
+  broken.add("resistor", { resistance: 100, nodes: ["p", "a"] });
+  const gate = broken.add("switch", { closed: true, nodes: ["a", "b"] }),
+    l = broken.add("inductor", { inductance: 0.5, nodes: ["b", "n"] });
+  broken.advance(0.1);
+  close(broken.solve().of(l).current, 0.1, TIMED);
+  broken.toggle(gate);
+  s = broken.solve();
+  finite(s);
+  assert.equal(s.of(l).current, 0);
+  assert.equal(s.status, "open");
+  const event = broken.takeEvents().find((e) => e.type === "kick");
+  assert.ok(event, "the interruption is reported");
+  assert.deepEqual(event.ids, [l]);
+  // ½LI² = ½ × 0.5 × 0.1² had nowhere to go.
+  close(event.lost, 2.5e-3, TIMED, "energy lost in the break");
+});
+
+test("inductors in series and in parallel", () => {
+  // Series: L = 0.1 + 0.3 H, τ = L/R; the p.d. divides in proportion to L.
+  const series = new CircuitLab();
+  series.add("cell", { emf: 10, nodes: ["p", "n"] });
+  series.add("resistor", { resistance: 100, nodes: ["p", "a"] });
+  const l1 = series.add("inductor", { inductance: 0.1, nodes: ["a", "b"] }),
+    l2 = series.add("inductor", { inductance: 0.3, nodes: ["b", "n"] });
+  close(series.timeConstants()[0], 0.4 / 100, STEADY, "series τ");
+  assert.equal(series.timeConstants().length, 1);
+  let s = solved(series);
+  close(s.of(l1).voltage, 2.5, STEADY, "V₁ = V·L₁/(L₁+L₂)");
+  close(s.of(l2).voltage, 7.5, STEADY, "V₂ = V·L₂/(L₁+L₂)");
+  series.advance(4e-3);
+  s = series.solve();
+  close(s.of(l1).current, 0.1 * (1 - Math.exp(-1)), TIMED);
+  close(s.of(l2).current, s.of(l1).current, STEADY, "same current");
+  close(s.of(l2).voltage / s.of(l1).voltage, 3, 1e-6, "still 1 : 3");
+
+  // Parallel: 1/L = 1/0.1 + 1/0.3, so L = 0.075 H; currents as 1/L.
+  const parallel = new CircuitLab();
+  parallel.add("cell", { emf: 10, nodes: ["p", "n"] });
+  const r = parallel.add("resistor", { resistance: 100, nodes: ["p", "a"] }),
+    a = parallel.add("inductor", { inductance: 0.1, nodes: ["a", "n"] }),
+    b = parallel.add("inductor", { inductance: 0.3, nodes: ["a", "n"] });
+  close(parallel.timeConstants()[0], 0.075 / 100, STEADY, "parallel τ");
+  parallel.advance(0.75e-3);
+  s = parallel.solve();
+  close(s.of(r).current, 0.1 * (1 - Math.exp(-1)), TIMED);
+  close(s.of(a).current / s.of(b).current, 3, 1e-9, "currents 3 : 1");
+
+  // An inductor carrying current is suddenly put in series with one that
+  // carries none: flux linkage L·I is shared, as charge is for capacitors.
+  const joined = new CircuitLab();
+  joined.add("cell", { emf: 10, nodes: ["p", "n"] });
+  joined.add("resistor", { resistance: 100, nodes: ["p", "a"] });
+  const first = joined.add("inductor", { inductance: 0.1, nodes: ["a", "b"] }),
+    second = joined.add("inductor", { inductance: 0.3, nodes: ["b", "n"] }),
+    bypass = joined.add("switch", { closed: true, nodes: ["b", "n"] });
+  joined.advance(0.05);
+  s = joined.solve();
+  close(s.of(first).current, 0.1, TIMED);
+  near(s.of(second).current, 0, 1e-12, "the closed switch takes it all");
+  joined.toggle(bypass);
+  s = joined.solve();
+  // 0.1 H × 0.1 A shared over 0.4 H.
+  close(s.of(first).current, 0.025, 1e-4, "I = L₁I₁/(L₁ + L₂)");
+  close(s.of(second).current, s.of(first).current, STEADY);
+  const kick = joined.takeEvents().find((e) => e.type === "kick");
+  // ½ × 0.1 × 0.1² − ½ × 0.4 × 0.025².
+  close(kick.lost, 3.75e-4, 1e-3);
+  joined.advance(0.1);
+  close(joined.solve().of(second).current, 0.1, TIMED, "and recovers to V/R");
+});
+
+test("LC circuit: oscillates at 1/2π√(LC) and keeps its energy", () => {
+  const lab = new CircuitLab(),
+    L = 0.1,
+    C = 100e-6,
+    cap = lab.add("capacitor", {
+      capacitance: C,
+      initialVoltage: 10,
+      nodes: ["a", "b"],
+    }),
+    coil = lab.add("inductor", { inductance: L, nodes: ["a", "b"] }),
+    w = 1 / Math.sqrt(L * C),
+    period = (2 * Math.PI) / w;
+  assert.deepEqual(lab.timeConstants(), [], "it does not decay");
+  assert.ok(lab.timestep <= period / 400, "steps follow the oscillation");
+  const energy = () => {
+    const s = lab.solve();
+    return s.of(cap).energy + s.of(coil).energy;
+  };
+  const start = energy();
+  close(start, 0.5 * C * 100, STEADY);
+  // A quarter of a period: all the energy is in the inductor.
+  lab.advance(period / 4);
+  let s = lab.solve();
+  close(Math.abs(s.of(coil).current), 10 * Math.sqrt(C / L), TIMED, "peak I");
+  near(s.of(cap).voltage, 0, 0.05, "capacitor empty at T/4");
+  lab.advance((3 * period) / 4);
+  close(lab.solve().of(cap).voltage, 10, TIMED, "back after one period");
+  lab.advance(9 * period);
+  close(lab.solve().of(cap).voltage, 10, TIMED, "and after ten");
+  close(energy(), start, 1e-9, "½CV² + ½LI² constant");
+});
+
+// 10 V RMS at 50 Hz.
+const RMS = 10,
+  HZ = 50,
+  PEAK = RMS * Math.SQRT2,
+  OMEGA = 2 * Math.PI * HZ;
+// Angle a − b, brought into (−π, π].
+const angle = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+
+test("AC source across a resistor: in phase, I = V/R, P = V²/R", () => {
+  const lab = new CircuitLab(),
+    src = lab.add("source", {
+      amplitude: PEAK,
+      frequency: HZ,
+      nodes: ["p", "n"],
+    }),
+    r = lab.add("resistor", { resistance: 100, nodes: ["p", "n"] });
+  close(lab.period, 1 / HZ, STEADY);
+  // 400 steps to a cycle.
+  close(lab.timestep, 1 / HZ / 400, STEADY);
+  let s = solved(lab);
+  assert.equal(s.of(r).rmsCurrent, null, "no RMS reading before a full cycle");
+  assert.equal(s.of(src).voltage, 0, "a sine starts from zero");
+  lab.advance(0.005); // a quarter of a cycle: the peak
+  s = solved(lab);
+  close(s.of(src).voltage, PEAK, 1e-9, "peak EMF");
+  close(s.of(r).current, PEAK / 100, 1e-9, "i = e/R at every instant");
+  lab.advance(0.0553);
+  close(lab.time, 0.0603, 1e-12);
+  s = lab.solve();
+  close(s.of(r).current, (PEAK / 100) * Math.sin(OMEGA * 0.0603), 1e-9);
+  close(s.of(r).rmsCurrent, RMS / 100, 1e-9, "I rms");
+  close(s.of(r).rmsVoltage, RMS, 1e-9, "V rms = peak/√2");
+  close(s.of(r).meanPower, RMS ** 2 / 100, 1e-9, "mean power");
+  close(s.of(src).rmsVoltage, RMS, 1e-9);
+  close(s.of(src).rmsCurrent, RMS / 100, 1e-9);
+  near(angle(s.of(r).phaseCurrent, s.of(r).phaseVoltage), 0, 1e-9, "in phase");
+  near(s.of(src).phaseVoltage, 0, 1e-9, "the source is the reference");
+  // Meters read RMS as well.
+  const meter = lab.add("voltmeter", { nodes: ["p", "n"] });
+  lab.advance(0.04);
+  close(lab.solve().of(meter).rmsVoltage, RMS, 1e-9);
+});
+
+test("AC source across a capacitor and across an inductor: reactance and 90°", () => {
+  // Capacitor: X_C = 1/ωC, current leads the p.d. by 90°.
+  const C = 10e-6,
+    cap = new CircuitLab();
+  cap.add("source", { amplitude: PEAK, frequency: HZ, nodes: ["p", "n"] });
+  const c = cap.add("capacitor", { capacitance: C, nodes: ["p", "n"] });
+  cap.advance(0.06);
+  let s = cap.solve();
+  close(s.of(c).rmsCurrent, RMS * OMEGA * C, TIMED, "I = V·ωC");
+  close(s.of(c).rmsCurrent, RMS * OMEGA * C, 1e-4);
+  near(
+    angle(s.of(c).phaseCurrent, s.of(c).phaseVoltage),
+    Math.PI / 2,
+    1e-3,
+    "current leads by 90°",
+  );
+  near(s.of(c).meanPower, 0, 1e-3 * RMS * RMS * OMEGA * C, "no mean power");
+
+  // Inductor: X_L = ωL, current lags by 90°. The source starts at its peak
+  // so that the current has no steady offset.
+  const L = 0.5,
+    coil = new CircuitLab();
+  coil.add("source", {
+    amplitude: PEAK,
+    frequency: HZ,
+    phase: Math.PI / 2,
+    nodes: ["p", "n"],
+  });
+  const l = coil.add("inductor", { inductance: L, nodes: ["p", "n"] });
+  coil.advance(0.06);
+  s = coil.solve();
+  close(s.of(l).rmsCurrent, RMS / (OMEGA * L), TIMED, "I = V/ωL");
+  close(s.of(l).rmsCurrent, RMS / (OMEGA * L), 1e-4);
+  near(
+    angle(s.of(l).phaseCurrent, s.of(l).phaseVoltage),
+    -Math.PI / 2,
+    1e-3,
+    "current lags by 90°",
+  );
+  near(s.of(l).meanPower, 0, 1e-3 * (RMS * RMS) / (OMEGA * L));
+  // Switched on at a zero of the p.d. instead, an ideal inductor's current
+  // never reverses: i = (V₀/ωL)(1 − cos ωt). That is the real behaviour.
+  const offset = new CircuitLab();
+  offset.add("source", { amplitude: PEAK, frequency: HZ, nodes: ["p", "n"] });
+  const lo = offset.add("inductor", { inductance: L, nodes: ["p", "n"] });
+  offset.advance(0.0137);
+  close(
+    offset.solve().of(lo).current,
+    (PEAK / (OMEGA * L)) * (1 - Math.cos(OMEGA * 0.0137)),
+    TIMED,
+  );
+});
+
+test("series RLC: impedance, phase, component p.d.s, power, and resonance", () => {
+  const R = 100,
+    L = 0.5,
+    C = 10e-6,
+    build = (frequency) => {
+      const lab = new CircuitLab(),
+        id = {
+          src: lab.add("source", {
+            amplitude: PEAK,
+            frequency,
+            nodes: ["p", "n"],
+          }),
+          r: lab.add("resistor", { resistance: R, nodes: ["p", "a"] }),
+          l: lab.add("inductor", { inductance: L, nodes: ["a", "b"] }),
+          c: lab.add("capacitor", { capacitance: C, nodes: ["b", "q"] }),
+          meter: lab.add("ammeter", { nodes: ["q", "n"] }),
+        };
+      // Twenty-five decay times (2L/R = 10 ms each), then whole cycles.
+      lab.advance(Math.ceil(0.25 * frequency) / frequency);
+      return { lab, id, s: lab.solve() };
+    };
+  // At 50 Hz: X_L = 157.08 Ω, X_C = 318.31 Ω.
+  const xl = OMEGA * L,
+    xc = 1 / (OMEGA * C),
+    z = Math.hypot(R, xl - xc),
+    i = RMS / z,
+    { id, s } = build(HZ);
+  close(z, 189.72, 1e-4, "the formula itself: Z = √(R² + (X_L − X_C)²)");
+  close(s.of(id.r).rmsCurrent, i, TIMED, "I = V/Z");
+  close(s.of(id.r).rmsCurrent, i, 1e-3);
+  close(s.of(id.r).rmsVoltage, i * R, TIMED, "V_R = IR");
+  close(s.of(id.l).rmsVoltage, i * xl, TIMED, "V_L = IX_L");
+  close(s.of(id.c).rmsVoltage, i * xc, TIMED, "V_C = IX_C");
+  // Capacitive (X_C > X_L): the current leads the supply p.d.
+  near(
+    angle(s.of(id.src).phaseCurrent, s.of(id.src).phaseVoltage),
+    Math.atan((xc - xl) / R),
+    2e-3,
+    "phase angle",
+  );
+  close(s.of(id.r).meanPower, i * i * R, TIMED, "P = I²R");
+  near(s.of(id.l).meanPower, 0, 1e-3 * i * i * R, "none in the inductor");
+  near(s.of(id.c).meanPower, 0, 1e-3 * i * i * R, "none in the capacitor");
+  // The source supplies VI cos φ = I²R.
+  close(-s.of(id.src).meanPower, RMS * i * (R / z), TIMED, "VI cos φ");
+  // V_L and V_C are in antiphase; V_R is in phase with the current.
+  near(
+    Math.abs(angle(s.of(id.l).phaseVoltage, s.of(id.c).phaseVoltage)),
+    Math.PI,
+    2e-3,
+  );
+  near(angle(s.of(id.r).phaseVoltage, s.of(id.r).phaseCurrent), 0, 1e-6);
+
+  // Resonance: f₀ = 1/2π√(LC) = 71.18 Hz. Z = R, and V_L = V_C = QV.
+  const f0 = 1 / (2 * Math.PI * Math.sqrt(L * C)),
+    at = build(f0);
+  close(f0, 71.18, 1e-4);
+  close(at.s.of(at.id.r).rmsCurrent, RMS / R, TIMED, "I = V/R at resonance");
+  close(
+    at.s.of(at.id.l).rmsVoltage,
+    (RMS / R) * 2 * Math.PI * f0 * L,
+    TIMED,
+    "V_L = I·ω₀L",
+  );
+  close(at.s.of(at.id.c).rmsVoltage, at.s.of(at.id.l).rmsVoltage, TIMED);
+  near(
+    angle(at.s.of(at.id.src).phaseCurrent, at.s.of(at.id.src).phaseVoltage),
+    0,
+    2e-3,
+    "in phase at resonance",
+  );
+  // The ammeter reads RMS and agrees with the resistor.
+  close(at.s.of(at.id.meter).rmsCurrent, at.s.of(at.id.r).rmsCurrent, 1e-9);
+});
+
+test("AC faults and limits: a shorted source is reported even at a zero of its EMF", () => {
+  const lab = new CircuitLab(),
+    src = lab.add("source", { amplitude: PEAK, frequency: HZ, nodes: ["p", "n"] });
+  lab.add("wire", { nodes: ["p", "n"] });
+  let s = lab.solve();
+  finite(s);
+  assert.equal(s.status, "short");
+  assert.equal(s.of(src).current, null);
+  lab.advance(0.03);
+  finite(lab.solve());
+  assert.equal(lab.solve().status, "short");
+  assert.throws(() => lab.add("source", { frequency: 0 }), /Frequency/);
+  assert.throws(() => lab.add("inductor", { inductance: 0 }), /Inductance/);
+  assert.throws(() => lab.add("source", { amplitude: -1 }), /Peak/);
+  // An inductor is the same either way round; an AC source is not.
+  const turn = new CircuitLab(),
+    coil = turn.add("inductor", { x: 0, y: 0, rot: 2 }),
+    supply = turn.add("source", { x: 4, y: 0, rot: 2 });
+  assert.equal(turn.get(coil).rot, 0);
+  assert.equal(turn.get(supply).rot, 2);
+  // No source: no period.
+  assert.equal(turn.period > 0, true);
+  assert.equal(new CircuitLab().period, null);
 });

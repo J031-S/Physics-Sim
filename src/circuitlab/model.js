@@ -22,16 +22,22 @@
 import { checkFormat, listOf } from "../scene-format.js";
 
 export const STEPS_PER_TAU = 100; // time steps in the shortest time constant
+export const STEPS_PER_CYCLE = 400; // time steps in one cycle of an AC source
 
 export const KINDS = {
   cell: { label: "Cell", prefix: "E", keys: ["emf", "internal"] },
+  source: {
+    label: "AC source",
+    prefix: "E",
+    keys: ["amplitude", "frequency", "phase", "internal"],
+  },
   resistor: { label: "Resistor", prefix: "R", keys: ["resistance"] },
   variable: {
     label: "Variable resistor",
     prefix: "R",
     keys: ["resistance", "maximum"],
   },
-  lamp: { label: "Lamp", prefix: "L", keys: ["resistance", "ratedPower"] },
+  lamp: { label: "Lamp", prefix: "La", keys: ["resistance", "ratedPower"] },
   switch: { label: "Switch", prefix: "S", keys: ["closed"] },
   switch2: {
     label: "Two-way switch",
@@ -47,6 +53,7 @@ export const KINDS = {
     prefix: "C",
     keys: ["capacitance", "initialVoltage"],
   },
+  inductor: { label: "Inductor", prefix: "L", keys: ["inductance"] },
 };
 
 // Allowed range of every editable quantity (SI). The forms in app.js mirror
@@ -60,6 +67,10 @@ export const LIMITS = {
   ratedPower: [1e-3, 1e4],
   capacitance: [1e-12, 100],
   initialVoltage: [-1000, 1000],
+  amplitude: [0, 1000],
+  frequency: [0.01, 1e6],
+  phase: [-2 * Math.PI, 2 * Math.PI],
+  inductance: [1e-9, 1000],
   grid: 10000,
   items: 400,
 };
@@ -75,6 +86,8 @@ const DEFAULTS = {
   ammeter: {},
   voltmeter: {},
   capacitor: { capacitance: 100e-6, initialVoltage: 0 },
+  source: { amplitude: 10 * Math.SQRT2, frequency: 50, phase: 0, internal: 0 },
+  inductor: { inductance: 0.1 },
 };
 
 const NAMES = {
@@ -85,6 +98,10 @@ const NAMES = {
   ratedPower: "Rated power",
   capacitance: "Capacitance",
   initialVoltage: "Initial voltage",
+  amplitude: "Peak voltage",
+  frequency: "Frequency",
+  phase: "Phase",
+  inductance: "Inductance",
 };
 
 // Terminal positions about the component's centre, in grid units, before it
@@ -107,7 +124,13 @@ const terminalCount = (kind) => KINDS[kind].terminals || 2;
 // the top), so turning one never draws it upside down or back to front. A
 // cell, a capacitor and a meter have a + terminal, and a two-way switch has
 // three contacts: those keep all four.
-export const SYMMETRIC = new Set(["resistor", "variable", "lamp", "switch"]);
+export const SYMMETRIC = new Set([
+  "resistor",
+  "variable",
+  "lamp",
+  "switch",
+  "inductor",
+]);
 export const turnsOf = (kind, rot) =>
   SYMMETRIC.has(kind) ? (rot & 1 ? 3 : 0) : rot & 3;
 // `rot` counts quarter-turns anticlockwise (y is up).
@@ -139,7 +162,14 @@ function validate(item) {
     if (typeof item.emf !== "function")
       inRange("emf", item.emf, LIMITS.emf, "V");
     inRange("internal", item.internal, LIMITS.internal, "Ω");
-  } else if (kind === "resistor")
+  } else if (kind === "source") {
+    inRange("amplitude", item.amplitude, LIMITS.amplitude, "V");
+    inRange("frequency", item.frequency, LIMITS.frequency, "Hz");
+    inRange("phase", item.phase, LIMITS.phase, "rad");
+    inRange("internal", item.internal, LIMITS.internal, "Ω");
+  } else if (kind === "inductor")
+    inRange("inductance", item.inductance, LIMITS.inductance, "H");
+  else if (kind === "resistor")
     inRange("resistance", item.resistance, LIMITS.resistance, "Ω");
   else if (kind === "variable") {
     inRange("maximum", item.maximum, LIMITS.maximum, "Ω");
@@ -355,12 +385,21 @@ function findBridges(nodeCount, edges) {
 // --------------------------------------------------------------- the stamps
 
 const emfAt = (item, t) => {
+  if (item.kind === "source")
+    return (
+      item.amplitude *
+      Math.sin(2 * Math.PI * item.frequency * t + item.phase)
+    );
   if (typeof item.emf !== "function") return item.emf;
   const e = Number(item.emf(t));
   return Number.isFinite(e) ? e : 0;
 };
 // dE/dt of a time-varying EMF, by central difference.
 const emfRate = (item, t) => {
+  if (item.kind === "source") {
+    const w = 2 * Math.PI * item.frequency;
+    return item.amplitude * w * Math.cos(w * t + item.phase);
+  }
   if (typeof item.emf !== "function") return 0;
   const d = 1e-7;
   return (emfAt(item, t + d) - emfAt(item, t - d)) / (2 * d);
@@ -376,16 +415,29 @@ const emfRate = (item, t) => {
 //           or ideal cells that disagree. Every quantity is a charge, not a
 //           current: a capacitor passes ΔQ = C·ΔV, a resistance passes none.
 //
-// Two kinds of branch come back (or null for an open circuit):
+//   "kick"  current stopped or shared in no time, when a switch breaks the
+//           path of an inductor or forces two inductors into series. Every
+//           "potential" is an impulse of p.d. (a flux linkage): an inductor
+//           takes L·ΔI, and nothing else can take any.
+//
+// An inductor is the capacitor's mirror image in each view: in "now" it
+// holds its current, in "step" it is the resistance 2L/h in series with an
+// EMF that carries its present current and p.d. forward, and in "kick" it
+// is the one thing that resists.
+//
+// Three kinds of branch come back (or null for an open circuit):
 //   g  obeys  I = G(Va − Vb) − s                  (I from terminal a to b)
 //   v  obeys  Va − Vb − R·I = e, with I an unknown of the solve
+//   i  carries the current s, whatever the p.d. across it
 // plus `from`/`to`, the terminals it joins.
 function branchOf(item, view, h) {
   const wire = { type: "v", R: 0, e: () => 0, from: 0, to: 1 };
   switch (item.kind) {
     case "cell":
+    case "source":
       // Terminal p.d. V = E − Ir, where the current out of the + terminal
       // is −I in the a → b sense used here.
+      if (view === "kick") return wire;
       if (view === "jump" && item.internal > 0) return null;
       return {
         ...wire,
@@ -394,10 +446,25 @@ function branchOf(item, view, h) {
         rate: (t) => emfRate(item, t),
         source: true,
       };
+    case "inductor": {
+      const L = item.inductance;
+      if (view === "jump") return null;
+      if (view === "now")
+        return { type: "i", s: () => item.current, L, from: 0, to: 1 };
+      if (view === "kick")
+        return { ...wire, R: L, e: () => -L * item.current, inductor: true };
+      const R = (2 * L) / h;
+      return {
+        ...wire,
+        R,
+        e: () => -(item.voltage + R * item.current),
+        inductor: true,
+      };
+    }
     case "resistor":
     case "variable":
     case "lamp":
-      if (item.resistance === 0) return wire;
+      if (item.resistance === 0 || view === "kick") return wire;
       if (view === "jump") return null;
       return { type: "g", G: 1 / item.resistance, s: () => 0, from: 0, to: 1 };
     case "wire":
@@ -409,6 +476,7 @@ function branchOf(item, view, h) {
       return { ...wire, to: item.position === "a" ? 1 : 2 };
     case "capacitor": {
       const C = item.capacitance;
+      if (view === "kick") return wire;
       if (view === "now")
         return { ...wire, e: () => item.voltage, cap: true, weight: 1 / C };
       const G = view === "step" ? (2 * C) / h : C;
@@ -430,6 +498,7 @@ function branchOf(item, view, h) {
 }
 
 const RESISTIVE = new Set(["resistor", "variable", "lamp"]);
+const SUPPLY = new Set(["cell", "source"]);
 const describe = (items) => {
   const names = items.map((i) => i.name);
   return names.length > 1
@@ -476,6 +545,8 @@ export class CircuitLab {
   #count = 0;
   #step = 0;
   #carry = 0; // requested time not yet covered by a whole step
+  #cycle = null; // sums over the AC cycle now in progress
+  #measured = new Map(); // id → RMS, mean power and phases over the last one
 
   constructor() {
     // Upper limit on the time step, for a circuit whose EMFs change in time
@@ -549,6 +620,7 @@ export class CircuitLab {
       item.voltage = item.initialVoltage;
       item.current = 0;
     }
+    if (kind === "inductor") item.voltage = item.current = 0;
     item.id = this.#nextId++;
     const prefix = KINDS[kind].prefix;
     if (prefix) {
@@ -691,6 +763,8 @@ export class CircuitLab {
   }
 
   clear() {
+    this.#cycle = null;
+    this.#measured.clear();
     this.#items = [];
     this.#counters = {};
     this.#work.clear();
@@ -707,11 +781,15 @@ export class CircuitLab {
   // Time back to zero, every capacitor back to its starting p.d., and the
   // energy totals cleared. The circuit itself is untouched.
   reset() {
-    for (const item of this.#items)
+    for (const item of this.#items) {
       if (item.kind === "capacitor") {
         item.voltage = item.initialVoltage;
         item.current = 0;
       }
+      if (item.kind === "inductor") item.voltage = item.current = 0;
+    }
+    this.#cycle = null;
+    this.#measured.clear();
     this.#work.clear();
     this.#events = [];
     this.#restart();
@@ -934,13 +1012,19 @@ export class CircuitLab {
       branches.push(branch);
     }
     const n0 = keys.length,
-      parts = makeSets(n0);
-    for (const b of branches) parts.union(b.a, b.b);
+      parts = makeSets(n0),
+      // Nodes whose potentials are tied together by conductances and
+      // "v" branches. An inductor holding its current ("i") ties nothing.
+      islands = makeSets(n0);
+    for (const b of branches) {
+      parts.union(b.a, b.b);
+      if (b.type !== "i") islands.union(b.a, b.b);
+    }
     // Reference node of each section: the negative terminal of its first
     // cell, so that potentials read as they do on a circuit diagram.
     const reference = new Map();
     for (const item of this.#items)
-      if (item.kind === "cell") {
+      if (item.kind === "cell" || item.kind === "source") {
         const i = index.get(item.nodes[1]),
           root = parts.find(i);
         if (!reference.has(root)) reference.set(root, i);
@@ -953,6 +1037,30 @@ export class CircuitLab {
     let nv = 0;
     for (let i = 0; i < n0; i++)
       col[i] = reference.get(parts.find(i)) === i ? -1 : nv++;
+    // An island joined to the rest of its section only through inductors
+    // has no reference of its own. Kirchhoff's current law there says only
+    // that the inductor currents into it add to zero, which is a condition
+    // on what they already are (if it fails, see `#kick`). Its equation at
+    // one node is replaced by that law's time derivative, Σ V/L = 0, which
+    // is what sets the island's potential: inductors in series divide the
+    // p.d. in proportion to L.
+    const anchored = new Set(),
+      floats = new Map();
+    for (const i of reference.values()) anchored.add(islands.find(i));
+    for (let i = 0; i < n0; i++) {
+      const root = islands.find(i);
+      if (!anchored.has(root) && !floats.has(root))
+        floats.set(root, { row: col[i], cut: [] });
+    }
+    for (const b of branches) {
+      if (b.type !== "i") continue;
+      const ra = islands.find(b.a),
+        rb = islands.find(b.b);
+      if (ra === rb) continue;
+      floats.get(ra)?.cut.push({ branch: b, sign: 1 });
+      floats.get(rb)?.cut.push({ branch: b, sign: -1 });
+    }
+    const replaced = new Set([...floats.values()].map((f) => f.row));
     const vs = branches.filter((b) => b.type === "v");
     vs.forEach((b, k) => (b.k = k));
     const nb = vs.length;
@@ -998,11 +1106,22 @@ export class CircuitLab {
     const n = nv + nb + cycles.length,
       a = new Float64Array(n * n),
       put = (r, c, value) => {
-        if (r >= 0 && c >= 0) a[r * n + c] += value;
+        if (r >= 0 && c >= 0 && !replaced.has(r)) a[r * n + c] += value;
       };
+    for (const f of floats.values()) {
+      const scale = Math.max(...f.cut.map((c) => 1 / c.branch.L), 0);
+      // An island with no inductor on it either is simply unconnected.
+      if (!scale) a[f.row * n + f.row] = 1;
+      for (const { branch, sign } of f.cut) {
+        const w = sign / branch.L / scale;
+        if (col[branch.a] >= 0) a[f.row * n + col[branch.a]] += w;
+        if (col[branch.b] >= 0) a[f.row * n + col[branch.b]] -= w;
+      }
+    }
     for (const b of branches) {
       const ca = col[b.a],
         cb = col[b.b];
+      if (b.type === "i") continue;
       if (b.type === "g") {
         put(ca, ca, b.G);
         put(cb, cb, b.G);
@@ -1041,6 +1160,7 @@ export class CircuitLab {
       nb,
       n,
       cycles,
+      floats: [...floats.values()],
       bridge: (branch) => branch.isBridge,
       lu: factor(a, n),
     };
@@ -1051,12 +1171,17 @@ export class CircuitLab {
   #solveAt(st, t, over) {
     const rhs = new Float64Array(st.n);
     for (const b of st.branches) {
-      if (b.type === "g") {
-        const s = over ? over.s(b) : b.s();
-        if (st.col[b.a] >= 0) rhs[st.col[b.a]] += s;
-        if (st.col[b.b] >= 0) rhs[st.col[b.b]] -= s;
-      } else rhs[st.nv + b.k] = over ? over.e(b) : b.e(t);
+      if (b.type === "v") {
+        rhs[st.nv + b.k] = over ? over.e(b) : b.e(t);
+        continue;
+      }
+      // A "g" branch sends its source term into node a; an "i" branch
+      // takes its whole current out of it.
+      const s = (over ? over.s(b) : b.s()) * (b.type === "g" ? 1 : -1);
+      if (st.col[b.a] >= 0) rhs[st.col[b.a]] += s;
+      if (st.col[b.b] >= 0) rhs[st.col[b.b]] -= s;
     }
+    for (const f of st.floats) rhs[f.row] = 0;
     if (!over)
       st.cycles.forEach((cycle, c) => {
         if (!cycle.hasCap) return;
@@ -1093,7 +1218,10 @@ export class CircuitLab {
     for (const b of st.branches) {
       const entry = of(b.a);
       entry.G = Math.max(entry.G, b.type === "g" ? b.G : b.R > 0 ? 1 / b.R : 0);
-      if (b.type === "v") entry.V = Math.max(entry.V, Math.abs(b.e(t)));
+      // (The EMF inside a stepped inductor is a device of the method, far
+      // larger than any real p.d., and is left out.)
+      if (b.type === "v" && !b.inductor)
+        entry.V = Math.max(entry.V, Math.abs(b.e(t)));
     }
     st.floor = (i) => 16 * Number.EPSILON * of(i).V;
     st.currentFloor = 0;
@@ -1107,7 +1235,10 @@ export class CircuitLab {
       const flow =
         b.type === "v"
           ? x[st.nv + b.k]
-          : b.G * (potential(b.a) - potential(b.b)) - b.s();
+          : b.type === "i"
+            ? b.s()
+            : b.G * (potential(b.a) - potential(b.b)) - b.s();
+      if (b.type === "i") return flow;
       return Math.abs(flow) <= st.floor(b.a) * of(b.a).G ? 0 : flow;
     });
   }
@@ -1116,15 +1247,30 @@ export class CircuitLab {
   #disagreements(st, t, withCaps) {
     return st.cycles.filter((cycle) => {
       if (cycle.hasCap !== withCaps) return false;
-      let sum = 0,
-        size = 0;
-      for (const e of cycle.entries) {
-        const value = e.branch.e(t);
-        sum += e.sign * value;
-        size += Math.abs(value);
+      // An alternating EMF passes through zero, so a loop holding an AC
+      // source is also tried a quarter and a third of a cycle on: shorted
+      // is shorted, whatever the instant.
+      const times = [t];
+      if (!withCaps)
+        for (const e of cycle.entries)
+          if (e.branch.item.kind === "source") {
+            const period = 1 / e.branch.item.frequency;
+            times.push(t + period / 4, t + period / 3);
+          }
+      cycle.residual = 0;
+      let failed = false;
+      for (const at of times) {
+        let sum = 0,
+          size = 0;
+        for (const e of cycle.entries) {
+          const value = e.branch.e(at);
+          sum += e.sign * value;
+          size += Math.abs(value);
+        }
+        if (Math.abs(sum) > Math.abs(cycle.residual)) cycle.residual = sum;
+        if (Math.abs(sum) > 1e-9 * size) failed = true;
       }
-      cycle.residual = sum;
-      return Math.abs(sum) > 1e-9 * size;
+      return failed;
     });
   }
 
@@ -1175,6 +1321,43 @@ export class CircuitLab {
       });
   }
 
+  // Current that must stop or be shared in no time: a switch has broken an
+  // inductor's only path, or put inductors with different currents in
+  // series. Flux linkage L·I is conserved round every loop, as charge is
+  // at every node in `#jump`; the energy that goes is the spark.
+  #kick(cache, commit) {
+    const st = (cache.kick ||= this.#assemble("kick")),
+      now = cache.now;
+    if (!st.lu.ok) return;
+    const x = this.#solveAt(st, this.time),
+      changed = [];
+    let lost = 0;
+    for (const b of st.branches) {
+      if (!b.inductor) continue;
+      const item = b.item,
+        before = item.current;
+      if (cache.broken.has(now.parts.find(now.index.get(item.nodes[0]))))
+        continue;
+      let after = st.bridge(b) ? 0 : x[st.nv + b.k];
+      if (Math.abs(after) < 1e-12 * Math.abs(before)) after = 0;
+      const size = Math.max(Math.abs(after), Math.abs(before));
+      if (Math.abs(after - before) <= 1e-12 * size) continue;
+      item.current = after;
+      lost += 0.5 * item.inductance * (before * before - after * after);
+      changed.push(item);
+    }
+    if (changed.length && commit)
+      this.#events.push({
+        type: "kick",
+        time: this.time,
+        ids: changed.map((m) => m.id),
+        lost,
+        message:
+          `The current through ${describe(changed)} was interrupted or forced to change at once. ` +
+          "An inductor cannot do that gently: in a real circuit the energy lost goes into a spark at the switch.",
+      });
+  }
+
   #workOf(id) {
     let w = this.#work.get(id);
     if (!w) this.#work.set(id, (w = { heat: 0, supplied: 0 }));
@@ -1186,7 +1369,12 @@ export class CircuitLab {
     if (this.#cache) return this.#cache;
     const t = this.time,
       commit = !this.#unsettled,
-      cache = { now: this.#assemble("now"), jump: null, steps: new Map() },
+      cache = {
+        now: this.#assemble("now"),
+        jump: null,
+        kick: null,
+        steps: new Map(),
+      },
       now = cache.now;
     // Faults: loops of ideal sources and wire that cannot be satisfied.
     cache.faults = this.#disagreements(now, t, false);
@@ -1194,18 +1382,35 @@ export class CircuitLab {
     // While something is being dragged, capacitors are left as they are:
     // the jump is worked out for the readings but not kept.
     const held = this.#items
-      .filter((i) => i.kind === "capacitor")
-      .map((i) => [i, i.voltage]);
+      .filter((i) => i.kind === "capacitor" || i.kind === "inductor")
+      .map((i) => [i, i.voltage, i.current]);
     const unequal = this.#disagreements(now, t, true);
     if (unequal.some((c) => !cache.broken.has(c.part)))
       this.#jump(cache, commit);
+    // Inductor currents into an island that do not add to zero.
+    const stranded = now.floats.some((f) => {
+      let sum = 0,
+        size = 0;
+      for (const { branch, sign } of f.cut) {
+        sum += sign * branch.s();
+        size += Math.abs(branch.s());
+      }
+      return Math.abs(sum) > 1e-9 * size;
+    });
+    if (stranded) this.#kick(cache, commit);
     const x = now.lu.ok ? this.#solveAt(now, t) : null;
     cache.solution = this.#read(now, x, x && this.#flows(now, x, t), t, cache);
     if (commit) {
-      for (const item of this.#items)
-        if (item.kind === "capacitor")
-          item.current = cache.solution.of(item.id).flow || 0;
-    } else for (const [item, voltage] of held) item.voltage = voltage;
+      // What each stores for the first step: a capacitor's current, an
+      // inductor's p.d., as they are at this instant.
+      for (const item of this.#items) {
+        const r = cache.solution.of(item.id);
+        if (item.kind === "capacitor") item.current = r.flow || 0;
+        if (item.kind === "inductor") item.voltage = r.voltage || 0;
+      }
+    } else
+      for (const [item, voltage, current] of held)
+        Object.assign(item, { voltage, current });
     return (this.#cache = cache);
   }
 
@@ -1237,14 +1442,30 @@ export class CircuitLab {
           potentials: nodes.map((i) => out.nodes.get(st.keys[i]).potential),
         };
       out.readings.set(item.id, r);
-      if (item.kind === "cell")
+      const supply = SUPPLY.has(item.kind);
+      if (supply)
         Object.assign(r, { emf: emfAt(item, t), emfPower: null, lost: null });
-      if (item.kind === "cell" || RESISTIVE.has(item.kind))
-        r.heat = work ? work.heat : 0;
-      if (item.kind === "cell") r.supplied = work ? work.supplied : 0;
+      if (supply || RESISTIVE.has(item.kind)) r.heat = work ? work.heat : 0;
+      if (supply) r.supplied = work ? work.supplied : 0;
       if (item.kind === "lamp") r.brightness = null;
       if (item.kind === "capacitor")
         Object.assign(r, { charge: null, energy: null });
+      if (item.kind === "inductor") r.energy = null;
+      // Over the last whole cycle of the AC source, once there has been
+      // one: RMS values, mean power, and the size and phase of the
+      // fundamental of each (radians ahead of the source's own EMF).
+      Object.assign(
+        r,
+        this.#measured.get(item.id) || {
+          rmsCurrent: null,
+          rmsVoltage: null,
+          meanPower: null,
+          phaseCurrent: null,
+          phaseVoltage: null,
+          peakCurrent: null,
+          peakVoltage: null,
+        },
+      );
       if (nodes.some(broken)) continue;
       // p.d. from terminal 0 to terminal 1 (for a two-way switch, across
       // its open contact). Not defined between sections that are not joined.
@@ -1261,7 +1482,10 @@ export class CircuitLab {
         r.voltage = branch.e(t) + branch.R * r.flow;
         if (branch.R > 0 && Math.abs(r.voltage) <= st.floor(nodes[0]))
           r.voltage = 0;
+        // A stepped inductor's own law holds its p.d. from the step before.
+        if (branch.inductor) r.voltage = item.voltage;
       } else if (branch.reactive) r.voltage = item.voltage;
+      else if (branch.type === "i") r.voltage = across;
       else r.voltage = st.bridge(branch) ? 0 : across;
       if (r.voltage !== null) r.voltage += 0;
       r.current = r.flow;
@@ -1270,7 +1494,7 @@ export class CircuitLab {
         r.voltage === null || item.kind === "switch2"
           ? 0
           : r.voltage * r.flow + 0;
-      if (item.kind === "cell") {
+      if (supply) {
         // Reported as the current the cell drives out of its + terminal.
         r.current = -r.flow + 0;
         r.emfPower = r.emf * r.current + 0;
@@ -1280,7 +1504,8 @@ export class CircuitLab {
       else if (item.kind === "capacitor") {
         r.charge = item.capacitance * r.voltage;
         r.energy = 0.5 * item.capacitance * r.voltage * r.voltage;
-      }
+      } else if (item.kind === "inductor")
+        r.energy = 0.5 * item.inductance * r.flow * r.flow;
     }
     this.#report(st, out, t, cache);
     return out;
@@ -1298,8 +1523,16 @@ export class CircuitLab {
     for (const cycle of cache.faults) {
       const items = cycle.entries.map((e) => e.branch.item),
         sources = cycle.entries
-          .filter((e) => e.branch.source && e.branch.e(t) !== 0)
+          .filter(
+            (e) =>
+              e.branch.source &&
+              (e.branch.item.kind === "source" || e.branch.e(t) !== 0),
+          )
           .map((e) => e.branch.item),
+        size = (item) =>
+          item.kind === "source"
+            ? volts(item.amplitude) + " peak"
+            : volts(emfAt(item, t)),
         path = items.filter((i) => !sources.includes(i) && i.kind !== "wire"),
         through = path.length ? `wire, ${describe(path)}` : "wire",
         problem =
@@ -1308,7 +1541,7 @@ export class CircuitLab {
                 type: "conflict",
                 message:
                   `${describe(sources)} are ideal cells (no internal resistance) joined directly together, but they disagree: ` +
-                  `${sources.map((s) => `${s.name} is ${volts(emfAt(s, t))}`).join(", ")}, leaving ${volts(Math.abs(cycle.residual))} with nothing to drop across. ` +
+                  `${sources.map((s) => `${s.name} is ${size(s)}`).join(", ")}, leaving ${volts(Math.abs(cycle.residual))} with nothing to drop across. ` +
                   "Give one of them an internal resistance, or put a resistance between them.",
               }
             : {
@@ -1341,7 +1574,11 @@ export class CircuitLab {
       const drives =
         item.kind === "cell"
           ? typeof item.emf === "function" || item.emf !== 0
-          : item.kind === "capacitor" && item.voltage !== 0;
+          : item.kind === "source"
+            ? item.amplitude !== 0
+            : item.kind === "capacitor"
+              ? item.voltage !== 0
+              : item.kind === "inductor" && item.current !== 0;
       if (!drives) continue;
       drivers.push(item);
       if (st.bridge(b)) open.push(item);
@@ -1349,7 +1586,7 @@ export class CircuitLab {
     for (const item of this.#items) {
       const r = out.of(item.id);
       if (
-        item.kind === "cell" &&
+        SUPPLY.has(item.kind) &&
         item.internal > 0 &&
         r.voltage !== null &&
         r.emf !== 0 &&
@@ -1398,57 +1635,90 @@ export class CircuitLab {
     const cache = this.#refresh();
     if (cache.dynamics) return cache.dynamics;
     const now = cache.now,
-      caps = now.branches.filter(
-        (b) => b.cap && !cache.broken.has(now.parts.find(b.a)),
-      ),
-      n = caps.length,
+      live = (b) => !cache.broken.has(now.parts.find(b.a)),
+      // The state of the circuit: every capacitor's p.d. and every
+      // inductor's current.
+      states = now.branches.filter((b) => (b.cap || b.type === "i") && live(b)),
+      n = states.length,
       result = (cache.dynamics = { modes: [], step: Infinity });
     if (!n || !now.lu.ok) return result;
-    const constrained = now.cycles.some((c) => c.hasCap),
-      jump = constrained ? (cache.jump ||= this.#assemble("jump")) : null,
-      at = new Map(caps.map((b, k) => [b.item.id, k])),
-      C = caps.map((b) => b.item.capacitance),
-      m = caps.map(() => new Array(n).fill(0));
+    const at = new Map(states.map((b, k) => [b.item.id, k])),
+      // The "mass" of each state: its energy is ½ × this × state².
+      mass = states.map((b) => (b.cap ? b.item.capacitance : b.L)),
+      m = states.map(() => new Array(n).fill(0)),
+      jump = now.cycles.some((c) => c.hasCap)
+        ? (cache.jump ||= this.#assemble("jump"))
+        : null,
+      kick = now.floats.length ? (cache.kick ||= this.#assemble("kick")) : null,
+      of = (state, b) => (at.has(b.item.id) ? state[at.get(b.item.id)] : 0);
     for (let k = 0; k < n; k++) {
-      let state = caps.map((_, i) => (i === k ? 1 : 0));
-      if (jump?.lu.ok) {
+      let state = states.map((_, i) => (i === k ? 1 : 0));
+      // A state the wiring does not allow (1 V on one of two capacitors
+      // joined by wire) is first shared out as the circuit would share it.
+      if (jump?.lu.ok && states[k].cap) {
         const x = this.#solveAt(jump, 0, {
             e: () => 0,
-            s: (b) => (b.reactive && at.get(b.item.id) === k ? b.G : 0),
+            s: (b) => (b.reactive ? b.G * of(state, b) : 0),
           }),
           potential = (i) => (jump.col[i] >= 0 ? x[jump.col[i]] : 0);
-        state = caps.map((b) => {
-          const j = jump.byItem.get(b.item.id);
-          return potential(j.a) - potential(j.b);
+        state = states.map((b, i) => {
+          const j = b.cap && jump.byItem.get(b.item.id);
+          return j ? potential(j.a) - potential(j.b) : state[i];
+        });
+      }
+      if (kick?.lu.ok && !states[k].cap) {
+        const x = this.#solveAt(kick, 0, {
+          e: (b) => (b.inductor ? -b.R * of(state, b) : 0),
+          s: () => 0,
+        });
+        state = states.map((b, i) => {
+          const j = !b.cap && kick.byItem.get(b.item.id);
+          return j ? (kick.bridge(j) ? 0 : x[kick.nv + j.k]) : state[i];
         });
       }
       const x = this.#solveAt(now, 0, {
-        e: (b) => (b.cap && at.has(b.item.id) ? state[at.get(b.item.id)] : 0),
-        s: () => 0,
-      });
-      // dV/dt = I/C for each capacitor.
-      caps.forEach((b, i) => {
-        m[i][k] = now.bridge(b) ? 0 : x[now.nv + b.k] / C[i];
+          e: (b) => (b.cap ? of(state, b) : 0),
+          s: (b) => (b.type === "i" ? of(state, b) : 0),
+        }),
+        potential = (i) => (now.col[i] >= 0 ? x[now.col[i]] : 0);
+      // dV/dt = I/C for a capacitor, dI/dt = V/L for an inductor.
+      states.forEach((b, i) => {
+        m[i][k] = now.bridge(b)
+          ? 0
+          : (b.cap ? x[now.nv + b.k] : potential(b.a) - potential(b.b)) /
+            mass[i];
       });
     }
-    // M is self-adjoint in the energy inner product ⟨u, v⟩ = Σ C·u·v, so
-    // C^½ M C^−½ is symmetric and has the same (real) eigenvalues.
-    const s = m.map((row, i) =>
-      row.map(
-        (_, j) =>
-          0.5 *
-          ((Math.sqrt(C[i]) * m[i][j]) / Math.sqrt(C[j]) +
-            (Math.sqrt(C[j]) * m[j][i]) / Math.sqrt(C[i])),
-      ),
+    const scaled = (i, j) => (Math.sqrt(mass[i]) * m[i][j]) / Math.sqrt(mass[j]),
+      mixed = states.some((b) => b.cap) && states.some((b) => !b.cap);
+    if (mixed) {
+      // Capacitors and inductors together can oscillate: there are natural
+      // frequencies, not just decay times, and none is reported as a time
+      // constant. The step is set from the largest rate the state matrix
+      // can produce (its row-sum norm bounds every natural frequency).
+      let rate = 0;
+      for (let i = 0; i < n; i++) {
+        let sum = 0;
+        for (let j = 0; j < n; j++) sum += Math.abs(scaled(i, j));
+        rate = Math.max(rate, sum);
+      }
+      if (rate > 0) result.step = 1 / (STEPS_PER_TAU * rate);
+      return result;
+    }
+    // With capacitors alone, or inductors alone, M is self-adjoint in the
+    // energy inner product, so the scaled matrix is symmetric and its
+    // eigenvalues are real: the decay rates.
+    const sym = m.map((row, i) =>
+      row.map((_, j) => 0.5 * (scaled(i, j) + scaled(j, i))),
     );
-    const { values, vectors } = symmetricEigen(s),
+    const { values, vectors } = symmetricEigen(sym),
       fastest = Math.max(...values.map((v) => -v));
     values.forEach((value, i) => {
-      // A zero eigenvalue is charge that has nowhere to go, not a decay.
+      // A zero eigenvalue is charge (or flux) that has nowhere to go.
       if (!(-value > 1e-9 * fastest)) return;
       result.modes.push({
         tau: -1 / value,
-        ids: caps
+        ids: states
           .filter((_, j) => Math.abs(vectors[j][i]) > 1e-6)
           .map((b) => b.item.id),
       });
@@ -1480,7 +1750,25 @@ export class CircuitLab {
   // no more than `maxStep`). Infinity when nothing in the circuit changes
   // with time.
   get timestep() {
-    return Math.min(this.#dynamics().step, this.maxStep);
+    const natural = Math.min(this.#dynamics().step, this.maxStep),
+      period = this.period;
+    if (!period) return natural;
+    // With an AC source: a whole number of steps to the cycle, at least
+    // STEPS_PER_CYCLE of them, halved until the circuit's own rates are
+    // respected as well.
+    let h = Number((period / STEPS_PER_CYCLE).toPrecision(12));
+    while (h > natural) h /= 2;
+    return h;
+  }
+
+  // The period of the AC source (of the slowest, if there are several), or
+  // null if there is none. RMS readings are taken over this.
+  get period() {
+    let lowest = Infinity;
+    for (const item of this.#items)
+      if (item.kind === "source" && item.amplitude > 0)
+        lowest = Math.min(lowest, item.frequency);
+    return lowest < Infinity ? 1 / lowest : null;
   }
 
   // Advances by up to `dt` seconds in whole fixed steps and returns the
@@ -1514,7 +1802,10 @@ export class CircuitLab {
       this.#origin = this.time;
       this.#count = 0;
       this.#step = h;
+      this.#cycle = null;
     }
+    const period = this.period,
+      perCycle = period ? Math.round(period / h) : 0;
     const wanted = Math.floor((this.#carry + dt) / h + 1e-9),
       steps = Math.min(wanted, maxSteps);
     // Time that the step budget could not cover is dropped, not owed.
@@ -1534,7 +1825,14 @@ export class CircuitLab {
         flows = this.#flows(st, x, t),
         potential = (k) => (st.col[k] >= 0 ? x[st.col[k]] : 0);
       st.branches.forEach((b, k) => {
-        if (!b.reactive || cache.broken.has(st.parts.find(b.a))) return;
+        if (cache.broken.has(st.parts.find(b.a))) return;
+        if (b.inductor) {
+          // Its p.d. from its own law, before the state it uses moves on.
+          const voltage = b.e(t) + b.R * flows[k];
+          b.item.voltage = voltage;
+          b.item.current = flows[k];
+        }
+        if (!b.reactive) return;
         // A capacitor with no path for charge keeps exactly what it has.
         if (!st.bridge(b)) b.item.voltage = potential(b.a) - potential(b.b);
         b.item.current = flows[k];
@@ -1542,11 +1840,65 @@ export class CircuitLab {
       this.#count++;
       const next = this.#read(st, x, flows, t, cache);
       this.#integrate(last, next, h);
+      if (perCycle) this.#measure(next, t, period, perCycle);
       last = next;
     }
     this.#stamp(last);
     cache.solution = last;
     return steps * h;
+  }
+
+  // Adds one step to the sums over the present AC cycle and, when the cycle
+  // is complete, publishes what a meter would show for it: RMS current and
+  // p.d., mean power, and the fundamental of each as a size and a phase
+  // relative to the source's EMF. Equally spaced samples over exactly one
+  // period give these sums exactly for anything that repeats each cycle.
+  #measure(solution, t, period, perCycle) {
+    const reference = this.#items.find(
+        (i) => i.kind === "source" && i.amplitude > 0,
+      ),
+      theta = (2 * Math.PI * t) / period + reference.phase,
+      sin = Math.sin(theta),
+      cos = Math.cos(theta);
+    this.#cycle ||= { n: 0, sums: new Map() };
+    const cycle = this.#cycle;
+    for (const item of this.#items) {
+      const r = solution.of(item.id);
+      if (!r || r.current === null || r.voltage === null) continue;
+      let sum = cycle.sums.get(item.id);
+      if (!sum) cycle.sums.set(item.id, (sum = new Float64Array(8)));
+      const i = r.current,
+        v = r.voltage;
+      sum[0] += i * i;
+      sum[1] += v * v;
+      sum[2] += r.power;
+      sum[3] += i * sin;
+      sum[4] += i * cos;
+      sum[5] += v * sin;
+      sum[6] += v * cos;
+      sum[7]++;
+    }
+    if (++cycle.n < perCycle) return;
+    this.#measured.clear();
+    for (const [id, sum] of cycle.sums) {
+      // Only what was there, and solvable, for the whole cycle.
+      if (sum[7] !== perCycle) continue;
+      const n = perCycle,
+        size = (a, b) => (2 / n) * Math.hypot(a, b);
+      this.#measured.set(id, {
+        rmsCurrent: Math.sqrt(sum[0] / n),
+        rmsVoltage: Math.sqrt(sum[1] / n),
+        meanPower: sum[2] / n,
+        phaseCurrent: Math.atan2(sum[4], sum[3]),
+        phaseVoltage: Math.atan2(sum[6], sum[5]),
+        peakCurrent: size(sum[3], sum[4]),
+        peakVoltage: size(sum[5], sum[6]),
+      });
+    }
+    this.#cycle = null;
+    // The solution in hand was read before these were known.
+    for (const [id, values] of this.#measured)
+      Object.assign(solution.of(id), values);
   }
 
   // Energy over one step: mean p.d. × mean current × h. The trapezoidal
@@ -1559,7 +1911,7 @@ export class CircuitLab {
         q = b.of(item.id);
       if (!p || !q || p.power === null || q.power === null) continue;
       const current = (p.current + q.current) / 2;
-      if (item.kind === "cell") {
+      if (SUPPLY.has(item.kind)) {
         const w = this.#workOf(item.id);
         w.supplied += (h * current * (p.emf + q.emf)) / 2;
         w.heat += h * current * current * item.internal;
