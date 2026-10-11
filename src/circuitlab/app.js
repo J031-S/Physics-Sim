@@ -3,6 +3,7 @@
 // number shown here is read from `lab.solve()`.
 import { $, isDark, showToast } from "../site/dom.js";
 import { setupSite } from "../site/shell.js";
+import { styleCanvas } from "../site/canvas-style.js";
 import { setPlaybackIcon } from "../site/icons.js";
 import { CircuitLab, KINDS, LIMITS, STEPS_PER_TAU, turnsOf } from "./model.js";
 import { presets } from "./presets.js";
@@ -21,9 +22,10 @@ import {
   potentialRange,
   si,
 } from "./render.js";
+import { onSchemeChange, reportFrame } from "../site/dev-hooks.js";
 
 const canvas = $("canvas"),
-  ctx = canvas.getContext("2d");
+  ctx = styleCanvas(canvas.getContext("2d"));
 const prefs = setupSite();
 
 // One circuit for each view of the page, "dc" and "ac", switched by
@@ -1520,7 +1522,9 @@ function frame(now) {
   const elapsed = last ? Math.min((now - last) / 1000, 0.05) : 0;
   last = now;
   // The clock waits while something is being dragged about.
-  const dragging = drag?.type === "move" || drag?.type === "end";
+  const dragging = drag?.type === "move" || drag?.type === "end",
+    frameBegan = performance.now();
+  let simulated = 0;
   if (state.running && elapsed > 0 && !dragging) {
     const began = performance.now(),
       wanted = elapsed * state.warp,
@@ -1536,9 +1540,15 @@ function frame(now) {
       );
     state.achieved += (done / elapsed - state.achieved) * 0.1;
     moveDots(lab.solve(), done);
+    simulated = done;
   }
   const { c, s } = draw();
   updatePanels(c, s);
+  reportFrame({
+    steps: Math.round(simulated / lab.timestep),
+    simulated,
+    ms: performance.now() - frameBegan,
+  });
   requestAnimationFrame(frame);
 }
 
@@ -2161,3 +2171,5 @@ setWarp(1);
 loadPreset(presets[0]);
 fitHeader();
 requestAnimationFrame(frame);
+// A developer scheme changed the colours: redraw the preset thumbnails.
+onSchemeChange(() => (previewTheme = null));

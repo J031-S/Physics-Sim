@@ -2,6 +2,7 @@
 // panels, the frame loop. All physics lives in model.js.
 import { $, isDark, showToast } from "../site/dom.js";
 import { setupSite } from "../site/shell.js";
+import { styleCanvas } from "../site/canvas-style.js";
 import { setPlaybackIcon } from "../site/icons.js";
 import {
   OrbitLab,
@@ -21,9 +22,10 @@ import {
   niceStep,
   orbitPalette,
 } from "./render.js";
+import { onSchemeChange, reportFrame } from "../site/dev-hooks.js";
 
 const canvas = $("canvas"),
-  ctx = canvas.getContext("2d");
+  ctx = styleCanvas(canvas.getContext("2d"));
 const prefs = setupSite();
 const lab = new OrbitLab();
 
@@ -1299,12 +1301,15 @@ function updatePanels(c) {
 // ---------------------------------------------------------------- loop
 
 function frame(now) {
-  const elapsed = last ? Math.min((now - last) / 1000, 0.05) : 0;
+  const elapsed = last ? Math.min((now - last) / 1000, 0.05) : 0,
+    frameBegan = performance.now();
+  let simulated = 0;
   last = now;
   if (state.running && elapsed > 0) {
     const began = performance.now(),
       done = lab.advance(elapsed * state.warp),
       took = performance.now() - began;
+    simulated = done;
     // The model stops short rather than take longer steps. How many steps
     // it may take in a frame is set to what this computer does in about
     // 6 ms, so that the picture stays smooth at the highest time warps.
@@ -1319,6 +1324,8 @@ function frame(now) {
     if (!lab.list().some((s) => s.status === "flying")) setRunning(false);
   }
   draw();
+  // The model does not say how many steps it took; only the time advanced.
+  reportFrame({ simulated, ms: performance.now() - frameBegan });
   requestAnimationFrame(frame);
 }
 
@@ -1762,3 +1769,5 @@ buildList();
 fitHeader();
 draw();
 requestAnimationFrame(frame);
+// A developer scheme changed the colours: redraw the preset thumbnails.
+onSchemeChange(() => (previewTheme = null));

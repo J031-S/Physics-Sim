@@ -2,6 +2,7 @@
 // input, panels. All physics lives in model.js.
 import { $, isDark, showToast } from "../site/dom.js";
 import { setupSite } from "../site/shell.js";
+import { styleCanvas } from "../site/canvas-style.js";
 import { FieldLab, KINDS, EPS0, MU0, TestCharges } from "./model.js";
 import {
   createFieldRenderer,
@@ -14,9 +15,10 @@ import {
 } from "./render.js";
 import { presets } from "./presets.js";
 import { setupSceneFiles } from "../scene-file.js";
+import { onSchemeChange, reportFrame } from "../site/dev-hooks.js";
 
 const canvas = $("canvas"),
-  ctx = canvas.getContext("2d");
+  ctx = styleCanvas(canvas.getContext("2d"));
 const prefs = setupSite();
 const lab = new FieldLab();
 
@@ -253,6 +255,7 @@ function invalidate(recompute = true) {
   if (queued) return;
   queued = true;
   requestAnimationFrame((now) => {
+    const began = performance.now();
     queued = false;
     // Test charges move in real time while the electric scene is on show.
     const animate = state.mode === "electric" && tests.moving > 0;
@@ -264,6 +267,7 @@ function invalidate(recompute = true) {
     }
     lastFrame = animate ? now : 0;
     draw();
+    reportFrame({ steps: animate ? 1 : 0, ms: performance.now() - began });
     if (state.mode === "electric" && tests.moving > 0) invalidate(false);
   });
 }
@@ -1167,3 +1171,9 @@ setSnapping(false);
 setMode("electric");
 fitHeader();
 draw();
+// A developer scheme changed the colours: redraw, and redraw the preset
+// thumbnails when they are next shown.
+onSchemeChange(() => {
+  previewTheme = null;
+  invalidate();
+});

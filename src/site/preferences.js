@@ -1,4 +1,4 @@
-import { prepareIcons, renderIcons, iconSetNames } from "./icons.js";
+import { prepareIcons, renderIcons } from "./icons.js";
 // Website preferences: loaded, applied and saved here for every page.
 export const STORAGE_KEY = "physium-ui";
 const OLD_STORAGE_KEY = "physics-sim-ui";
@@ -16,7 +16,9 @@ export function setupPreferences($) {
   if (!saved || typeof saved !== "object") saved = {};
   prepareIcons();
   const prefs = {
-    iconSet: iconSetNames.includes(saved.iconSet) ? saved.iconSet : "material",
+    // The icon set belongs to developer schemes (developer.js), which set
+    // it after loading; without developer mode it is always Material.
+    iconSet: "material",
     theme: ["light", "dark", "system"].includes(saved.theme)
       ? saved.theme
       : "light",
@@ -35,7 +37,7 @@ export function setupPreferences($) {
           : "light"
         : prefs.theme;
     document.documentElement.style.setProperty("--ui-scale", prefs.size / 100);
-    // The icon-set and angle-unit controls exist only on some pages.
+    // The icon-set control exists only in developer mode.
     if ($("ui-icons")) $("ui-icons").value = prefs.iconSet;
     renderIcons(prefs.iconSet);
     $("ui-theme").value = prefs.theme;
@@ -43,17 +45,16 @@ export function setupPreferences($) {
     $("ui-size-value").textContent = prefs.size + "%";
     $("ui-grid").checked = prefs.grid;
     if ($("ui-angle-unit")) $("ui-angle-unit").value = prefs.angleUnit;
+    const { theme, size, grid, angleUnit } = prefs;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ theme, size, grid, angleUnit }),
+      );
     } catch {}
   };
-  if ($("ui-icons"))
-    $("ui-icons").onchange = (e) => {
-      prefs.iconSet = iconSetNames.includes(e.target.value)
-        ? e.target.value
-        : "material";
-      apply();
-    };
+  // For the developer options: apply after changing prefs.iconSet.
+  Object.defineProperty(prefs, "refresh", { value: apply });
   $("ui-theme").onchange = (e) => {
     prefs.theme = e.target.value;
     apply();

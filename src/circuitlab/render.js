@@ -6,6 +6,7 @@
 // looks nothing up in the page. Selection handles, the wire being drawn,
 // the component being placed, panels and graphs stay with the page.
 import { paletteOf } from "../site/theme.js";
+import { endGrid, gridDash } from "../site/canvas-style.js";
 
 export const DOT_SPACING = 0.8, // grid squares between current dots
   DOT_FADE = 0.35; // grid squares over which dots fade at a junction
@@ -666,6 +667,8 @@ export function createCircuitRenderer(ctx, view) {
       hi = world(view.width, 0),
       step = 2 ** Math.max(0, Math.ceil(Math.log2(12 / view.scale)));
     ctx.lineWidth = 1;
+    const px = step * view.scale;
+    gridDash(ctx, px, (screen(0, Math.ceil(lo.y / step) * step)[1] + 0.5) % px);
     for (let x = Math.ceil(lo.x / step) * step; x <= hi.x; x += step) {
       ctx.strokeStyle = x % (step * 5) === 0 ? c.gridMajor : c.gridMinor;
       const sx = Math.round(screen(x, 0)[0]) + 0.5;
@@ -674,6 +677,7 @@ export function createCircuitRenderer(ctx, view) {
       ctx.lineTo(sx, view.height);
       ctx.stroke();
     }
+    gridDash(ctx, px, (screen(Math.ceil(lo.x / step) * step, 0)[0] + 0.5) % px);
     for (let y = Math.ceil(lo.y / step) * step; y <= hi.y; y += step) {
       ctx.strokeStyle = y % (step * 5) === 0 ? c.gridMajor : c.gridMinor;
       const sy = Math.round(screen(0, y)[1]) + 0.5;
@@ -682,6 +686,7 @@ export function createCircuitRenderer(ctx, view) {
       ctx.lineTo(view.width, sy);
       ctx.stroke();
     }
+    endGrid(ctx);
   }
 
   // options: colours (circuitPalette), solution (the circuit's solve()),

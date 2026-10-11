@@ -716,10 +716,7 @@ change($("ui-theme"), "dark");
 assert.equal(document.documentElement.dataset.theme, "dark");
 change($("ui-size"), "125", "input");
 assert.equal($("ui-size-value").textContent, "125%");
-assert.equal(
-  JSON.parse(window.localStorage.getItem("physium-ui")).size,
-  125,
-);
+assert.equal(JSON.parse(window.localStorage.getItem("physium-ui")).size, 125);
 $("close-settings").click();
 const priorZoom = $("zoom-level").textContent;
 $("zoom-out").click();
@@ -778,15 +775,26 @@ $("close-menu").click();
 $("settings-toggle").click();
 const wedgeButton = document.querySelector('[data-tool="wedge"]');
 const initialIcon = wedgeButton.querySelector("svg").innerHTML;
-for (const name of ["lucide", "tabler", "material"]) {
+// The icon set is a developer option: hidden until developer mode is on.
+assert.equal($("ui-icons"), null);
+const tick = (node, on) => {
+  node.checked = on;
+  node.dispatchEvent(new window.Event("change"));
+};
+tick($("ui-developer"), true);
+assert.ok($("developer-settings"), "developer group shown");
+const iconSets = [...$("ui-icons").options].map((o) => o.value);
+assert.ok(iconSets.length >= 8, "at least eight icon sets");
+for (const name of [...iconSets.slice(1), "material"]) {
   change($("ui-icons"), name);
   assert.equal(wedgeButton.dataset.iconSet, name);
   assert.equal(wedgeButton.textContent, "Wedge");
   assert.equal($("pause").textContent, "Run");
   assert.ok($("pause").querySelector("svg"));
+  const stored = JSON.parse(window.localStorage.getItem("physium-schemes"));
   assert.equal(
-    JSON.parse(window.localStorage.getItem("physium-ui")).iconSet,
-    name,
+    stored.current.values["icon-set"],
+    name === "material" ? undefined : name,
   );
   for (const button of document.querySelectorAll("[data-icon]"))
     assert.ok(
@@ -796,6 +804,12 @@ for (const name of ["lucide", "tabler", "material"]) {
   if (name !== "material")
     assert.notEqual(wedgeButton.querySelector("svg").innerHTML, initialIcon);
 }
+// With developer mode off the site is back to its defaults.
+change($("ui-icons"), "feather");
+tick($("ui-developer"), false);
+assert.equal($("developer-settings"), null);
+assert.equal(wedgeButton.dataset.iconSet, "material");
+assert.equal(wedgeButton.querySelector("svg").innerHTML, initialIcon);
 $("close-settings").click();
 key(" ");
 assert.equal($("pause").textContent, "Pause");

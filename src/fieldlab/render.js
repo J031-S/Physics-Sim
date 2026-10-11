@@ -11,6 +11,13 @@ import {
 } from "./model.js";
 import { arrowFeatures, lineArrows } from "./arrows.js";
 import { paletteOf } from "../site/theme.js";
+import {
+  arrowheadScale,
+  endGrid,
+  fieldLineWeight,
+  gridDash,
+  vectorWeight,
+} from "../site/canvas-style.js";
 
 export const GRID = 0.25,
   SOURCE_RADIUS = 11;
@@ -254,6 +261,7 @@ export function createFieldRenderer(ctx, view) {
     ctx.stroke();
   }
   function arrowHead(x, y, angle, size) {
+    size *= arrowheadScale();
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
@@ -273,7 +281,10 @@ export function createFieldRenderer(ctx, view) {
   }
   function fieldLine(points, arrows, pointSources) {
     if (points.length < 2) return;
+    const width = ctx.lineWidth;
+    ctx.lineWidth = width * fieldLineWeight();
     strokePath(points, true);
+    ctx.lineWidth = width;
     for (const a of arrows) {
       const [x, y] = screen(a.x, a.y);
       if (x < -10 || y < -10 || x > view.width + 10 || y > view.height + 10)
@@ -289,6 +300,8 @@ export function createFieldRenderer(ctx, view) {
       step =
         GRID * 2 ** Math.max(0, Math.ceil(Math.log2(14 / (GRID * view.scale))));
     ctx.lineWidth = 1;
+    const px = step * view.scale;
+    gridDash(ctx, px, (screen(0, Math.ceil(lo.y / step) * step)[1] + 0.5) % px);
     for (let x = Math.ceil(lo.x / step) * step; x <= hi.x; x += step) {
       const major = Math.abs(x - Math.round(x)) < 1e-6 || step >= 1;
       ctx.strokeStyle = major ? c.gridMajor : c.gridMinor;
@@ -298,6 +311,7 @@ export function createFieldRenderer(ctx, view) {
       ctx.lineTo(sx, view.height);
       ctx.stroke();
     }
+    gridDash(ctx, px, (screen(Math.ceil(lo.x / step) * step, 0)[0] + 0.5) % px);
     for (let y = Math.ceil(lo.y / step) * step; y <= hi.y; y += step) {
       const major = Math.abs(y - Math.round(y)) < 1e-6 || step >= 1;
       ctx.strokeStyle = major ? c.gridMajor : c.gridMinor;
@@ -307,6 +321,7 @@ export function createFieldRenderer(ctx, view) {
       ctx.lineTo(view.width, sy);
       ctx.stroke();
     }
+    endGrid(ctx);
   }
   function drawScaleBar(c) {
     let length = 1;
@@ -548,7 +563,7 @@ export function createFieldRenderer(ctx, view) {
         x1 = x0 + ux * length,
         y1 = y0 + uy * length;
       ctx.strokeStyle = ctx.fillStyle = c.force;
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 2.5 * vectorWeight();
       ctx.beginPath();
       ctx.moveTo(x0, y0);
       ctx.lineTo(x1, y1);

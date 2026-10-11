@@ -54,6 +54,14 @@ export const pages = [
     description: "One equation at a time, with values to change",
     group: "minitools",
   },
+  {
+    id: "gallery",
+    address: "dev/gallery",
+    file: "dev/gallery.html",
+    title: "Component gallery",
+    description: "Developer page: every shared component, light and dark",
+    group: "developer",
+  },
 ];
 
 // Addresses the site used before pages moved into folders, and the page each

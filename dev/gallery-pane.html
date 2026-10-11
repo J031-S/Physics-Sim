@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Physium · Components</title>
+    <link rel="stylesheet" href="../styles/tokens.css" />
+    <link rel="stylesheet" href="../styles/base.css" />
+    <link rel="stylesheet" href="../styles/fields.css" />
+    <link rel="stylesheet" href="../styles/gallery.css" />
+  </head>
+  <!-- One theme's worth of the shared components, shown by dev/gallery in a
+       frame per theme (?theme=light or ?theme=dark). Every element uses the
+       site's own classes and ids, so it looks exactly as on the pages. -->
+  <body class="doc-page gallery-pane" data-page="gallery">
+    <header>
+      <a class="brand"></a>
+      <nav class="site-nav"></nav>
+      <div class="playback">
+        <button id="pause">Run</button>
+        <button id="clear">Clear scene</button>
+      </div>
+    </header>
+    <main class="gallery-sheet">
+      <h2 class="gallery-theme"></h2>
+
+      <section aria-label="Buttons">
+        <h3>Buttons</h3>
+        <div class="gallery-row">
+          <button>Normal</button>
+          <button class="active">Active</button>
+          <button aria-pressed="true">Pressed</button>
+          <button disabled>Disabled</button>
+          <button class="gallery-focus">Focused</button>
+          <button
+            data-icon="settings"
+            data-icon-label="Settings"
+            data-icon-only="true"
+          ></button>
+          <button data-icon="presets" data-icon-label="Presets"></button>
+        </div>
+      </section>
+
+      <section aria-label="Toolbar">
+        <h3>Toolbar, modes and hint</h3>
+        <div class="fl-toolbar" role="toolbar" aria-label="Sample toolbar">
+          <div class="fl-modes" role="group" aria-label="Sample modes">
+            <button aria-pressed="true">Electric</button
+            ><button aria-pressed="false">Magnetic</button>
+          </div>
+          <button>Charge</button><button>Plate</button>
+        </div>
+        <div class="fl-hint">
+          <strong>Grab</strong> Drag a source to move it.
+        </div>
+      </section>
+
+      <section aria-label="Panels and controls">
+        <h3>Panel, toggles, sliders, number rows, selects</h3>
+        <div class="gallery-row gallery-top">
+          <section id="settings-panel" aria-labelledby="settings-title">
+            <div class="menu-header">
+              <strong id="settings-title">Settings</strong
+              ><button id="close-settings" aria-label="Close settings">
+                ×
+              </button>
+            </div>
+            <details class="settings-section" open>
+              <summary>Simulation</summary>
+              <div class="prop-row">
+                <label for="g-mass">Mass</label
+                ><input
+                  id="g-mass"
+                  type="range"
+                  min="0"
+                  max="10"
+                  value="4"
+                /><span class="prop-value"
+                  ><input type="number" value="4" aria-label="Mass" /><span
+                    class="unit"
+                    >kg</span
+                  ></span
+                >
+              </div>
+              <label class="setting-toggle"
+                ><input type="checkbox" checked /> Air resistance</label
+              >
+              <label class="setting-toggle"
+                ><input type="checkbox" /> Walls</label
+              >
+              <label class="setting-toggle"
+                ><input type="checkbox" disabled /> Unavailable</label
+              >
+              <label class="select-row"
+                >Integrator
+                <select>
+                  <option>Leapfrog</option>
+                  <option>Euler</option>
+                </select></label
+              >
+            </details>
+            <details
+              id="website-settings"
+              class="settings-section"
+              open
+            ></details>
+          </section>
+          <details class="fl-display" open>
+            <summary>Display</summary>
+            <label class="fl-check"
+              ><input type="checkbox" checked /> Field lines</label
+            >
+            <label class="fl-check"
+              ><input type="checkbox" /> Field arrows</label
+            >
+            <div class="prop-row fl-density">
+              <label for="g-density">Line density</label
+              ><input
+                id="g-density"
+                type="range"
+                min="0.5"
+                max="2"
+                step="0.25"
+                value="1"
+              /><span class="prop-value"
+                ><output for="g-density">1×</output></span
+              >
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section aria-label="Menus and navigation">
+        <h3>Navigation menu (open)</h3>
+        <div class="gallery-nav"></div>
+      </section>
+
+      <section aria-label="Toast">
+        <h3>Toast</h3>
+        <div class="gallery-toast">
+          <div id="toast" class="show" role="status">
+            Sample toast: a message the page shows for a few seconds.
+          </div>
+        </div>
+      </section>
+
+      <section aria-label="Minitool card">
+        <h3>Minitool card and equation</h3>
+        <div class="gallery-row gallery-minitool"></div>
+      </section>
+    </main>
+    <script type="module" src="../src/site/gallery.js"></script>
+  </body>
+</html>

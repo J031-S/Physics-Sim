@@ -4,6 +4,7 @@ import { Sandbox, DT, GRID, snap } from "./physics.js";
 import { presets } from "./presets.js";
 import { FieldDrag } from "./field-view.js";
 import { setupSite } from "./site/shell.js";
+import { styleCanvas } from "./site/canvas-style.js";
 import { color } from "./site/theme.js";
 import {
   createSceneRenderer,
@@ -11,6 +12,7 @@ import {
   linkPath as pathOfLink,
   VELOCITY_PX,
 } from "./sandbox/render.js";
+import { onSchemeChange, reportFrame } from "./site/dev-hooks.js";
 // Builds the brand, navigation and Website settings before anything below
 // looks up a control.
 const prefs = setupSite();
@@ -25,7 +27,7 @@ const settingKeys = [
   "magneticZ",
 ];
 const canvas = $("canvas"),
-  ctx = canvas.getContext("2d");
+  ctx = styleCanvas(canvas.getContext("2d"));
 let sim = new Sandbox(),
   running = true,
   tool = "grab",
@@ -2441,17 +2443,21 @@ function draw() {
   drawGraph(dark);
 }
 function frame(now) {
-  const elapsed = last ? Math.min((now - last) / 1000, 0.05) : 0;
+  const elapsed = last ? Math.min((now - last) / 1000, 0.05) : 0,
+    began = performance.now();
+  let steps = 0;
   last = now;
   if (running) {
     // Slow motion: less simulated time per real second, same fixed step.
     accumulator += elapsed * Number($("speed").value);
     while (accumulator >= DT) {
       stepOnce();
+      steps++;
       accumulator -= DT;
     }
   }
   draw();
+  reportFrame({ steps, simulated: steps * DT, ms: performance.now() - began });
   requestAnimationFrame(frame);
 }
 for (const [key, t] of Object.entries({
@@ -2477,3 +2483,5 @@ updateVectorLegend();
 fitHeader();
 draw();
 requestAnimationFrame(frame);
+// A developer scheme changed the colours: redraw the preset thumbnails.
+onSchemeChange(() => (previewTheme = null));

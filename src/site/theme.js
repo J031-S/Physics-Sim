@@ -1,11 +1,14 @@
 // Design tokens: the single source of every colour on the site (CSS and
 // canvas), and of the main shape and type sizes. No DOM in the data part.
 //
-// CSS reads the tokens as custom properties from styles/tokens.css, which is
-// generated from this file (`npm run tokens`; a test fails if it is stale).
-// Canvas code asks for colours with `color(name)` or `paletteOf(names)`.
-// Developer schemes (developer options) replace values through
+// CSS reads the colours as custom properties from styles/tokens.css, which
+// is generated from this file (`npm run tokens`; a test fails if it is
+// stale). Canvas code asks for colours with `color(name)` or
+// `paletteOf(names)`, and for other tokens with `value(name)`. Developer
+// schemes (developer options, src/site/scheme.js) replace values through
 // `setOverrides`; without developer mode the values below are always used.
+// The size and choice defaults describe the stylesheets as they are: a
+// developer scheme that changes one adds override rules (surface.js).
 
 export const GROUPS = [
   "Page",
@@ -20,6 +23,8 @@ export const GROUPS = [
   "Circuits",
   "Graphs",
   "Status",
+  "Patterns",
+  "Developer",
 ];
 
 // Every colour: name (the CSS custom property is --name), group, the value in
@@ -974,29 +979,57 @@ export const COLOURS = [
     dark: "#6b2a2330",
     description: "CSS: .cl-warning box-shadow",
   },
+  {
+    name: "on-colour",
+    group: "Controls",
+    light: "#ffffff",
+    dark: "#ffffff",
+    description:
+      "Text on coloured buttons and on toasts (Run, Clear, Delete, toast)",
+  },
+  {
+    name: "pattern-page",
+    group: "Patterns",
+    light: "#6f7f63",
+    dark: "#bdb4a2",
+    description:
+      "Background pattern of the page (developer scheme; strength sets how much shows)",
+  },
+  {
+    name: "pattern-canvas",
+    group: "Patterns",
+    light: "#6f7f63",
+    dark: "#bdb4a2",
+    description:
+      "Background pattern behind the simulation canvas (developer scheme)",
+  },
+  {
+    name: "dev-outline",
+    group: "Developer",
+    light: "#c2187a",
+    dark: "#ff6fb0",
+    description: "Developer layout aid: element outlines",
+  },
+  {
+    name: "dev-grid",
+    group: "Developer",
+    light: "#2f7dd0",
+    dark: "#6fa8ec",
+    description: "Developer layout aid: spacing grid and size badge",
+  },
 ];
 
 // Non-colour tokens. `value` is the default; sliders use min/max/step.
 export const SIZES = [
-  {
-    name: "font-size",
-    group: "Type",
-    unit: "px",
-    value: 13,
-    min: 10,
-    max: 18,
-    step: 0.5,
-    description: "Base interface font size",
-  },
   {
     name: "radius-button",
     group: "Shape",
     unit: "px",
     value: 7,
     min: 0,
-    max: 20,
+    max: 32,
     step: 1,
-    description: "Corner radius of buttons",
+    description: "Corner radius of buttons (32 is fully round)",
   },
   {
     name: "radius-input",
@@ -1004,9 +1037,10 @@ export const SIZES = [
     unit: "px",
     value: 5,
     min: 0,
-    max: 20,
+    max: 32,
     step: 1,
-    description: "Corner radius of number fields and selects",
+    description:
+      "Corner radius of number fields and selects (32 is fully round)",
   },
   {
     name: "radius-panel",
@@ -1014,9 +1048,9 @@ export const SIZES = [
     unit: "px",
     value: 12,
     min: 0,
-    max: 28,
+    max: 32,
     step: 1,
-    description: "Corner radius of panels and menus",
+    description: "Corner radius of panels and menus (32 is fully round)",
   },
   {
     name: "radius-card",
@@ -1024,9 +1058,10 @@ export const SIZES = [
     unit: "px",
     value: 9,
     min: 0,
-    max: 28,
+    max: 32,
     step: 1,
-    description: "Corner radius of cards and small panels",
+    description:
+      "Corner radius of cards, toolbars and small panels (32 is fully round)",
   },
   {
     name: "radius-canvas",
@@ -1034,9 +1069,9 @@ export const SIZES = [
     unit: "px",
     value: 0,
     min: 0,
-    max: 28,
+    max: 32,
     step: 1,
-    description: "Corner radius of the canvas frame",
+    description: "Corner radius of the canvas frame (32 is fully round)",
   },
   {
     name: "border-width",
@@ -1046,45 +1081,577 @@ export const SIZES = [
     min: 0,
     max: 4,
     step: 0.5,
-    description: "Border width of buttons, inputs and panels",
+    description: "Border width of buttons, inputs, panels and cards",
   },
   {
-    name: "space",
-    group: "Shape",
+    name: "panel-opacity",
+    group: "Surface",
+    unit: "%",
+    value: 100,
+    min: 40,
+    max: 100,
+    step: 5,
+    description: "Opacity of panel and card backgrounds",
+  },
+  {
+    name: "panel-blur",
+    group: "Surface",
     unit: "px",
-    value: 8,
-    min: 2,
-    max: 16,
+    value: 0,
+    min: 0,
+    max: 24,
     step: 1,
-    description: "Spacing step (gaps and padding in the shell)",
+    description: "Blur of what shows through a see-through panel",
+  },
+  {
+    name: "icon-size",
+    group: "Icons",
+    unit: "%",
+    value: 100,
+    min: 70,
+    max: 150,
+    step: 5,
+    description: "Size of interface icons",
+  },
+  {
+    name: "icon-stroke",
+    group: "Icons",
+    unit: "px",
+    value: 0,
+    min: 0,
+    max: 3,
+    step: 0.25,
+    description: "Stroke weight of outline icon sets (0 keeps each set's own)",
+  },
+  {
+    name: "canvas-line",
+    group: "Canvas",
+    unit: "×",
+    value: 1,
+    min: 0.5,
+    max: 3,
+    step: 0.1,
+    description: "Weight of every line drawn on the simulation canvas",
+  },
+  {
+    name: "canvas-vector-line",
+    group: "Canvas",
+    unit: "×",
+    value: 1,
+    min: 0.5,
+    max: 3,
+    step: 0.1,
+    description: "Weight of vector arrows (on top of the canvas line weight)",
+  },
+  {
+    name: "canvas-field-line",
+    group: "Canvas",
+    unit: "×",
+    value: 1,
+    min: 0.5,
+    max: 3,
+    step: 0.1,
+    description: "Weight of field lines (on top of the canvas line weight)",
+  },
+  {
+    name: "canvas-arrowhead",
+    group: "Canvas",
+    unit: "×",
+    value: 1,
+    min: 0.5,
+    max: 2.5,
+    step: 0.1,
+    description: "Size of arrowheads on the canvas",
+  },
+  {
+    name: "page-pattern-size",
+    group: "Patterns",
+    unit: "px",
+    value: 24,
+    min: 6,
+    max: 96,
+    step: 2,
+    description: "Spacing of the page background pattern",
+  },
+  {
+    name: "page-pattern-strength",
+    group: "Patterns",
+    unit: "%",
+    value: 25,
+    min: 0,
+    max: 100,
+    step: 5,
+    description: "Strength of the page background pattern",
+  },
+  {
+    name: "canvas-pattern-size",
+    group: "Patterns",
+    unit: "px",
+    value: 24,
+    min: 6,
+    max: 96,
+    step: 2,
+    description: "Spacing of the canvas background pattern",
+  },
+  {
+    name: "canvas-pattern-strength",
+    group: "Patterns",
+    unit: "%",
+    value: 25,
+    min: 0,
+    max: 100,
+    step: 5,
+    description: "Strength of the canvas background pattern",
+  },
+  {
+    name: "font-size",
+    group: "Fonts",
+    unit: "px",
+    value: 13,
+    min: 10,
+    max: 18,
+    step: 0.5,
+    description: "Interface text size",
+  },
+  {
+    name: "font-size-heading",
+    group: "Fonts",
+    unit: "px",
+    value: 14,
+    min: 10,
+    max: 28,
+    step: 0.5,
+    description: "Headings and brand name size",
+  },
+  {
+    name: "font-size-numbers",
+    group: "Fonts",
+    unit: "px",
+    value: 12,
+    min: 9,
+    max: 18,
+    step: 0.5,
+    description: "Numbers and readouts size",
+  },
+  {
+    name: "font-size-canvas",
+    group: "Fonts",
+    unit: "%",
+    value: 100,
+    min: 60,
+    max: 160,
+    step: 5,
+    description: "Canvas labels size",
+  },
+  {
+    name: "font-size-code",
+    group: "Fonts",
+    unit: "px",
+    value: 12,
+    min: 9,
+    max: 18,
+    step: 0.5,
+    description: "Code size",
+  },
+  {
+    name: "font-weight-ui",
+    group: "Fonts",
+    unit: "",
+    value: 400,
+    min: 300,
+    max: 700,
+    step: 100,
+    description: "Interface text weight",
+  },
+  {
+    name: "font-weight-heading",
+    group: "Fonts",
+    unit: "",
+    value: 600,
+    min: 300,
+    max: 800,
+    step: 100,
+    description: "Headings and brand name weight",
+  },
+  {
+    name: "font-weight-numbers",
+    group: "Fonts",
+    unit: "",
+    value: 400,
+    min: 300,
+    max: 700,
+    step: 100,
+    description: "Numbers and readouts weight",
+  },
+  {
+    name: "font-weight-canvas",
+    group: "Fonts",
+    unit: "",
+    value: 600,
+    min: 300,
+    max: 800,
+    step: 100,
+    description: "Canvas labels weight",
+  },
+  {
+    name: "font-weight-code",
+    group: "Fonts",
+    unit: "",
+    value: 400,
+    min: 300,
+    max: 700,
+    step: 100,
+    description: "Code weight",
+  },
+  {
+    name: "letter-spacing-ui",
+    group: "Fonts",
+    unit: "em",
+    value: 0,
+    min: -0.05,
+    max: 0.2,
+    step: 0.005,
+    description: "Interface text letter-spacing",
+  },
+  {
+    name: "letter-spacing-heading",
+    group: "Fonts",
+    unit: "em",
+    value: 0,
+    min: -0.05,
+    max: 0.2,
+    step: 0.005,
+    description: "Headings and brand name letter-spacing",
+  },
+  {
+    name: "letter-spacing-numbers",
+    group: "Fonts",
+    unit: "em",
+    value: 0,
+    min: -0.05,
+    max: 0.2,
+    step: 0.005,
+    description: "Numbers and readouts letter-spacing",
+  },
+  {
+    name: "letter-spacing-canvas",
+    group: "Fonts",
+    unit: "em",
+    value: 0,
+    min: -0.05,
+    max: 0.2,
+    step: 0.005,
+    description: "Canvas labels letter-spacing",
+  },
+  {
+    name: "letter-spacing-code",
+    group: "Fonts",
+    unit: "em",
+    value: 0,
+    min: -0.05,
+    max: 0.2,
+    step: 0.005,
+    description: "Code letter-spacing",
   },
 ];
-export const STRINGS = [
+
+// Tokens with a fixed set of values (`fonts: true`: one of FONTS, or
+// "default" for the font each part of the page was designed with).
+export const CHOICES = [
   {
-    name: "font-family",
-    group: "Type",
-    value:
-      'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    description: "Interface font",
-  },
-  {
-    name: "shadow-panel",
+    name: "border-style",
     group: "Shape",
-    value: "0 10px 40px",
-    description:
-      "Offset and blur of panel shadows (the colour is panel-shadow)",
+    value: "solid",
+    options: ["solid", "dashed", "dotted", "double", "none"],
+    description: "Border style of buttons, inputs, panels and cards",
   },
+  {
+    name: "shadow",
+    group: "Surface",
+    value: "soft",
+    options: ["none", "soft", "hard", "raised"],
+    description: "Shadow of panels, menus and toolbars",
+  },
+  {
+    name: "button-style",
+    group: "Surface",
+    value: "filled",
+    options: ["filled", "outlined", "flat"],
+    description: "Button style",
+  },
+  {
+    name: "toggle-style",
+    group: "Surface",
+    value: "checkbox",
+    options: ["checkbox", "switch"],
+    description: "On/off controls drawn as checkboxes or switches",
+  },
+  {
+    name: "density",
+    group: "Surface",
+    value: "normal",
+    options: ["compact", "normal", "roomy"],
+    description: "Control height, padding and gaps",
+  },
+  {
+    name: "slider-shape",
+    group: "Surface",
+    value: "default",
+    options: ["default", "round", "square", "thin"],
+    description: "Slider track and thumb",
+  },
+  {
+    name: "focus-ring",
+    group: "Surface",
+    value: "outline",
+    options: ["outline", "thick", "glow", "underline"],
+    description: "Keyboard focus indicator",
+  },
+  {
+    name: "header-style",
+    group: "Surface",
+    value: "bordered",
+    options: ["flat", "bordered", "tinted", "floating"],
+    description: "Top bar",
+  },
+  {
+    name: "page-pattern",
+    group: "Patterns",
+    value: "none",
+    options: [
+      "none",
+      "dots",
+      "grid",
+      "graph",
+      "diagonal",
+      "isometric",
+      "noise",
+    ],
+    description: "Background pattern of the page",
+  },
+  {
+    name: "canvas-pattern",
+    group: "Patterns",
+    value: "none",
+    options: [
+      "none",
+      "dots",
+      "grid",
+      "graph",
+      "diagonal",
+      "isometric",
+      "noise",
+    ],
+    description: "Background pattern behind the simulation canvas",
+  },
+  {
+    name: "grid-style",
+    group: "Canvas",
+    value: "solid",
+    options: ["solid", "dotted", "crosses"],
+    description: "Grid lines on the canvas",
+  },
+  {
+    name: "icon-set",
+    group: "Icons",
+    value: "material",
+    options: [
+      "material",
+      "lucide",
+      "tabler",
+      "phosphor",
+      "heroicons",
+      "feather",
+      "bootstrap",
+      "remix",
+    ],
+    description: "Interface icon set",
+  },
+  {
+    name: "font-ui",
+    group: "Fonts",
+    value: "default",
+    fonts: true,
+    description: "Interface text",
+  },
+  {
+    name: "font-heading",
+    group: "Fonts",
+    value: "default",
+    fonts: true,
+    description: "Headings and the brand name",
+  },
+  {
+    name: "font-numbers",
+    group: "Fonts",
+    value: "default",
+    fonts: true,
+    description: "Numbers and readouts (shown with fixed-width digits)",
+  },
+  {
+    name: "font-canvas",
+    group: "Fonts",
+    value: "default",
+    fonts: true,
+    description: "Labels drawn on the canvas",
+  },
+  {
+    name: "font-code",
+    group: "Fonts",
+    value: "default",
+    fonts: true,
+    description: "Code",
+  },
+];
+
+// CSS applied after everything else when a developer scheme is on.
+export const CUSTOM_CSS = "";
+
+// ---- Not part of a scheme.
+
+// Fonts a scheme can choose: system stacks, and open fonts in vendor/fonts/
+// (see its NOTICE.txt), loaded only when a scheme uses them.
+export const FONTS = [
+  {
+    id: "system",
+    label: "System UI",
+    kind: "sans",
+    stack:
+      'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  {
+    id: "humanist",
+    label: "System humanist",
+    kind: "sans",
+    stack:
+      'Seravek, "Gill Sans Nova", Ubuntu, Calibri, "DejaVu Sans", sans-serif',
+  },
+  {
+    id: "rounded-system",
+    label: "System rounded",
+    kind: "rounded",
+    stack:
+      'ui-rounded, "Hiragino Maru Gothic ProN", Quicksand, Comfortaa, "Arial Rounded MT", sans-serif',
+  },
+  {
+    id: "serif-system",
+    label: "System serif",
+    kind: "serif",
+    stack: 'Charter, "Bitstream Charter", "Sitka Text", Cambria, serif',
+  },
+  {
+    id: "mono-system",
+    label: "System monospace",
+    kind: "mono",
+    stack:
+      'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace',
+  },
+  {
+    id: "inter",
+    label: "Inter",
+    kind: "sans",
+    file: "inter.woff2",
+    weights: "100 900",
+  },
+  {
+    id: "atkinson",
+    label: "Atkinson Hyperlegible Next",
+    kind: "sans",
+    file: "atkinson-hyperlegible-next.woff2",
+    weights: "200 800",
+  },
+  {
+    id: "plex-sans",
+    label: "IBM Plex Sans",
+    kind: "sans",
+    file: "ibm-plex-sans.woff2",
+    weights: "100 700",
+  },
+  {
+    id: "nunito",
+    label: "Nunito",
+    kind: "rounded",
+    file: "nunito.woff2",
+    weights: "200 900",
+  },
+  {
+    id: "source-serif",
+    label: "Source Serif 4",
+    kind: "serif",
+    file: "source-serif-4.woff2",
+    weights: "200 900",
+  },
+  {
+    id: "literata",
+    label: "Literata",
+    kind: "serif",
+    file: "literata.woff2",
+    weights: "200 900",
+  },
+  {
+    id: "jetbrains-mono",
+    label: "JetBrains Mono",
+    kind: "mono",
+    file: "jetbrains-mono.woff2",
+    weights: "100 800",
+  },
+  {
+    id: "plex-mono",
+    label: "IBM Plex Mono",
+    kind: "mono",
+    file: "ibm-plex-mono-400.woff2",
+    bold: "ibm-plex-mono-600.woff2",
+    weights: "400",
+  },
+];
+
+// Text and background tokens drawn together: [text, background, where].
+// The theme tweaker shows their contrast ratio.
+export const PAIRS = [
+  ["ink", "canvas-bg", "Page text"],
+  ["ink", "panel", "Panel and menu text"],
+  ["active-ink", "tools-active-background", "Active tool"],
+  [
+    "active-ink",
+    "fl-toolbar-button-aria-pressed-true-background",
+    "Pressed toolbar button",
+  ],
+  [
+    "active-ink",
+    "ol-chip-button-aria-pressed-true-background",
+    "Pressed satellite chip",
+  ],
+  [
+    "icon-toggle-has-input-checked-color",
+    "tools-active-background",
+    "Checked icon toggle",
+  ],
+  ["accent-text", "panel", "Accent text in panels"],
+  ["accent-text", "canvas-bg", "Links on the page"],
+  ["status-color", "canvas-bg", "Status line"],
+  ["on-colour", "run-button", "Run button"],
+  ["on-colour", "clear-button", "Clear button"],
+  ["on-colour", "danger-button", "Confirm clear button"],
+  ["on-colour", "toast", "Toast"],
+  ["canvas-soft", "canvas-bg", "Canvas labels"],
+  ["link-label", "canvas-bg", "Spring label"],
+  ["charge-label-positive", "canvas-bg", "Positive charge label"],
+  ["charge-label-negative", "canvas-bg", "Negative charge label"],
+  ["circuit-current", "canvas-bg", "Ammeter reading"],
+  ["circuit-voltage", "canvas-bg", "Voltmeter reading"],
 ];
 
 const byName = new Map(COLOURS.map((t) => [t.name, t]));
-let overrides = { light: {}, dark: {}, sizes: {} };
+const valueTokens = new Map([...SIZES, ...CHOICES].map((t) => [t.name, t]));
+let overrides = { light: {}, dark: {}, values: {} };
 
-// Replace (or clear, with no argument) the developer overrides.
+// Replace (or clear, with no argument) the developer overrides: colours by
+// theme, and values of size and choice tokens.
 export function setOverrides(next = {}) {
   overrides = {
     light: { ...next.light },
     dark: { ...next.dark },
-    sizes: { ...next.sizes },
+    values: { ...next.values },
   };
 }
 export const getOverrides = () => structuredClone(overrides);
@@ -1093,6 +1660,13 @@ export function colourValue(name, mode) {
   const token = byName.get(name);
   if (!token) throw new Error("Unknown colour token: " + name);
   return overrides[mode][name] ?? token[mode];
+}
+// The value of a size or choice token (the default unless a developer
+// scheme changes it).
+export function value(name) {
+  const token = valueTokens.get(name);
+  if (!token) throw new Error("Unknown token: " + name);
+  return overrides.values[name] ?? token.value;
 }
 const pageIsDark = () =>
   globalThis.document?.documentElement?.dataset?.theme === "dark";
@@ -1106,19 +1680,17 @@ export function paletteOf(names, dark = pageIsDark()) {
   return out;
 }
 
-// The text of styles/tokens.css: every token as a custom property, light
+// The text of styles/tokens.css: every colour as a custom property, light
 // values on :root and dark values in one :root[data-theme="dark"] block.
+// Size and choice tokens are applied by the developer options only (see
+// src/site/surface.js), so the stylesheets keep their own sizes.
 export function tokensCss() {
   const light = COLOURS.map((t) => `  --${t.name}: ${t.light};`),
-    dark = COLOURS.map((t) => `  --${t.name}: ${t.dark};`),
-    sizes = SIZES.map((t) => `  --${t.name}: ${t.value}${t.unit};`),
-    strings = STRINGS.map((t) => `  --${t.name}: ${t.value};`);
+    dark = COLOURS.map((t) => `  --${t.name}: ${t.dark};`);
   return [
     "/* Generated from src/site/theme.js by `npm run tokens`. Do not edit. */",
     ":root {",
     ...light,
-    ...sizes,
-    ...strings,
     "}",
     ':root[data-theme="dark"] {',
     "  color-scheme: dark;",

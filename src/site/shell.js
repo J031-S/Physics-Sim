@@ -7,6 +7,7 @@ import { pages, pageById } from "./pages.js";
 import { setupNav } from "./nav.js";
 import { setupPreferences } from "./preferences.js";
 import { $ } from "./dom.js";
+import { setupDeveloper } from "./developer.js";
 
 // This file sits at src/site/, so the site root is two folders up. Every link
 // is built from it, so nothing depends on the folder a page is in.
@@ -83,18 +84,7 @@ export const WEBSITE_SETTINGS = `<summary>Website</summary>
   <small
     >Website preferences are remembered on this browser and shared by every
     page.</small
-  >
-  <details class="debug-settings">
-    <summary>Debug · icon preview</summary>
-    <label class="select-row"
-      >Icon set
-      <select id="ui-icons">
-        <option value="material">Material Rounded</option>
-        <option value="lucide">Lucide</option>
-        <option value="tabler">Tabler</option>
-      </select></label
-    >
-  </details>`;
+  >`;
 
 function buildWebsite() {
   const section = $("website-settings");
@@ -106,7 +96,9 @@ export function setupSite() {
   buildNav(document.body.dataset.page);
   buildWebsite();
   setupNav();
-  return setupPreferences($);
+  const prefs = setupPreferences($);
+  setupDeveloper(prefs);
+  return prefs;
 }
 
 // Settings button and panel for pages that have no settings of their own

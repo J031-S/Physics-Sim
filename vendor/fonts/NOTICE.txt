@@ -1,0 +1,21 @@
+Fonts for the developer options (font choices in a developer scheme). They
+are loaded only when a developer scheme uses them; students never download
+them. Each is the Latin subset, as packaged by Fontsource, under the SIL Open
+Font License 1.1 (the adjacent *-LICENSE.txt files).
+
+inter.woff2                       Inter (variable weight 100–900)
+                                  @fontsource-variable/inter 5.3.0
+atkinson-hyperlegible-next.woff2  Atkinson Hyperlegible Next (variable 200–800)
+                                  @fontsource-variable/atkinson-hyperlegible-next 5.3.0
+ibm-plex-sans.woff2               IBM Plex Sans (variable 100–700)
+                                  @fontsource-variable/ibm-plex-sans 5.3.0
+nunito.woff2                      Nunito, rounded (variable 200–900)
+                                  @fontsource-variable/nunito 5.3.0
+source-serif-4.woff2              Source Serif 4 (variable 200–900)
+                                  @fontsource-variable/source-serif-4 5.3.1
+literata.woff2                    Literata, serif (variable 200–900)
+                                  @fontsource-variable/literata 5.3.0
+jetbrains-mono.woff2              JetBrains Mono (variable 100–800)
+                                  @fontsource-variable/jetbrains-mono 5.3.0
+ibm-plex-mono-400.woff2,          IBM Plex Mono regular and semibold
+ibm-plex-mono-600.woff2           @fontsource/ibm-plex-mono 5.3.0

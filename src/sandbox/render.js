@@ -7,6 +7,12 @@ import { color } from "../site/theme.js";
 import { canvasIcon } from "../site/icons.js";
 import { drawFields } from "../field-view.js";
 import { GRID } from "../physics.js";
+import {
+  arrowheadScale,
+  endGrid,
+  gridDash,
+  vectorWeight,
+} from "../site/canvas-style.js";
 
 // Velocity arrows: fixed px per m/s. Long force arrows are capped.
 export const VELOCITY_PX = 12,
@@ -92,17 +98,19 @@ export function createSceneRenderer(ctx, view) {
       capped = length > cap,
       k = capped ? cap / length : 1,
       end = { x: p.x + dx * k, y: p.y - dy * k },
-      a = Math.atan2(end.y - p.y, end.x - p.x);
-    line(p, end, colour, 2);
+      a = Math.atan2(end.y - p.y, end.x - p.x),
+      width = 2 * vectorWeight(),
+      head = 7 * arrowheadScale();
+    line(p, end, colour, width);
     for (const turn of [-0.45, 0.45])
       line(
         end,
         {
-          x: end.x - 7 * Math.cos(a + turn),
-          y: end.y - 7 * Math.sin(a + turn),
+          x: end.x - head * Math.cos(a + turn),
+          y: end.y - head * Math.sin(a + turn),
         },
         colour,
-        2,
+        width,
       );
     if (capped)
       // Two short slashes across the shaft: drawn shorter than true length.
@@ -296,6 +304,15 @@ export function createSceneRenderer(ctx, view) {
       max = world({ x: o.width, y: 0 });
     const gridStep =
       GRID * 2 ** Math.max(0, Math.ceil(Math.log2(12 / (GRID * view.scale))));
+    const gridPx = gridStep * view.scale;
+    if (o.grid)
+      gridDash(
+        ctx,
+        gridPx,
+        (o.height -
+          screen({ x: 0, y: Math.ceil(min.y / gridStep) * gridStep }).y) %
+          gridPx,
+      );
     if (o.grid)
       for (
         let x = Math.ceil(min.x / gridStep) * gridStep;
@@ -311,6 +328,12 @@ export function createSceneRenderer(ctx, view) {
         );
       }
     if (o.grid)
+      gridDash(
+        ctx,
+        gridPx,
+        screen({ x: Math.ceil(min.x / gridStep) * gridStep, y: 0 }).x % gridPx,
+      );
+    if (o.grid)
       for (
         let y = Math.ceil(min.y / gridStep) * gridStep;
         y <= max.y;
@@ -324,6 +347,7 @@ export function createSceneRenderer(ctx, view) {
           major ? 1 : 0.75,
         );
       }
+    endGrid(ctx);
     ctx.fillStyle = color("canvas-ground", dark);
     ctx.fillRect(0, view.y, o.width, o.height - view.y);
     line(

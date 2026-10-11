@@ -83,7 +83,7 @@ header {
 #pause {
   min-width: 80px;
   background: var(--run-button);
-  color: white;
+  color: var(--on-colour);
   border-color: var(--run-button);
 }
 main {
@@ -144,7 +144,7 @@ input[type="checkbox"] {
   left: 50%;
   transform: translateX(-50%);
   background: var(--toast);
-  color: white;
+  color: var(--on-colour);
   padding: 10px 15px;
   border-radius: 7px;
   font-size: 11px;
@@ -465,20 +465,6 @@ button[data-icon] {
   white-space: nowrap;
   border: 0;
 }
-.debug-settings {
-  margin: 24px 0 18px;
-  padding: 12px;
-  border: 1px dashed var(--line);
-  border-radius: 8px;
-}
-.debug-settings summary {
-  cursor: pointer;
-  font-size: 12px;
-}
-#ui-icons {
-  width: 100%;
-  margin-top: 8px;
-}
 .edit-tools {
   position: absolute;
   top: 12px;
@@ -582,10 +568,6 @@ button[data-icon] {
 }
 #settings-panel > p {
   margin: 6px 0 8px;
-}
-#settings-panel .debug-settings {
-  margin: 10px 0 4px;
-  padding: 6px 10px;
 }
 #settings-panel .prop-row {
   grid-template-columns: 8.4em minmax(60px, 1fr) auto;
@@ -746,7 +728,7 @@ button:disabled {
 #clear-confirm .danger {
   background: var(--danger-button);
   border-color: var(--danger-button);
-  color: white;
+  color: var(--on-colour);
 }
 #clear-confirm .danger:hover {
   background: var(--danger-button-hover);
@@ -844,7 +826,7 @@ header {
 #clear {
   background: var(--clear-button);
   border-color: var(--clear-button);
-  color: white;
+  color: var(--on-colour);
 }
 #clear:hover {
   background: var(--clear-button-hover);
@@ -1121,4 +1103,10 @@ body.doc-page {
   margin: 4px 0 2px 21px;
   font-size: 10px;
   opacity: 0.85;
+}
+/* The developer options switch at the foot of the Website section. */
+#settings-panel .dev-switch {
+  margin-top: 10px;
+  font-size: 11px;
+  opacity: 0.8;
 }

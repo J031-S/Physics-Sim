@@ -5,6 +5,12 @@
 // page. Panels, graphs, preset thumbnails and input stay with the page.
 
 import { color, paletteOf } from "../site/theme.js";
+import {
+  arrowheadScale,
+  endGrid,
+  gridDash,
+  vectorWeight,
+} from "../site/canvas-style.js";
 
 export const TAU = 2 * Math.PI,
   // The launch arrow is this long, in pixels, at the circular orbit speed
@@ -69,6 +75,7 @@ export function createOrbitRenderer(ctx, view) {
     ({ joined, distance, prefixed, speedText, angleText } = options.format);
   }
   function arrowHead(x, y, angle, size) {
+    size *= arrowheadScale();
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
@@ -86,7 +93,7 @@ export function createOrbitRenderer(ctx, view) {
     const x1 = x + dx * length,
       y1 = y + dy * length;
     ctx.strokeStyle = ctx.fillStyle = colour;
-    ctx.lineWidth = width;
+    ctx.lineWidth = width * vectorWeight();
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(x, y);
@@ -122,11 +129,27 @@ export function createOrbitRenderer(ctx, view) {
       step = niceStep(90 / view.scale, 1);
     ctx.lineWidth = 1;
     ctx.strokeStyle = c.gridMinor;
+    const px = step * view.scale,
+      dashed = gridDash(
+        ctx,
+        px,
+        (screen(0, Math.ceil(lo.y / step) * step)[1] + 0.5) % px,
+      );
     ctx.beginPath();
     for (let x = Math.ceil(lo.x / step) * step; x <= hi.x; x += step) {
       const sx = Math.round(screen(x, 0)[0]) + 0.5;
       ctx.moveTo(sx, 0);
       ctx.lineTo(sx, view.height);
+    }
+    // Crossed lines need the horizontal ones dashed from their own start.
+    if (dashed) {
+      ctx.stroke();
+      gridDash(
+        ctx,
+        px,
+        (screen(Math.ceil(lo.x / step) * step, 0)[0] + 0.5) % px,
+      );
+      ctx.beginPath();
     }
     for (let y = Math.ceil(lo.y / step) * step; y <= hi.y; y += step) {
       const sy = Math.round(screen(0, y)[1]) + 0.5;
@@ -134,6 +157,7 @@ export function createOrbitRenderer(ctx, view) {
       ctx.lineTo(view.width, sy);
     }
     ctx.stroke();
+    endGrid(ctx);
   }
   function drawScaleBar(c) {
     const length = niceStep(80 / view.scale, 1),

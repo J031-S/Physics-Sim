@@ -13,7 +13,7 @@ import { pages, findPage, pageById } from "../src/site/pages.js";
 const root = new URL("../", import.meta.url);
 const home = root.href;
 
-async function load(file, address) {
+async function load(file, address, fresh = "") {
   const window = new Window({ url: "http://localhost:3000/" + address });
   const html = await readFile(new URL(file, root), "utf8");
   window.document.write(html);
@@ -43,7 +43,8 @@ async function load(file, address) {
   const src = script.startsWith("/")
     ? new URL("." + script, root)
     : new URL(script, new URL(file, root));
-  await import(src.href);
+  // `fresh` loads the script again (modules are otherwise cached).
+  await import(src.href + fresh);
   return window.document;
 }
 
@@ -59,7 +60,7 @@ const describe = (doc) => {
 };
 
 const shellPages = [
-  ...pages.filter((p) => p.group === "simulation"),
+  ...pages.filter((p) => p.group === "simulation" || p.group === "developer"),
   { id: "not-found", file: "404.html", address: "no-such-page" },
 ];
 let reference = null,
@@ -105,6 +106,32 @@ for (const page of shellPages) {
   assert.equal(brand.getAttribute("href"), home, page.id + ": brand → home");
   assert.match(brand.textContent, /Physium/);
   assert.ok(brand.querySelector(".brand-mark"));
+}
+
+// Developer mode: off by default (only the switch shows, no scheme is
+// applied); ?dev turns it on and shows the Developer group.
+{
+  const gallery = pageById("gallery");
+  let doc = await load(gallery.file, gallery.address, "?off");
+  assert.ok(doc.getElementById("ui-developer"), "developer switch");
+  assert.equal(doc.getElementById("ui-developer").checked, false);
+  assert.equal(doc.getElementById("developer-settings"), null);
+  assert.equal(doc.getElementById("ui-icons"), null);
+  assert.equal(doc.getElementById("physium-scheme"), null);
+  doc = await load(gallery.file, gallery.address + "?dev", "?on");
+  assert.ok(doc.getElementById("developer-settings"), "?dev shows the group");
+  assert.equal(doc.getElementById("ui-developer").checked, true);
+  assert.equal(
+    doc.getElementById("ui-developer").closest("#website-settings"),
+    doc.getElementById("website-settings"),
+  );
+  // The group sits above the switch, at the foot of the Website section.
+  assert.equal(
+    doc.getElementById("developer-settings").nextElementSibling,
+    doc.getElementById("ui-developer").parentElement,
+  );
+  const sets = [...doc.getElementById("ui-icons").options].map((o) => o.value);
+  assert.ok(sets.length >= 8, "eight icon sets");
 }
 
 // Lookups the 404 page redirects: case, ".html", trailing slash, old names.

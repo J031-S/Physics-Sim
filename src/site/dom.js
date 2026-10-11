@@ -12,3 +12,11 @@ export function showToast(message, duration = 3200) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove("show"), duration);
 }
+// An <option> for a select (without relying on the global Option, which
+// test DOMs may lack).
+export function option(text, value) {
+  const el = document.createElement("option");
+  el.textContent = text;
+  el.value = value;
+  return el;
+}
