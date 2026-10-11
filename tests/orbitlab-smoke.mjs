@@ -110,7 +110,7 @@ assert.equal($("nav-menu").hidden, false);
 const links = [...$("nav-menu").querySelectorAll("a")];
 assert.deepEqual(
   links.map((a) => a.getAttribute("href")),
-  ["./", "fields.html", "orbits.html"],
+  ["./", "fields.html", "orbits.html", "circuits.html"],
 );
 assert.equal(links[2].getAttribute("aria-current"), "page");
 nav.click();
