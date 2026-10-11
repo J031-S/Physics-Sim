@@ -285,9 +285,10 @@
 .orbit-lab #zoom-level {
   min-width: 96px;
 }
-/* The view cluster sits beside the left-hand panels, not under them. */
-.orbit-lab .camera-controls {
-  left: 362px;
+/* The view cluster is in the bottom-left corner, as on the other pages, so
+   the left-hand panels stop short of it and scroll if they are taller. */
+.ol-left {
+  max-height: calc(100% - 50px);
 }
 .orbit-lab #settings-panel .prop-row input[type="number"] {
   width: 84px;
@@ -297,9 +298,6 @@
 }
 /* Narrow screens: the panels stack and start folded (see app.js). */
 @media (max-width: 900px) {
-  .orbit-lab .camera-controls {
-    left: 16px;
-  }
   .ol-top {
     flex-wrap: wrap;
     align-content: flex-start;
