@@ -1,4 +1,5 @@
 import { color } from "./site/theme.js";
+import { tidyNumber } from "./site/numbers.js";
 // Indicator spacing uses a bounded logarithmic scale so both weak and strong fields remain readable.
 export const fieldSpacing = (strength) =>
   Math.max(14, 80 / Math.sqrt(1 + 3 * Math.log1p(Math.abs(strength))));
@@ -235,7 +236,7 @@ export function drawFields(
     ctx.font = "11px system-ui";
     ctx.fillStyle = ctx.strokeStyle;
     ctx.fillText(
-      `${f.type === "electric" ? "E" : "B"} ${f.strength} ${f.type === "electric" ? "N/C" : "T"} · ${f.gradient}`,
+      `${f.type === "electric" ? "E" : "B"} ${tidyNumber(f.strength, 3)} ${f.type === "electric" ? "N/C" : "T"} · ${f.gradient}`,
       -w / 2 + 6,
       -h / 2 - 7,
     );

@@ -7,7 +7,7 @@ import { pageById } from "../site/pages.js";
 import { renderMath, renderAllMath } from "../site/math.js";
 import { onSchemeChange } from "../site/dev-hooks.js";
 import { renderIcons } from "../site/icons.js";
-import { toolById } from "./catalogue.js";
+import { rearrangement, toolById } from "./catalogue.js";
 import { reviewBadges, toolUrl } from "./card.js";
 import {
   fieldText,
@@ -31,6 +31,35 @@ const id = decodeURIComponent(
 );
 const tool = toolById(id),
   main = $("minitool");
+
+// A sentence that may hold mathematics between $ signs, typeset in place.
+function say(element, text) {
+  element.replaceChildren();
+  text.split("$").forEach((part, i) => {
+    if (!part) return;
+    if (i % 2 === 0) return element.append(part);
+    const span = document.createElement("span");
+    span.className = "mt-inline-math";
+    renderMath(span, part);
+    element.append(span);
+  });
+}
+// A numbered list of steps: a sentence, then the equation after the step.
+function stepList(list, steps) {
+  list.replaceChildren();
+  for (const step of steps) {
+    const item = document.createElement("li");
+    item.innerHTML = `<p></p>`;
+    say(item.querySelector("p"), step.say);
+    if (step.latex) {
+      const box = document.createElement("div");
+      box.className = "mt-step-math";
+      renderMath(box, step.latex, { display: true });
+      item.append(box);
+    }
+    list.append(item);
+  }
+}
 
 if (!tool) {
   main.innerHTML = `<div class="doc-main"><h1>No such minitool</h1><p>There is no minitool called <code></code>.</p><p><a class="button-link" href="./" data-icon="back" data-icon-label="All minitools">All minitools</a></p></div>`;
@@ -56,7 +85,9 @@ function build() {
   for (const v of tool.variables) {
     const given = Number(query.get(v.key));
     if (query.has(v.key) && Number.isFinite(given))
-      state.values[v.key] = Math.min(v.max, Math.max(v.min, given));
+      state.values[v.key] = v.step
+        ? Math.round(Math.min(v.max, Math.max(v.min, given)) / v.step) * v.step
+        : Math.min(v.max, Math.max(v.min, given));
   }
   // Every quantity's value, the unknown worked out from the others.
   const values = () => {
@@ -77,6 +108,7 @@ function build() {
         <h1></h1>
         <p class="mt-topic"></p>
         <p class="mt-purpose"></p>
+        <p class="mt-note" hidden></p>
       </div>
       <div class="mt-columns">
         <section class="mt-left" aria-label="Equation and values">
@@ -86,11 +118,16 @@ function build() {
             <div class="mt-solve-buttons" role="group" aria-labelledby="solve-label"></div>
           </div>
           <div class="mt-rearranged"></div>
+          <details class="mt-algebra" open>
+            <summary>How to rearrange it, step by step</summary>
+            <ol></ol>
+          </details>
           <div class="mt-rows"></div>
           <p class="mt-constants"></p>
           <section class="mt-working" aria-labelledby="working-title">
             <h2 id="working-title">Working</h2>
             <div class="mt-working-math" aria-live="polite"></div>
+            <p class="mt-caution" role="status" hidden></p>
             <p class="mt-measured" aria-live="polite"></p>
           </section>
         </section>
@@ -125,6 +162,10 @@ function build() {
   q(".mt-topic span + span").textContent =
     tool.kind === "combined" ? "a combination of equations" : "one equation";
   q(".mt-purpose").textContent = tool.purpose;
+  if (tool.note) {
+    q(".mt-note").hidden = false;
+    q(".mt-note").textContent = tool.note;
+  }
   renderMath(q(".mt-equation"), tool.latex, { display: true });
   if (tool.constants.length)
     renderMath(
@@ -179,10 +220,18 @@ function build() {
             ? Math.log(x / v.min) / Math.log(v.max / v.min)
             : (x - v.min) / (v.max - v.min)),
       );
+    // A quantity that only makes sense in whole steps (a number of turns,
+    // a harmonic) is rounded to them.
+    const whole = (x) =>
+      v.step
+        ? Math.min(v.max, Math.max(v.min, Math.round(x / v.step) * v.step))
+        : x;
     const fromSlider = (n) =>
-      log
-        ? Number((v.min * (v.max / v.min) ** (n / 1000)).toPrecision(3))
-        : Number((v.min + ((v.max - v.min) * n) / 1000).toPrecision(4));
+      whole(
+        log
+          ? Number((v.min * (v.max / v.min) ** (n / 1000)).toPrecision(3))
+          : Number((v.min + ((v.max - v.min) * n) / 1000).toPrecision(4)),
+      );
     slider.addEventListener("input", () => {
       state.values[v.key] = fromSlider(Number(slider.value));
       changed(false, slider);
@@ -193,8 +242,8 @@ function build() {
         field.value = fieldText(state.values[v.key]);
         return;
       }
-      state.values[v.key] = Math.min(v.max, Math.max(v.min, x));
-      changed(false, field);
+      state.values[v.key] = whole(Math.min(v.max, Math.max(v.min, x)));
+      changed(false);
     });
     controls.set(v.key, { row, slider, field, toSlider });
     rows.append(row);
@@ -220,14 +269,8 @@ function build() {
     const section = q(".mt-derivation"),
       list = section.querySelector("ol");
     section.hidden = false;
-    for (const step of tool.derivation) {
-      const item = document.createElement("li");
-      item.innerHTML = `<p></p><div class="mt-step-math"></div>`;
-      item.querySelector("p").textContent = step.say;
-      renderMath(item.querySelector("div"), step.latex, { display: true });
-      item.hidden = true;
-      list.append(item);
-    }
+    stepList(list, tool.derivation);
+    for (const item of list.children) item.hidden = true;
     let shown = 1;
     const show = () => {
       [...list.children].forEach((li, i) => (li.hidden = i >= shown));
@@ -359,6 +402,9 @@ function build() {
         `${unknown.latex} = ${fillForm(form, symbol)}`,
         { display: true },
       );
+      const steps = rearrangement(tool, state.unknown);
+      q(".mt-algebra").hidden = !steps.length;
+      stepList(q(".mt-algebra ol"), steps);
       plot.replaceChildren(
         ...tool.variables
           .filter((v) => v.key !== state.unknown)
@@ -373,9 +419,20 @@ function build() {
       q(".mt-working-math"),
       Number.isFinite(result)
         ? `${unknown.latex} = ${substituted} = ${numberTex(result)}\\,${unitTex(unknown.unit)}`
-        : `${unknown.latex} = ${substituted}\\quad\\text{(no solution for these values)}`,
+        : `${unknown.latex} = ${substituted}\\quad\\text{(no value: see below)}`,
       { display: true },
     );
+    // Values the equation does not describe (nothing slides, nothing is
+    // emitted, …) are said so, rather than left as a bare number.
+    let caution = null;
+    try {
+      caution = tool.check?.(all, state.unknown) ?? null;
+    } catch {}
+    if (!caution && !Number.isFinite(result))
+      caution =
+        "These values give no answer: the equation would need a division by zero, or the square root of a negative number.";
+    q(".mt-caution").hidden = !caution;
+    if (caution) q(".mt-caution").textContent = caution;
     showMeasured();
     drawPictures();
     // The simulation is rebuilt for the new values, a little after the

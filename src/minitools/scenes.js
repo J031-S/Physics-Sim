@@ -174,3 +174,61 @@ export function once(model, key, ready, read) {
   if (!(key in t) && ready) t[key] = read();
   return t[key] ?? null;
 }
+
+// How far the watched ball has moved from where it started (`tags.start`).
+// Both are the engine's `potentialPoint`: the position that belongs with the
+// stored velocity, half a step behind the body's drawn position.
+export function travelled(model) {
+  const p = model.potentialPoint(model.tags.ball),
+    start = model.tags.start;
+  return { x: p.x - start.x, y: p.y - start.y };
+}
+
+// What `read()` gives at the moment `value` passes `target`, found between
+// the two steps either side of it: each number that `read()` returns is taken
+// in proportion between its values at those two steps. Null until then; the
+// same answer ever after (`tags.crossings[key].done`).
+export function crossing(model, key, value, target, read) {
+  const all = (model.tags.crossings ??= {}),
+    seen = (all[key] ??= { last: null, before: null, done: false, at: null });
+  if (seen.done) return seen.at;
+  const now = read(),
+    was = seen.last;
+  if (was !== null && was !== target && (was - target) * (value - target) <= 0) {
+    const f = (target - was) / (value - was);
+    seen.at = {};
+    for (const k of Object.keys(now))
+      seen.at[k] = seen.before[k] + f * (now[k] - seen.before[k]);
+    seen.done = true;
+    return seen.at;
+  }
+  seen.last = value;
+  seen.before = now;
+  return null;
+}
+
+// The radius of the circle through three points of a path: where it began,
+// where it is now, and a point midway between. Read each step with the latest
+// point; settles once the path has gone half way round.
+export function circleThrough(model, key, point) {
+  const all = (model.tags.circles ??= {}),
+    seen = (all[key] ??= { points: [], length: 0, value: null, done: false });
+  if (seen.done) return seen.value;
+  const points = seen.points,
+    last = points[points.length - 1];
+  if (last) seen.length += Math.hypot(point.x - last.x, point.y - last.y);
+  points.push({ x: point.x, y: point.y });
+  if (points.length < 3) return null;
+  const a = points[0],
+    b = points[(points.length - 1) >> 1],
+    c = points[points.length - 1],
+    ab = Math.hypot(b.x - a.x, b.y - a.y),
+    bc = Math.hypot(c.x - b.x, c.y - b.y),
+    ca = Math.hypot(a.x - c.x, a.y - c.y),
+    twice = Math.abs((b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y));
+  // Three points in a line: no circle yet.
+  if (!(twice > 1e-12 * ab * bc)) return seen.value;
+  seen.value = (ab * bc * ca) / (2 * twice);
+  if (seen.length > Math.PI * seen.value) seen.done = true;
+  return seen.value;
+}

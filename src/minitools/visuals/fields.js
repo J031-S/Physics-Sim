@@ -713,49 +713,62 @@ export function selector(ctx, o) {
   P.text("B into the screen", x1 + 14, bottom - 38, "left");
 }
 
-// A mass spectrometer: accelerated through V, then bent round in B.
+// A mass spectrometer: accelerated through V, then bent through half a
+// circle in B. As in the mini simulation, the field is out of the screen, so
+// a positive charge moving right is pushed downwards (F = qv × B) and comes
+// back out of the field a diameter below where it went in.
 export function spectrometer(ctx, o) {
   const P = picture(ctx, o),
     { w, h, ctx: g } = P,
-    x0 = 30,
-    x1 = w * 0.2,
+    x0 = 26,
+    x1 = w * 0.16,
     entry = w * 0.3,
-    y = h - 30,
-    R = Math.min(h - 60, (w - entry - 40) / 2) * 0.9,
+    top = 44,
+    R = Math.min((h - top - 34) / 2, w - entry - 150),
     q = P.value("q", 1);
-  P.plate(x0, y - 50, x0, y + 10, 1);
-  P.plate(x1, y - 50, x1, y - 28, -1);
-  P.plate(x1, y - 12, x1, y + 10, -1);
-  P.tag("V", (x0 + x1) / 2, y - 64);
+  P.plate(x0, top - 30, x0, top + 30, 1);
+  P.plate(x1, top - 30, x1, top - 8, -1);
+  P.plate(x1, top + 8, x1, top + 30, -1);
+  P.tag("V", (x0 + x1) / 2, top + 48);
+  P.bRegion(entry, 8, w - 14, h - 8, false);
+  // From rest at the first plate, straight to the edge of the field.
   P.line(
     [
-      [x0 + 10, y - 20],
-      [entry, y - 20],
+      [x0 + 10, top],
+      [entry, top],
     ],
     "vector-velocity",
     1.5,
   );
-  // B into the screen bends a positive charge moving right upwards.
-  P.bRegion(entry, 10, w - 20, y - 4, true);
   g.strokeStyle = P.col("vector-velocity");
   g.lineWidth = 1.5;
   g.beginPath();
-  g.arc(entry + R, y - 20, R, Math.PI, 0);
+  g.arc(entry, top + R, R, -Math.PI / 2, Math.PI / 2);
   g.stroke();
-  P.charge(entry + R, y - 20 - R, q, 8);
-  P.dim(entry + R, y - 20, entry + 2 * R, y - 20);
-  P.tag("r", entry + 1.5 * R, y - 4);
+  // Leaving the field again, towards the detector.
   P.line(
     [
-      [entry + 2 * R - 14, y - 4],
-      [entry + 2 * R + 14, y - 4],
+      [entry, top + 2 * R],
+      [entry - 34, top + 2 * R],
+    ],
+    "vector-velocity",
+    1.5,
+  );
+  P.charge(entry + R, top + R, q, 8);
+  P.dim(entry, top + R, entry + R - 12, top + R);
+  P.tag("r", entry + R / 2, top + R - 14);
+  P.line(
+    [
+      [entry - 38, top + 2 * R - 14],
+      [entry - 38, top + 2 * R + 14],
     ],
     "structure",
     5,
   );
-  P.text("detector", entry + 2 * R, y + 14);
-  P.tag("B", w - 24, 26, "right");
-  P.text("into the screen", w - 24, 50, "right");
-  P.tag("m", w - 24, 76, "right");
-  P.tag("q", w - 24, 102, "right");
+  P.text("detector", entry - 46, top + 2 * R + 4, "right");
+  P.text("goes in", entry - 8, top - 12, "right");
+  P.tag("B", w - 24, 30, "right");
+  P.text("out of the screen", w - 24, 54, "right");
+  P.tag("m", w - 24, 80, "right");
+  P.tag("q", w - 24, 106, "right");
 }

@@ -350,3 +350,49 @@
   font-size: 12px;
   opacity: 0.7;
 }
+
+/* A note under the purpose, and a caution under the working when the values
+   are outside what the equation describes. */
+.mt-note {
+  margin: 6px 0 0;
+  max-width: 70ch;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.mt-caution {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--danger);
+  border-radius: 8px;
+  background: var(--panel);
+  font-size: 13px;
+}
+/* The algebra of rearranging, one move a line. */
+.mt-algebra {
+  margin: 4px 0 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.mt-algebra summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.mt-algebra ol {
+  margin: 8px 0 4px;
+  padding-left: 1.4em;
+}
+.mt-algebra li {
+  margin-bottom: 6px;
+}
+.mt-algebra li p {
+  margin: 0 0 2px;
+}
+.mt-algebra .mt-step-math {
+  margin: 2px 0 4px;
+}
+.mt-inline-math {
+  white-space: nowrap;
+}

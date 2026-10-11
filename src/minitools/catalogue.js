@@ -17,7 +17,9 @@
 //   forms       { key: right-hand side } of the rearranged equation, with
 //               @key for each quantity and · for a product (shown as a gap
 //               between symbols and as × between numbers)
-//   derivation  numbered steps { say, latex } (combinations)
+//   derivation  "Where it comes from": numbered steps { say, latex }, written
+//               in explain.js for every tool (not here)
+//   step        on a variable: the size of its steps (1 for whole numbers)
 //   uses        ids of the single-equation tools a combination is built from
 //   visual      the bespoke picture in src/minitools/visuals/ ("graph" is
 //               always shown as well)
@@ -29,17 +31,9 @@
 //   wants       the simulation a tool without `sim` is waiting for
 //   related     id in src/site/pages.js of the full simulation
 //   verified    false until reviewed
-import {
-  body,
-  fields,
-  loop,
-  once,
-  orbit,
-  parallel,
-  period,
-  region,
-  sandbox,
-} from "./scenes.js";
+import { sims } from "./sims.js";
+import { explain } from "./explain.js";
+import { rearrange } from "./algebra.js";
 
 const deg = Math.PI / 180;
 const V = (key, latex, name, unit, min, max, value, scale = "linear") => ({
@@ -65,11 +59,20 @@ const tool = (entry) => ({
   derivation: [],
   uses: [],
   visual: "graph",
-  sim: null,
   wants: null,
   related: null,
   verified: false,
   ...entry,
+  // The mini simulation, if this tool has one (sims.js).
+  sim: sims[entry.id] ?? null,
+  // Where the equation comes from, a note under the purpose, and a check
+  // that the values are ones the equation describes (explain.js).
+  derivation: (explain[entry.id]?.origin ?? []).map(([say, latex]) => ({
+    say,
+    latex,
+  })),
+  note: explain[entry.id]?.note ?? null,
+  check: explain[entry.id]?.check ?? null,
 });
 
 // Constants.
@@ -87,111 +90,6 @@ const Cc = K("c", "c", "Speed of light", 2.998e8, "m s⁻¹");
 const E0 = K("e", "e", "Elementary charge", 1.602e-19, "C");
 const g981 = K("g", "g", "Gravitational field strength", 9.81, "m s⁻²");
 
-// Sandbox helpers: one charged ball floating with gravity off, pushed along
-// x by a uniform electric field (F = qE with q = 1 C, so E in N/C equals the
-// force in newtons).
-function pushedBall(
-  E,
-  { u = 0, force = 0, mass = 1, angle = 0, gravity = 0, floor = false },
-) {
-  const sim = sandbox(E, {
-    gravity,
-    electricX: force * Math.cos(angle),
-    electricY: force * Math.sin(angle),
-    view: { minX: -1, maxX: 8, minY: 0, maxY: 3 },
-  });
-  sim.tags.ball = body(sim, "ball", {
-    x: 0,
-    y: floor ? 0.2 : 1.5,
-    size: 0.4,
-    mass,
-    charge: 1,
-    vx: u,
-  });
-  sim.tags.x0 = 0;
-  sim.tags.u0 = u;
-  return sim;
-}
-const ballState = (sim) => sim.state(sim.tags.ball);
-// A ball whirled on a rod round a fixed centre, gravity off: uniform
-// circular motion at speed v and radius r.
-function whirl(watch) {
-  return {
-    engine: "sandbox",
-    caption:
-      "A ball on a light rod pinned at the centre, gravity off, set moving at speed v at right angles to the rod.",
-    build: (v, E) => {
-      const centre = { x: 0, y: v.r + 0.6 },
-        sim = sandbox(E, {
-          view: {
-            minX: -v.r - 0.6,
-            maxX: v.r + 0.6,
-            minY: 0,
-            maxY: 2 * v.r + 1.2,
-          },
-        });
-      sim.tags.centre = centre;
-      sim.tags.mass = v.m ?? 1;
-      sim.tags.ball = body(sim, "ball", {
-        x: 0,
-        y: centre.y + v.r,
-        size: Math.min(0.3, v.r / 2),
-        mass: v.m ?? 1,
-        vx: v.v,
-      });
-      sim.connect("rod", null, sim.tags.ball, centre, null);
-      return sim;
-    },
-    watch,
-  };
-}
-// A satellite on a circular orbit of radius r round a body of mass M.
-function circularOrbit(watch) {
-  return {
-    engine: "orbitlab",
-    caption:
-      "A satellite of mass m on a circular orbit of radius r in the orbits simulation (launched at √(GM/r)); the value is read from the simulation.",
-    build: (v, E) =>
-      orbit(E, {
-        M: v.M,
-        R: Math.min(6.371e6, 0.95 * v.r),
-        r: v.r,
-        v: Math.sqrt((E.G * v.M) / v.r),
-        m: v.m,
-      }),
-    watch,
-  };
-}
-// Parallel plates a gap d apart in the fields simulation, charged ±σ with
-// σ = ε₀V/d (the ideal infinite-plate value), so that the field between
-// them should be close to V/d.
-function platesSim(watch, gap) {
-  return {
-    engine: "fieldlab",
-    caption:
-      "Two plates in the fields simulation charged ±ε₀V/d. They are finite, so the field between them is a little under the ideal value.",
-    build: (v, E) => {
-      const d = v.d ?? gap,
-        length = Math.max(4, 5 * d),
-        sigma = (E.EPS0 * v.V) / d,
-        lab = fields(E, "electric", Math.max(1.5, length * 0.45));
-      lab.add("plate", { x: 0, y: d / 2, length, density: sigma });
-      lab.add("plate", { x: 0, y: -d / 2, length, density: -sigma });
-      lab.tags.d = d;
-      lab.tags.probe = { x: 0, y: 0 };
-      return lab;
-    },
-    watch,
-  };
-}
-const plateDifference = (lab) =>
-  lab.potential(0, lab.tags.d / 2) - lab.potential(0, -lab.tags.d / 2);
-// A reading from the circuit's solution (magnitude), or null.
-function reading(lab, id, quantity) {
-  const value = lab.solve().of(id)?.[quantity];
-  return value === null || value === undefined ? null : Math.abs(value);
-}
-
 // ---------------------------------------------------------------- motion
 
 const motionVars = {
@@ -201,15 +99,6 @@ const motionVars = {
   t: V("t", "t", "Time", "s", 0.1, 10, 2),
   s: V("s", "s", "Displacement", "m", -100, 100, 10),
 };
-const motionSim = (watch, duration) => ({
-  engine: "sandbox",
-  caption:
-    "A 1 kg ball with a 1 C charge, pushed by a uniform electric field with gravity off, so it has a constant acceleration.",
-  build: (v, E) => pushedBall(E, { u: v.u, force: v.a }),
-  duration,
-  watch,
-});
-
 export const tools = [
   tool({
     id: "suvat-v-u-at",
@@ -232,13 +121,6 @@ export const tools = [
       a: "\\frac{@v - @u}{@t}",
       t: "\\frac{@v - @u}{@a}",
     },
-    sim: motionSim(
-      {
-        v: (m) => ballState(m).vx,
-        a: (m) => (m.time > 0 ? (ballState(m).vx - m.tags.u0) / m.time : null),
-      },
-      (v) => v.t,
-    ),
     related: "mechanics",
   }),
   tool({
@@ -260,7 +142,6 @@ export const tools = [
       u: "\\frac{@s - \\tfrac{1}{2}·@a·@t^{2}}{@t}",
       a: "\\frac{2(@s - @u·@t)}{@t^{2}}",
     },
-    sim: motionSim({ s: (m) => ballState(m).x - m.tags.x0 }, (v) => v.t),
     related: "mechanics",
   }),
   tool({
@@ -287,15 +168,6 @@ export const tools = [
       a: "\\frac{@v^{2} - @u^{2}}{2·@s}",
       s: "\\frac{@v^{2} - @u^{2}}{2·@a}",
     },
-    sim: motionSim(
-      {
-        v: (m, _, v) =>
-          once(m, "v", ballState(m).x - m.tags.x0 >= v.s, () =>
-            Math.hypot(ballState(m).vx, ballState(m).vy),
-          ),
-      },
-      null,
-    ),
     related: "mechanics",
   }),
   tool({
@@ -318,14 +190,6 @@ export const tools = [
       v: "\\frac{2·@s}{@t} - @u",
       t: "\\frac{2·@s}{@u + @v}",
     },
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A charged ball pushed by a uniform electric field, with the acceleration that takes it from u to v in time t.",
-      build: (v, E) => pushedBall(E, { u: v.u, force: (v.v - v.u) / v.t }),
-      duration: (v) => v.t,
-      watch: { s: (m) => ballState(m).x - m.tags.x0 },
-    },
     related: "mechanics",
   }),
   tool({
@@ -347,16 +211,6 @@ export const tools = [
       t: ({ s, vav }) => s / vav,
     },
     forms: { vav: "\\frac{@s}{@t}", s: "@vav·@t", t: "\\frac{@s}{@vav}" },
-    sim: {
-      engine: "sandbox",
-      caption: "A ball gliding at a steady velocity with nothing acting on it.",
-      build: (v, E) => pushedBall(E, { u: v.vav }),
-      duration: (v) => v.t,
-      watch: {
-        vav: (m) => (m.time > 0 ? (ballState(m).x - m.tags.x0) / m.time : null),
-        s: (m) => ballState(m).x - m.tags.x0,
-      },
-    },
     related: "mechanics",
   }),
 
@@ -380,18 +234,6 @@ export const tools = [
       m: ({ F, a }) => F / a,
     },
     forms: { a: "\\frac{@F}{@m}", F: "@m·@a", m: "\\frac{@F}{@a}" },
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A ball of mass m with a 1 C charge in a uniform electric field of F N/C, so the force on it is F.",
-      build: (v, E) => pushedBall(E, { force: v.F, mass: v.m }),
-      duration: () => 2,
-      watch: {
-        a: (m) => (m.time > 0 ? ballState(m).vx / m.time : null),
-        F: (m, _, v) => (m.time > 0 ? (v.m * ballState(m).vx) / m.time : null),
-        m: (m, _, v) => (m.time > 0 ? v.F / (ballState(m).vx / m.time) : null),
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -413,29 +255,6 @@ export const tools = [
       g: ({ W, m }) => W / m,
     },
     forms: { W: "@m·@g", m: "\\frac{@W}{@g}", g: "\\frac{@W}{@m}" },
-    sim: {
-      engine: "sandbox",
-      caption:
-        "The ball is dropped; the weight is worked out from its measured acceleration, W = m × (Δv/Δt).",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          gravity: v.g,
-          view: { minX: -3, maxX: 3, minY: 0, maxY: 6 },
-        });
-        sim.tags.ball = body(sim, "ball", {
-          x: 0,
-          y: 5.5,
-          size: 0.4,
-          mass: v.m,
-        });
-        return sim;
-      },
-      duration: () => 0.5,
-      watch: {
-        W: (m, _, v) => (m.time > 0 ? (-v.m * ballState(m).vy) / m.time : null),
-        g: (m) => (m.time > 0 ? -ballState(m).vy / m.time : null),
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -457,34 +276,6 @@ export const tools = [
       N: ({ Ff, mu }) => Ff / mu,
     },
     forms: { Ff: "@mu·@N", mu: "\\frac{@Ff}{@N}", N: "\\frac{@Ff}{@mu}" },
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A block of weight N slides on a floor of friction μ; the friction force is its mass times its measured deceleration.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          gravity: 9.81,
-          floorFriction: v.mu,
-          view: { minX: -1, maxX: 9, minY: 0, maxY: 3 },
-        });
-        sim.tags.mass = v.N / 9.81;
-        sim.tags.ball = body(sim, "block", {
-          x: 0,
-          y: 0.25,
-          size: [0.5, 0.5],
-          mass: v.N / 9.81,
-          friction: v.mu,
-          vx: 6,
-        });
-        return sim;
-      },
-      duration: () => 0.4,
-      watch: {
-        Ff: (m) =>
-          m.time > 0 ? (m.tags.mass * (6 - ballState(m).vx)) / m.time : null,
-        mu: (m) => (m.time > 0 ? (6 - ballState(m).vx) / m.time / 9.81 : null),
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -497,7 +288,7 @@ export const tools = [
     variables: [
       V("F", "F", "Spring force", "N", 0, 100, 9.81),
       V("k", "k", "Spring constant", "N/m", 0.1, 100, 20, "log"),
-      V("x", "x", "Extension", "m", 0, 5, 0.49),
+      V("x", "x", "Extension", "m", 0, 5, 0.4905),
     ],
     solveFor: ["x", "F", "k"],
     solve: {
@@ -506,37 +297,6 @@ export const tools = [
       k: ({ F, x }) => F / x,
     },
     forms: { x: "\\frac{@F}{@k}", F: "@k·@x", k: "\\frac{@F}{@x}" },
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A mass of weight F hangs from a damped spring of stiffness k and settles; the extension is measured from the spring's natural length.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          gravity: 9.81,
-          view: { minX: -3, maxX: 3, minY: 0, maxY: 8 },
-        });
-        sim.tags.ball = body(sim, "ball", {
-          x: 0,
-          y: 7.5 - 1,
-          size: 0.3,
-          mass: v.F / 9.81,
-        });
-        sim.tags.spring = sim.connect(
-          "spring",
-          null,
-          sim.tags.ball,
-          { x: 0, y: 7.5 },
-          null,
-        );
-        sim.updateLink(sim.tags.spring, { k: v.k, damping: 5 });
-        return sim;
-      },
-      duration: () => 12,
-      watch: {
-        x: (m) => 7.5 - ballState(m).y - 1,
-        F: (m, _, v) => v.k * (7.5 - ballState(m).y - 1),
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -587,19 +347,6 @@ export const tools = [
       v: ({ p, m }) => p / m,
     },
     forms: { p: "@m·@v", m: "\\frac{@p}{@v}", v: "\\frac{@p}{@m}" },
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A ball of mass m gliding at v; its momentum is read from the simulation.",
-      build: (v, E) => pushedBall(E, { u: v.v, mass: v.m }),
-      duration: () => 3,
-      watch: {
-        p: (m) => {
-          const p = m.measure(m.tags.ball).momentum;
-          return Math.hypot(p.x, p.y);
-        },
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -627,14 +374,6 @@ export const tools = [
       F: "\\frac{@m·@dv}{@dt}",
       dt: "\\frac{@m·@dv}{@F}",
       m: "\\frac{@F·@dt}{@dv}",
-    },
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A charged ball of mass m pushed by a uniform field of F N/C (1 C, so the force is F) for Δt.",
-      build: (v, E) => pushedBall(E, { force: v.F, mass: v.m }),
-      duration: (v) => v.dt,
-      watch: { dv: (m) => ballState(m).vx },
     },
     related: "mechanics",
   }),
@@ -664,28 +403,6 @@ export const tools = [
       F: "\\frac{@W}{@s\\cos @theta}",
       s: "\\frac{@W}{@F\\cos @theta}",
     },
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A 20 kg charged ball on a frictionless floor, pulled by a field at angle θ; the work is the kinetic energy it has gained after moving s.",
-      build: (v, E) =>
-        pushedBall(E, {
-          force: v.F,
-          angle: v.theta * deg,
-          mass: 20,
-          gravity: 9.81,
-          floor: true,
-        }),
-      watch: {
-        W: (m, _, v) =>
-          once(
-            m,
-            "W",
-            ballState(m).x - m.tags.x0 >= v.s,
-            () => m.measure(m.tags.ball).translational,
-          ),
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -710,17 +427,6 @@ export const tools = [
       Ek: "\\tfrac{1}{2}·@m·@v^{2}",
       m: "\\frac{2·@Ek}{@v^{2}}",
       v: "\\sqrt{\\frac{2·@Ek}{@m}}",
-    },
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A ball of mass m gliding at v; its kinetic energy is read from the simulation.",
-      build: (v, E) => pushedBall(E, { u: v.v, mass: v.m }),
-      duration: () => 3,
-      watch: {
-        Ek: (m) => m.measure(m.tags.ball).kinetic,
-        v: (m) => m.measure(m.tags.ball).speed,
-      },
     },
     related: "mechanics",
   }),
@@ -748,28 +454,6 @@ export const tools = [
       m: "\\frac{@Ep}{@g·@h}",
       h: "\\frac{@Ep}{@m·@g}",
     },
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A ball of mass m held with its centre at height h, then let go; its potential energy is read from the simulation as it is released.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          gravity: v.g,
-          view: { minX: -3, maxX: 3, minY: 0, maxY: Math.max(3, v.h + 1) },
-        });
-        sim.tags.ball = body(sim, "ball", {
-          x: 0,
-          y: v.h,
-          size: 0.2,
-          mass: v.m,
-        });
-        return sim;
-      },
-      watch: {
-        Ep: (m) =>
-          once(m, "Ep", true, () => m.measure(m.tags.ball).gravitational),
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -795,28 +479,6 @@ export const tools = [
       k: "\\frac{2·@Es}{@x^{2}}",
       x: "\\sqrt{\\frac{2·@Es}{@k}}",
     },
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A 1 kg ball on a spring of natural length 2 m, pulled out by x and let go, with gravity off; the stored energy is read from the simulation.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          view: { minX: -1, maxX: 8, minY: 0, maxY: 3 },
-        });
-        sim.tags.ball = body(sim, "ball", { x: 2, y: 1.5, size: 0.3 });
-        sim.tags.spring = sim.connect(
-          "spring",
-          null,
-          sim.tags.ball,
-          { x: 0, y: 1.5 },
-          null,
-        );
-        sim.updateLink(sim.tags.spring, { k: v.k, damping: 0 });
-        sim.setPose(sim.tags.ball, { x: 2 + v.x, y: 1.5 });
-        return sim;
-      },
-      watch: { Es: (m) => once(m, "Es", true, () => m.energy().elastic) },
-    },
     related: "mechanics",
   }),
   tool({
@@ -838,16 +500,6 @@ export const tools = [
       t: ({ W, P }) => W / P,
     },
     forms: { P: "\\frac{@W}{@t}", W: "@P·@t", t: "\\frac{@W}{@P}" },
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A 1 kg charged ball pushed from rest by a steady force for time t; the power is the kinetic energy it gains divided by t.",
-      build: (v, E) => pushedBall(E, { force: Math.sqrt(2 * v.W) / v.t }),
-      duration: (v) => v.t,
-      watch: {
-        P: (m) => (m.time > 0 ? m.measure(m.tags.ball).kinetic / m.time : null),
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -869,23 +521,6 @@ export const tools = [
       v: ({ P, F }) => P / F,
     },
     forms: { P: "@F·@v", F: "\\frac{@P}{@v}", v: "\\frac{@P}{@F}" },
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A 100 kg charged ball moving at v is pushed by a force F; the power is the kinetic energy it gains in the first 0.05 s divided by 0.05 s.",
-      build: (v, E) => {
-        const sim = pushedBall(E, { u: v.v, force: v.F, mass: 100 });
-        sim.tags.k0 = 0.5 * 100 * v.v * v.v;
-        return sim;
-      },
-      duration: () => 0.05,
-      watch: {
-        P: (m) =>
-          m.time > 0
-            ? (m.measure(m.tags.ball).kinetic - m.tags.k0) / m.time
-            : null,
-      },
-    },
     related: "mechanics",
   }),
 
@@ -913,10 +548,6 @@ export const tools = [
       r: "\\frac{@v·@T}{2\\pi}",
       T: "\\frac{2\\pi·@r}{@v}",
     },
-    sim: whirl({
-      T: (m) => period(m, "T", ballState(m).y, m.tags.centre.y, m.time),
-      v: (m) => m.measure(m.tags.ball).speed,
-    }),
     related: "mechanics",
   }),
   tool({
@@ -942,12 +573,6 @@ export const tools = [
       v: "\\sqrt{@a·@r}",
       r: "\\frac{@v^{2}}{@a}",
     },
-    sim: whirl({
-      a: (m) => {
-        const f = m.netForce(m.tags.ball);
-        return Math.hypot(f.x, f.y) / m.tags.mass;
-      },
-    }),
     related: "mechanics",
   }),
   tool({
@@ -976,12 +601,6 @@ export const tools = [
       v: "\\sqrt{\\frac{@F·@r}{@m}}",
       r: "\\frac{@m·@v^{2}}{@F}",
     },
-    sim: whirl({
-      F: (m) => {
-        const f = m.netForce(m.tags.ball);
-        return Math.hypot(f.x, f.y);
-      },
-    }),
     related: "mechanics",
   }),
 
@@ -1022,7 +641,6 @@ export const tools = [
       m: "\\frac{@F·@r^{2}}{@G·@M}",
       r: "\\sqrt{\\frac{@G·@M·@m}{@F}}",
     },
-    sim: circularOrbit({ F: (lab) => lab.measure(lab.tags.satellite).force }),
     related: "orbits",
   }),
   tool({
@@ -1067,9 +685,6 @@ export const tools = [
       M: "\\frac{@g·@r^{2}}{@G}",
       r: "\\sqrt{\\frac{@G·@M}{@g}}",
     },
-    sim: circularOrbit({
-      g: (lab) => lab.measure(lab.tags.satellite).force / lab.satelliteMass,
-    }),
     related: "orbits",
   }),
   tool({
@@ -1104,9 +719,6 @@ export const tools = [
       Ep: "-\\frac{@G·@M·@m}{@r}",
       r: "-\\frac{@G·@M·@m}{@Ep}",
     },
-    sim: circularOrbit({
-      Ep: (lab) => lab.measure(lab.tags.satellite).potential,
-    }),
     related: "orbits",
   }),
 
@@ -1136,23 +748,6 @@ export const tools = [
       q2: "\\frac{@F·@r^{2}}{@k·@q1}",
       r: "\\sqrt{\\frac{@k·@q1·@q2}{@F}}",
     },
-    sim: {
-      engine: "fieldlab",
-      caption:
-        "Two charges in the fields simulation; the force is read from it.",
-      build: (v, E) => {
-        const lab = fields(E, "electric", Math.max(2, v.r * 1.2));
-        lab.add("charge", { x: -v.r / 2, y: 0, charge: v.q1 });
-        lab.tags.second = lab.add("charge", { x: v.r / 2, y: 0, charge: v.q2 });
-        return lab;
-      },
-      watch: {
-        F: (lab) => {
-          const f = lab.forceOn(lab.tags.second);
-          return f && Math.hypot(f.x, f.y);
-        },
-      },
-    },
     related: "fields",
   }),
   tool({
@@ -1174,27 +769,6 @@ export const tools = [
       q: ({ F, E }) => F / E,
     },
     forms: { F: "@E·@q", E: "\\frac{@F}{@q}", q: "\\frac{@F}{@E}" },
-    sim: {
-      engine: "fieldlab",
-      caption:
-        "A charge q in a uniform field of strength E; the force on it is read from the fields simulation.",
-      build: (v, E) => {
-        const lab = fields(E, "electric", 2);
-        lab.setUniform("electric", { x: v.E, y: 0 });
-        lab.tags.charge = lab.add("charge", { x: 0, y: 0, charge: v.q });
-        return lab;
-      },
-      watch: {
-        F: (lab) => {
-          const f = lab.forceOn(lab.tags.charge);
-          return f && Math.hypot(f.x, f.y);
-        },
-        E: (lab, _, v) => {
-          const f = lab.forceOn(lab.tags.charge);
-          return f && Math.hypot(f.x, f.y) / v.q;
-        },
-      },
-    },
     related: "fields",
   }),
   tool({
@@ -1221,23 +795,6 @@ export const tools = [
       q: "\\frac{@E·@r^{2}}{@k}",
       r: "\\sqrt{\\frac{@k·@q}{@E}}",
     },
-    sim: {
-      engine: "fieldlab",
-      caption:
-        "One charge in the fields simulation; the field strength is read at the marked point, a distance r away.",
-      build: (v, E) => {
-        const lab = fields(E, "electric", Math.max(2, v.r * 1.3));
-        lab.add("charge", { x: 0, y: 0, charge: v.q });
-        lab.tags.probe = { x: v.r, y: 0 };
-        return lab;
-      },
-      watch: {
-        E: (lab) => {
-          const [x, y] = lab.electricField(lab.tags.probe.x, lab.tags.probe.y);
-          return Math.hypot(x, y);
-        },
-      },
-    },
     related: "fields",
   }),
   tool({
@@ -1259,13 +816,6 @@ export const tools = [
       d: ({ V, E }) => V / E,
     },
     forms: { E: "\\frac{@V}{@d}", V: "@E·@d", d: "\\frac{@V}{@E}" },
-    sim: platesSim({
-      E: (lab) => {
-        const [x, y] = lab.electricField(0, 0);
-        return Math.hypot(x, y);
-      },
-      V: (lab) => plateDifference(lab),
-    }),
     related: "fields",
   }),
   tool({
@@ -1287,7 +837,6 @@ export const tools = [
       V: ({ W, q }) => W / q,
     },
     forms: { W: "@q·@V", q: "\\frac{@W}{@V}", V: "\\frac{@W}{@q}" },
-    sim: platesSim({ W: (lab, _, v) => v.q * plateDifference(lab) }, 0.2),
     related: "fields",
   }),
 
@@ -1311,16 +860,6 @@ export const tools = [
       t: ({ q, I }) => q / I,
     },
     forms: { I: "\\frac{@q}{@t}", q: "@I·@t", t: "\\frac{@q}{@I}" },
-    sim: {
-      engine: "circuitlab",
-      caption:
-        "A 12 V cell and a resistor chosen to draw the current; the ammeter reading is the measured current, and the charge is that current times t.",
-      build: (v, E) => loop(E, 12, [["resistor", { resistance: 12 / v.I }]]),
-      watch: {
-        I: (lab) => reading(lab, lab.tags.ammeter, "current"),
-        q: (lab, _, v) => reading(lab, lab.tags.ammeter, "current") * v.t,
-      },
-    },
     related: "circuits",
   }),
   tool({
@@ -1342,19 +881,6 @@ export const tools = [
       R: ({ V, I }) => V / I,
     },
     forms: { I: "\\frac{@V}{@R}", V: "@I·@R", R: "\\frac{@V}{@I}" },
-    sim: {
-      engine: "circuitlab",
-      caption:
-        "A cell of emf V and a resistor R; read the current from the ammeter.",
-      build: (v, E) => loop(E, v.V, [["resistor", { resistance: v.R }]]),
-      watch: {
-        I: (lab) => reading(lab, lab.tags.ammeter, "current"),
-        V: (lab) => reading(lab, lab.tags.parts[0], "voltage"),
-        R: (lab) =>
-          reading(lab, lab.tags.parts[0], "voltage") /
-          reading(lab, lab.tags.ammeter, "current"),
-      },
-    },
     related: "circuits",
   }),
   tool({
@@ -1376,13 +902,6 @@ export const tools = [
       I: ({ P, V }) => P / V,
     },
     forms: { P: "@V·@I", V: "\\frac{@P}{@I}", I: "\\frac{@P}{@V}" },
-    sim: {
-      engine: "circuitlab",
-      caption:
-        "A cell of emf V and a resistor that draws current I; the resistor's power is read from the simulation.",
-      build: (v, E) => loop(E, v.V, [["resistor", { resistance: v.V / v.I }]]),
-      watch: { P: (lab) => reading(lab, lab.tags.parts[0], "power") },
-    },
     related: "circuits",
   }),
   tool({
@@ -1408,13 +927,6 @@ export const tools = [
       I: "\\sqrt{\\frac{@P}{@R}}",
       R: "\\frac{@P}{@I^{2}}",
     },
-    sim: {
-      engine: "circuitlab",
-      caption:
-        "A resistor R carrying current I (from a cell of emf IR); its power is read from the simulation.",
-      build: (v, E) => loop(E, v.I * v.R, [["resistor", { resistance: v.R }]]),
-      watch: { P: (lab) => reading(lab, lab.tags.parts[0], "power") },
-    },
     related: "circuits",
   }),
   tool({
@@ -1436,18 +948,6 @@ export const tools = [
       R3: ({ R, R1, R2 }) => R - R1 - R2,
     },
     forms: { R: "@R1 + @R2 + @R3", R3: "@R - @R1 - @R2" },
-    sim: {
-      engine: "circuitlab",
-      caption:
-        "Three resistors in series with a 12 V cell; the total resistance is the cell's emf divided by the ammeter reading.",
-      build: (v, E) =>
-        loop(E, 12, [
-          ["resistor", { resistance: v.R1 }],
-          ["resistor", { resistance: v.R2 }],
-          ["resistor", { resistance: v.R3 }],
-        ]),
-      watch: { R: (lab) => 12 / reading(lab, lab.tags.ammeter, "current") },
-    },
     related: "circuits",
   }),
   tool({
@@ -1467,13 +967,6 @@ export const tools = [
     solve: { R: ({ R1, R2, R3 }) => 1 / (1 / R1 + 1 / R2 + 1 / R3) },
     forms: {
       R: "\\left(\\frac{1}{@R1} + \\frac{1}{@R2} + \\frac{1}{@R3}\\right)^{-1}",
-    },
-    sim: {
-      engine: "circuitlab",
-      caption:
-        "Three resistors in parallel across a 12 V cell; the total resistance is the emf divided by the ammeter reading.",
-      build: (v, E) => parallel(E, 12, [v.R1, v.R2, v.R3]),
-      watch: { R: (lab) => 12 / reading(lab, lab.tags.ammeter, "current") },
     },
     related: "circuits",
   }),
@@ -1504,32 +997,6 @@ export const tools = [
       B: "\\frac{@F}{@q·@v\\sin @theta}",
       v: "\\frac{@F}{@q·@B\\sin @theta}",
     },
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A 1 kg charge moving in a uniform magnetic field, gravity off. The sandbox is flat with B out of the screen, so it uses the part of B at right angles to v, B sin θ.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          magneticZ: v.B * Math.sin(v.theta * deg),
-          view: { minX: -4, maxX: 4, minY: 0, maxY: 6 },
-        });
-        sim.tags.ball = body(sim, "ball", {
-          x: 0,
-          y: 3,
-          size: 0.3,
-          charge: v.q,
-          vx: v.v,
-        });
-        return sim;
-      },
-      watch: {
-        F: (m) =>
-          once(m, "F", m.time > 0, () => {
-            const f = m.netForce(m.tags.ball);
-            return Math.hypot(f.x, f.y);
-          }),
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -1557,23 +1024,6 @@ export const tools = [
       B: "\\frac{@F}{@I·@l\\sin @theta}",
       I: "\\frac{@F}{@B·@l\\sin @theta}",
     },
-    sim: {
-      engine: "fieldlab",
-      caption:
-        "A wire carrying I out of the screen in a uniform field B sin θ across it (the fields simulation's wires all run out of the screen); force per metre from the simulation, times ℓ.",
-      build: (v, E) => {
-        const lab = fields(E, "magnetic", 1.5);
-        lab.setUniform("magnetic", { x: v.B * Math.sin(v.theta * deg), y: 0 });
-        lab.tags.wire = lab.add("wire", { x: 0, y: 0, current: v.I });
-        return lab;
-      },
-      watch: {
-        F: (lab, _, v) => {
-          const f = lab.forceOn(lab.tags.wire);
-          return f && Math.hypot(f.x, f.y) * v.l;
-        },
-      },
-    },
     related: "fields",
   }),
   tool({
@@ -1599,23 +1049,6 @@ export const tools = [
       B: "\\frac{@mu0·@I}{2\\pi·@r}",
       I: "\\frac{2\\pi·@r·@B}{@mu0}",
       r: "\\frac{@mu0·@I}{2\\pi·@B}",
-    },
-    sim: {
-      engine: "fieldlab",
-      caption:
-        "A wire in the fields simulation; the field is read at the marked point, a distance r away.",
-      build: (v, E) => {
-        const lab = fields(E, "magnetic", Math.max(1.5, v.r * 1.3));
-        lab.add("wire", { x: 0, y: 0, current: v.I });
-        lab.tags.probe = { x: v.r, y: 0 };
-        return lab;
-      },
-      watch: {
-        B: (lab) => {
-          const [x, y] = lab.magneticField(lab.tags.probe.x, lab.tags.probe.y);
-          return Math.hypot(x, y);
-        },
-      },
     },
     related: "fields",
   }),
@@ -1654,7 +1087,7 @@ export const tools = [
     latex: "\\varepsilon = -N\\frac{\\Delta\\Phi}{\\Delta t}",
     variables: [
       V("emf", "\\varepsilon", "Induced emf", "V", -1000, 1000, -5),
-      V("N", "N", "Turns", "", 1, 1000, 100),
+      { ...V("N", "N", "Turns", "", 1, 1000, 100), step: 1 },
       V("dPhi", "\\Delta\\Phi", "Change in flux", "Wb", -1, 1, 0.01),
       V("dt", "\\Delta t", "Time taken", "s", 0.001, 10, 0.2, "log"),
     ],
@@ -1707,8 +1140,8 @@ export const tools = [
     variables: [
       V("Vs", "V_s", "Secondary voltage", "V", 0.1, 1e5, 12, "log"),
       V("Vp", "V_p", "Primary voltage", "V", 0.1, 1e5, 240, "log"),
-      V("Np", "N_p", "Primary turns", "", 1, 1e4, 2000, "log"),
-      V("Ns", "N_s", "Secondary turns", "", 1, 1e4, 100, "log"),
+      { ...V("Np", "N_p", "Primary turns", "", 1, 1e4, 2000, "log"), step: 1 },
+      { ...V("Ns", "N_s", "Secondary turns", "", 1, 1e4, 100, "log"), step: 1 },
     ],
     solveFor: ["Vs", "Vp", "Ns", "Np"],
     solve: {
@@ -1806,7 +1239,7 @@ export const tools = [
     latex: "f_n = \\frac{nv}{2L}",
     variables: [
       V("f", "f_n", "Frequency of harmonic n", "Hz", 0.1, 1e4, 110, "log"),
-      V("n", "n", "Harmonic number", "", 1, 10, 1),
+      { ...V("n", "n", "Harmonic number", "", 1, 10, 1), step: 1 },
       V("v", "v", "Wave speed on the string", "m/s", 1, 1000, 143),
       V("L", "L", "Length of the string", "m", 0.1, 5, 0.65),
     ],
@@ -1875,7 +1308,7 @@ export const tools = [
     purpose: "A photon's energy pays the work function, the rest is kinetic",
     latex: "E_k = hf - W",
     variables: [
-      V("Ek", "E_{k}", "Maximum kinetic energy", "J", 0, 1e-17, 1.6e-19),
+      V("Ek", "E_{k}", "Maximum kinetic energy", "J", 0, 1e-17, 1.63e-19),
       V("f", "f", "Frequency", "Hz", 1e14, 3e15, 1e15, "log"),
       V("W", "W", "Work function", "J", 1e-19, 1e-18, 5e-19),
     ],
@@ -1935,7 +1368,7 @@ export const tools = [
     purpose: "A moving clock runs slow",
     latex: "t = \\frac{t_0}{\\sqrt{1 - v^2/c^2}}",
     variables: [
-      V("t", "t", "Time measured by the observer", "s", 0, 1000, 2.29),
+      V("t", "t", "Time measured by the observer", "s", 0, 1000, 2.3),
       V("t0", "t_0", "Proper time (moving clock)", "s", 0.001, 100, 1, "log"),
       V("v", "v", "Speed", "m/s", 0, 2.99e8, 2.7e8),
     ],
@@ -1959,7 +1392,7 @@ export const tools = [
     purpose: "A moving object is shorter along its motion",
     latex: "L = L_0\\sqrt{1 - v^2/c^2}",
     variables: [
-      V("L", "L", "Length measured by the observer", "m", 0, 1000, 43.6),
+      V("L", "L", "Length measured by the observer", "m", 0, 1000, 43.5),
       V("L0", "L_0", "Proper length", "m", 0.01, 1000, 100, "log"),
       V("v", "v", "Speed", "m/s", 0, 2.99e8, 2.7e8),
     ],
@@ -2028,9 +1461,6 @@ export const tools = [
       },
     ],
     uses: ["newtons-gravitation", "centripetal-force", "circular-speed"],
-    sim: circularOrbit({
-      T: (lab) => lab.get(lab.tags.satellite)?.measuredPeriod ?? null,
-    }),
     related: "orbits",
   }),
   tool({
@@ -2076,13 +1506,6 @@ export const tools = [
       { say: "Take the square root", latex: "v = \\sqrt{\\frac{GM}{r}}" },
     ],
     uses: ["newtons-gravitation", "centripetal-force"],
-    sim: {
-      ...circularOrbit({ v: (lab) => lab.measure(lab.tags.satellite).speed }),
-      caption:
-        "A satellite launched sideways at radius r with the speed shown. On a circle its speed stays the same; read it from the simulation.",
-      build: (v, E) =>
-        orbit(E, { M: v.M, R: Math.min(6.371e6, 0.95 * v.r), r: v.r, v: v.v }),
-    },
     related: "orbits",
   }),
   tool({
@@ -2123,29 +1546,6 @@ export const tools = [
       },
     ],
     uses: ["kepler-third-law"],
-    sim: {
-      ...circularOrbit({
-        T: (lab) => lab.get(lab.tags.satellite)?.measuredPeriod ?? null,
-        r: (lab) => {
-          const s = lab.get(lab.tags.satellite);
-          return s?.measuredPeriod
-            ? {
-                value: lab.measure(s.id).radius,
-                note: `period ${(s.measuredPeriod / 3600).toFixed(2)} h`,
-              }
-            : null;
-        },
-      }),
-      caption:
-        "A satellite on a circular orbit of radius r; after one orbit its radius and measured period are read from the simulation.",
-      build: (v, E) =>
-        orbit(E, {
-          M: v.M,
-          R: Math.min(6.371e6, 0.5 * v.r),
-          r: v.r,
-          v: Math.sqrt((E.G * v.M) / v.r),
-        }),
-    },
     related: "orbits",
   }),
   tool({
@@ -2200,20 +1600,6 @@ export const tools = [
       { say: "Take the square root", latex: "v = \\sqrt{\\frac{2GM}{r}}" },
     ],
     uses: ["kinetic-energy", "gravitational-potential"],
-    sim: {
-      engine: "orbitlab",
-      caption:
-        "A satellite launched sideways at radius r with the speed shown. The measured value is the speed that would make its total energy zero, from the simulation's own energies at launch.",
-      build: (v, E) =>
-        orbit(E, { M: v.M, R: Math.min(6.371e6, 0.999 * v.r), r: v.r, v: v.v }),
-      watch: {
-        v: (lab) =>
-          once(lab, "v", true, () => {
-            const m = lab.measure(lab.tags.satellite);
-            return Math.sqrt((-2 * m.potential) / lab.satelliteMass);
-          }),
-      },
-    },
     related: "orbits",
   }),
   tool({
@@ -2258,40 +1644,6 @@ export const tools = [
       },
     ],
     uses: ["force-on-moving-charge", "centripetal-force"],
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A charge moving in a uniform magnetic field, gravity off. The radius is worked out from its measured speed and the measured force on it, r = mv²/F.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          magneticZ: v.B,
-          view: {
-            minX: -v.r * 1.3,
-            maxX: v.r * 1.3,
-            minY: 0,
-            maxY: 2.6 * v.r + 0.4,
-          },
-        });
-        sim.tags.mass = v.m;
-        sim.tags.ball = body(sim, "ball", {
-          x: 0,
-          y: 2 * v.r + 0.2,
-          size: Math.min(0.3, v.r / 2),
-          mass: v.m,
-          charge: v.q,
-          vx: v.v,
-        });
-        return sim;
-      },
-      watch: {
-        r: (m) => {
-          if (!(m.time > 0)) return null;
-          const f = m.netForce(m.tags.ball),
-            speed = m.measure(m.tags.ball).speed;
-          return (m.tags.mass * speed * speed) / Math.hypot(f.x, f.y);
-        },
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -2326,46 +1678,6 @@ export const tools = [
       },
     ],
     uses: ["electric-field-force", "force-on-moving-charge"],
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A 1 C, 1 kg charge entering crossed fields at speed v, gravity off. The measured value is its speed after 2 m of the fields; how far it has drifted sideways is shown with it.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          view: { minX: -4, maxX: 4, minY: 0, maxY: 5 },
-        });
-        region(sim, "electric", {
-          x: 0.5,
-          y: 2.5,
-          width: 5,
-          height: 7,
-          angle: 90,
-          strength: v.E,
-        });
-        region(sim, "magnetic", {
-          x: 0.5,
-          y: 2.5,
-          width: 7,
-          height: 5,
-          strength: v.B,
-        });
-        sim.tags.ball = body(sim, "ball", {
-          x: -3,
-          y: 2.5,
-          size: 0.3,
-          charge: 1,
-          vx: v.v,
-        });
-        return sim;
-      },
-      watch: {
-        v: (m) =>
-          once(m, "v", ballState(m).x >= -1, () => ({
-            value: m.measure(m.tags.ball).speed,
-            note: `drifted ${(ballState(m).y - 2.5).toFixed(3)} m`,
-          })),
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -2411,48 +1723,6 @@ export const tools = [
       },
     ],
     uses: ["electron-gun", "cyclotron-motion"],
-    sim: {
-      engine: "sandbox",
-      caption:
-        "The charge starts at rest in a 1 m electric field of V N/C (a p.d. of V across it), then enters a magnetic field. The radius is worked out there from its measured speed and the force on it, r = mv²/F.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          view: { minX: -2, maxX: 6, minY: 0, maxY: 6 },
-        });
-        region(sim, "electric", {
-          x: -1,
-          y: 3,
-          width: 1,
-          height: 1,
-          strength: v.V,
-        });
-        region(sim, "magnetic", {
-          x: 4,
-          y: 3,
-          width: 8,
-          height: 12,
-          strength: v.B,
-        });
-        sim.tags.mass = v.m;
-        sim.tags.ball = body(sim, "ball", {
-          x: -1.4999,
-          y: 3,
-          size: 0.1,
-          mass: v.m,
-          charge: v.q,
-        });
-        return sim;
-      },
-      watch: {
-        // Once, just inside the magnetic field.
-        r: (m) =>
-          once(m, "r", ballState(m).x >= 0.2, () => {
-            const f = m.netForce(m.tags.ball),
-              speed = m.measure(m.tags.ball).speed;
-            return (m.tags.mass * speed * speed) / Math.hypot(f.x, f.y);
-          }),
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -2484,40 +1754,6 @@ export const tools = [
       { say: "Solve for the speed", latex: "v = \\sqrt{\\frac{2qV}{m}}" },
     ],
     uses: ["electric-work", "kinetic-energy"],
-    sim: {
-      engine: "sandbox",
-      caption:
-        "The charge starts at rest in a 1 m wide electric field of V N/C, so it falls through a p.d. of V; its speed is measured as it leaves.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          view: { minX: -2, maxX: 4, minY: 0, maxY: 3 },
-        });
-        region(sim, "electric", {
-          x: -1,
-          y: 1.5,
-          width: 1,
-          height: 1,
-          strength: v.V,
-        });
-        sim.tags.ball = body(sim, "ball", {
-          x: -1.4999,
-          y: 1.5,
-          size: 0.1,
-          mass: v.m,
-          charge: v.q,
-        });
-        return sim;
-      },
-      watch: {
-        v: (m) =>
-          once(
-            m,
-            "v",
-            ballState(m).x >= -0.3,
-            () => m.measure(m.tags.ball).speed,
-          ),
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -2529,9 +1765,9 @@ export const tools = [
     purpose: "A charge crossing a uniform field follows a parabola",
     latex: "y = \\frac{qVL^2}{2mdu^2}",
     variables: [
-      V("y", "y", "Sideways deflection", "m", 0, 10, 1),
+      V("y", "y", "Sideways deflection", "m", 0, 10, 0.5),
       V("q", "q", "Charge", "C", 0.1, 10, 1),
-      V("V", "V", "P.d. across the plates", "V", 0, 100, 4),
+      V("V", "V", "P.d. across the plates", "V", 0, 100, 2),
       V("L", "L", "Length of the plates", "m", 0.5, 6, 4),
       V("m", "m", "Mass", "kg", 0.05, 100, 1, "log"),
       V("d", "d", "Gap between the plates", "m", 0.5, 6, 2),
@@ -2564,38 +1800,6 @@ export const tools = [
       },
     ],
     uses: ["uniform-field-plates", "newtons-second-law", "suvat-s-ut-at2"],
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A charge entering a uniform field region L long and d high (field V/d across it), gravity off; its sideways deflection is measured as it leaves.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          view: { minX: -1, maxX: v.L + 1, minY: 0, maxY: v.d + 2 },
-        });
-        region(sim, "electric", {
-          x: v.L / 2,
-          y: 1 + v.d / 2,
-          width: v.d,
-          height: v.L,
-          angle: 90,
-          strength: v.V / v.d,
-        });
-        sim.tags.y0 = 1 + v.d / 2;
-        sim.tags.ball = body(sim, "ball", {
-          x: -0.5,
-          y: 1 + v.d / 2,
-          size: 0.1,
-          mass: v.m,
-          charge: v.q,
-          vx: v.u,
-        });
-        return sim;
-      },
-      watch: {
-        y: (m, _, v) =>
-          once(m, "y", ballState(m).x >= v.L, () => ballState(m).y - m.tags.y0),
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -2633,33 +1837,6 @@ export const tools = [
       { say: "Solve for the charge", latex: "q = \\frac{mgd}{V}" },
     ],
     uses: ["uniform-field-plates", "electric-field-force", "weight"],
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A charged drop in an upward field of V/d with gravity g. The measured value is the charge that would hold it, from its measured acceleration: q = m(g + a)/E.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          gravity: v.g,
-          electricY: v.V / v.d,
-          view: { minX: -2, maxX: 2, minY: 0, maxY: 5 },
-        });
-        sim.tags.ball = body(sim, "ball", {
-          x: 0,
-          y: 3,
-          size: 0.2,
-          mass: v.m,
-          charge: v.q,
-        });
-        return sim;
-      },
-      duration: () => 1,
-      watch: {
-        q: (m, _, v) =>
-          m.time > 0
-            ? (v.m * (v.g + ballState(m).vy / m.time)) / (v.V / v.d)
-            : null,
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -2709,35 +1886,6 @@ export const tools = [
       },
     ],
     uses: ["suvat-s-ut-at2", "suvat-v-u-at"],
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A ball launched from just above the floor, gravity g; the range is how far it has gone when its centre is back at launch height.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          gravity: v.g,
-          view: { minX: -1, maxX: Math.max(4, v.R + 1), minY: 0, maxY: 3 },
-        });
-        sim.tags.ball = body(sim, "ball", {
-          x: 0,
-          y: 0.2,
-          size: 0.2,
-          vx: v.u * Math.cos(v.theta * deg),
-          vy: v.u * Math.sin(v.theta * deg),
-        });
-        return sim;
-      },
-      watch: {
-        R: (m) =>
-          once(
-            m,
-            "R",
-            m.time > 0.02 && ballState(m).y <= 0.2 + 1e-6,
-            () => ballState(m).x,
-          ),
-      },
-      until: (m) => m.tags.once && "R" in m.tags.once,
-    },
     related: "mechanics",
   }),
   tool({
@@ -2764,29 +1912,6 @@ export const tools = [
       { say: "The mass cancels", latex: "v = \\sqrt{2gh}" },
     ],
     uses: ["gravitational-potential-energy", "kinetic-energy"],
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A ball dropped from height h; its speed is measured after falling h.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          gravity: v.g,
-          view: { minX: -2, maxX: 2, minY: 0, maxY: v.h + 1 },
-        });
-        sim.tags.ball = body(sim, "ball", { x: 0, y: v.h + 0.15, size: 0.2 });
-        sim.tags.top = v.h + 0.15;
-        return sim;
-      },
-      watch: {
-        v: (m, _, v) =>
-          once(
-            m,
-            "v",
-            m.tags.top - ballState(m).y >= v.h,
-            () => m.measure(m.tags.ball).speed,
-          ),
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -2838,51 +1963,6 @@ export const tools = [
       },
     ],
     uses: ["weight", "friction", "newtons-second-law"],
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A block released on a fixed ramp of friction μ with gravity g (the block has the same friction); its acceleration is measured over the first second.",
-      build: (v, E) => {
-        const theta = v.theta * deg,
-          width = 8,
-          height = width * Math.tan(theta),
-          sim = sandbox(E, {
-            gravity: v.g,
-            view: { minX: -1, maxX: width + 1, minY: 0, maxY: height + 1.5 },
-          });
-        const ramp = body(sim, "wedge", {
-          x: (2 * width) / 3,
-          y: height / 3,
-          size: [width, Math.max(0.05, height)],
-          friction: v.mu,
-        });
-        sim.setLock(ramp, "position", true);
-        sim.setLock(ramp, "rotation", true);
-        const half = 0.2,
-          t = 0.8;
-        sim.tags.ball = body(sim, "block", {
-          x: width * t - Math.sin(theta) * (half + 0.001),
-          y: height * t + Math.cos(theta) * (half + 0.001),
-          angle: theta,
-          size: [0.4, 0.4],
-          friction: v.mu,
-        });
-        sim.tags.theta = theta;
-        return sim;
-      },
-      duration: () => 1,
-      watch: {
-        a: (m) => {
-          if (!(m.time > 0)) return null;
-          const s = ballState(m),
-            along = -(
-              s.vx * Math.cos(m.tags.theta) +
-              s.vy * Math.sin(m.tags.theta)
-            );
-          return along / m.time;
-        },
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -2894,7 +1974,7 @@ export const tools = [
     purpose: "The angle at which no friction is needed to turn",
     latex: "\\tan\\theta = \\frac{v^2}{rg}",
     variables: [
-      V("theta", "\\theta", "Banking angle", "°", 0, 80, 17.8),
+      V("theta", "\\theta", "Banking angle", "°", 0, 80, 18.1),
       V("v", "v", "Speed", "m/s", 1, 60, 20),
       V("r", "r", "Radius of the curve", "m", 5, 1000, 125, "log"),
       V("g", "g", "Gravitational field strength", "m/s²", 1, 30, 9.81),
@@ -2933,7 +2013,7 @@ export const tools = [
     purpose: "A mass swung round in a horizontal circle on a string",
     latex: "T = 2\\pi\\sqrt{\\frac{L\\cos\\theta}{g}}",
     variables: [
-      V("T", "T", "Period", "s", 0.1, 20, 1.86),
+      V("T", "T", "Period", "s", 0.1, 20, 1.87),
       V("L", "L", "Length of the string", "m", 0.1, 10, 1),
       V("theta", "\\theta", "Angle from the vertical", "°", 0, 85, 30),
       V("g", "g", "Gravitational field strength", "m/s²", 1, 30, 9.81),
@@ -3012,7 +2092,7 @@ export const tools = [
     purpose: "The period of an oscillating mass",
     latex: "T = 2\\pi\\sqrt{\\frac{m}{k}}",
     variables: [
-      V("T", "T", "Period", "s", 0.01, 100, 1.4),
+      V("T", "T", "Period", "s", 0.01, 100, 1.405),
       V("m", "m", "Mass", "kg", 0.05, 100, 1, "log"),
       V("k", "k", "Spring constant", "N/m", 0.1, 100, 20, "log"),
     ],
@@ -3046,33 +2126,6 @@ export const tools = [
       },
     ],
     uses: ["hookes-law", "newtons-second-law"],
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A mass on an undamped spring, gravity off, pulled 0.5 m from its natural length and let go; the period is timed from the simulation.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          view: { minX: -1, maxX: 4, minY: 0, maxY: 3 },
-        });
-        sim.tags.ball = body(sim, "ball", {
-          x: 2,
-          y: 1.5,
-          size: 0.3,
-          mass: v.m,
-        });
-        const spring = sim.connect(
-          "spring",
-          null,
-          sim.tags.ball,
-          { x: 0, y: 1.5 },
-          null,
-        );
-        sim.updateLink(spring, { k: v.k, damping: 0 });
-        sim.setPose(sim.tags.ball, { x: 2.5, y: 1.5 });
-        return sim;
-      },
-      watch: { T: (m) => period(m, "T", ballState(m).x, 2, m.time) },
-    },
     related: "mechanics",
   }),
   tool({
@@ -3112,32 +2165,6 @@ export const tools = [
       { say: "The period", latex: "T = 2\\pi\\sqrt{\\frac{L}{g}}" },
     ],
     uses: ["weight", "newtons-second-law"],
-    sim: {
-      engine: "sandbox",
-      caption:
-        "A ball on a light rod of length L, released from 10°; the period is timed from the simulation.",
-      build: (v, E) => {
-        const top = v.L + 0.5,
-          a = 10 * deg,
-          sim = sandbox(E, {
-            gravity: v.g,
-            view: {
-              minX: -v.L * 0.6,
-              maxX: v.L * 0.6,
-              minY: 0,
-              maxY: top + 0.3,
-            },
-          });
-        sim.tags.ball = body(sim, "ball", {
-          x: v.L * Math.sin(a),
-          y: top - v.L * Math.cos(a),
-          size: Math.min(0.3, v.L / 4),
-        });
-        sim.connect("rod", null, sim.tags.ball, { x: 0, y: top }, null);
-        return sim;
-      },
-      watch: { T: (m) => period(m, "T", ballState(m).x, 0, m.time) },
-    },
     related: "mechanics",
   }),
   tool({
@@ -3183,44 +2210,6 @@ export const tools = [
       },
     ],
     uses: ["momentum", "kinetic-energy"],
-    sim: {
-      engine: "sandbox",
-      caption:
-        "Two balls on a frictionless floor with gravity off; the first ball's velocity is measured once they have separated.",
-      build: (v, E) => {
-        const sim = sandbox(E, {
-          view: { minX: -6, maxX: 6, minY: 0, maxY: 3 },
-        });
-        sim.tags.ball = body(sim, "ball", {
-          x: -3,
-          y: 1.5,
-          size: 0.6,
-          mass: v.m1,
-          restitution: v.e,
-          vx: v.u1,
-        });
-        sim.tags.other = body(sim, "ball", {
-          x: 0,
-          y: 1.5,
-          size: 0.6,
-          mass: v.m2,
-          restitution: v.e,
-          vx: v.u2,
-        });
-        return sim;
-      },
-      duration: () => 4,
-      watch: {
-        v1: (m) => {
-          const a = ballState(m),
-            b = m.state(m.tags.other);
-          return {
-            value: a.vx,
-            note: `second ball ${b.vx.toFixed(2)} m/s`,
-          };
-        },
-      },
-    },
     related: "mechanics",
   }),
   tool({
@@ -3268,17 +2257,6 @@ export const tools = [
       },
     ],
     uses: ["electrical-power", "power-current-resistance", "transformer"],
-    sim: {
-      engine: "circuitlab",
-      caption:
-        "A cell of emf V feeding a line of resistance R in series with a load chosen to draw P/V; the line's power is read from the simulation.",
-      build: (v, E) =>
-        loop(E, v.V, [
-          ["resistor", { resistance: v.R }],
-          ["resistor", { resistance: Math.max(0, (v.V * v.V) / v.P - v.R) }],
-        ]),
-      watch: { Ploss: (lab) => reading(lab, lab.tags.parts[0], "power") },
-    },
     related: "circuits",
   }),
   tool({
@@ -3291,7 +2269,7 @@ export const tools = [
     latex: "\\varepsilon = NBA\\omega\\sin\\omega t",
     variables: [
       V("emf", "\\varepsilon_{0}", "Peak emf", "V", 0, 1e4, 314),
-      V("N", "N", "Turns", "", 1, 1000, 100),
+      { ...V("N", "N", "Turns", "", 1, 1000, 100), step: 1 },
       V("B", "B", "Magnetic field", "T", 0, 2, 0.1),
       V("A", "A", "Area of the coil", "m²", 0, 1, 0.1),
       V("omega", "\\omega", "Angular speed", "rad/s", 0, 1000, 314),
@@ -3357,5 +2335,33 @@ export const tools = [
 ];
 
 export const toolById = (id) => tools.find((t) => t.id === id) ?? null;
+
+/**
+ * The algebra that makes `unknown` the subject of a tool's equation, one
+ * move at a time: [{ say, latex, equation? }]. Written by hand in explain.js
+ * for equations with sums in them; worked out by algebra.js for products and
+ * quotients. `equation` (when present) can be checked with `holds`.
+ */
+export function rearrangement(tool, unknown) {
+  const info = explain[tool.id] ?? {},
+    symbols = new Map(
+      [...tool.variables, ...tool.constants].map((q) => [q.key, q.latex]),
+    ),
+    symbol = (key) => symbols.get(key),
+    pairs = (list) => list.map(([say, latex]) => ({ say, latex }));
+  if (info.steps?.[unknown]) return pairs(info.steps[unknown]);
+  if (info.subject === unknown)
+    return [
+      {
+        say: `The equation is already written with $${symbol(unknown)}$ by itself on the left, so there is nothing to rearrange.`,
+        latex: null,
+      },
+    ];
+  if (!info.eq) return [];
+  const { steps } = rearrange(info.eq, unknown, symbol);
+  if (info.before && steps.length > 1)
+    steps[0] = { ...steps[0], say: info.before };
+  return [...steps, ...pairs(info.finish?.[unknown] ?? [])];
+}
 // Topics in the order they first appear.
 export const TOPICS = [...new Set(tools.map((t) => t.topic))];

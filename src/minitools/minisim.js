@@ -4,8 +4,12 @@
 // the shared renderer of that tool (src/*/render.js). Only Play/Pause,
 // Restart and the page's sliders; the view fits the scene by itself.
 import { isDark } from "../site/dom.js";
+import { color } from "../site/theme.js";
+import { tidyNumber } from "../site/numbers.js";
 import { styleCanvas } from "../site/canvas-style.js";
 import { reportFrame } from "../site/dev-hooks.js";
+import { startRun } from "./runner.js";
+import { explain } from "./sims.js";
 
 const root = new URL("../../", import.meta.url);
 
@@ -59,17 +63,7 @@ const ENGINES = {
 const sandboxDriver = {
   still: false,
   renderer: (R, ctx, view) => R.createSceneRenderer(ctx, view),
-  // Fixed engine steps of 1/120 s, as many as real time asks for; `after`
-  // runs after each one so that measurements and stops land on a step.
-  advance(model, seconds, after) {
-    const steps = Math.min(16, Math.round(seconds * 120));
-    for (let i = 0; i < steps; i++) {
-      model.step();
-      if (after()) return;
-    }
-  },
-  time: (model) => model.time,
-  draw(model, renderer, view, size, prefs) {
+  draw(model, renderer, view, size, prefs, R, E, ctx) {
     // The region to show: the scene's own, grown to keep every body in view.
     // A strip below the floor holds its metre labels.
     const fit = (model.tags.fit ??= {
@@ -98,16 +92,45 @@ const sandboxDriver = {
       width: size.width,
       height: size.height,
       grid: prefs.grid,
+      locks: false,
       vectors: true,
       iconWeight: prefs.iconWeight,
       angleUnit: prefs.angleUnit,
     });
+    // The path the watched body has taken, so that a curve can be seen
+    // after the body has moved on. Drawing only: nothing is measured from it.
+    const watched = model.tags.ball;
+    if (watched !== undefined && model.objects.has(watched)) {
+      const s = model.state(watched),
+        trail = (model.tags.trail ??= []),
+        last = trail[trail.length - 1];
+      if (!last || Math.hypot(s.x - last[0], s.y - last[1]) * view.scale > 2)
+        trail.push([s.x, s.y]);
+      if (trail.length > 4000) trail.splice(0, trail.length - 4000);
+      if (trail.length > 1) {
+        ctx.save();
+        ctx.strokeStyle = color("vector-velocity", isDark());
+        ctx.globalAlpha = 0.55;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        trail.forEach(([x, y], i) => {
+          const at = renderer.screen({ x, y });
+          if (i) ctx.lineTo(at.x, at.y);
+          else ctx.moveTo(at.x, at.y);
+        });
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
   },
 };
 
 // ---------------------------------------------------------------- orbits
 
-const km = (m) => (m / 1e3).toPrecision(3);
+// Kilometres to three significant figures, written out in full (5000, not
+// 5.00e+3).
+const km = (m) => tidyNumber(Number((m / 1e3).toPrecision(3)), 3);
 const orbitFormat = {
   joined: (pair) => (pair[1] ? pair[0] + " " + pair[1] : pair[0]),
   distance: (m) => [km(m), "km"],
@@ -118,13 +141,6 @@ const orbitFormat = {
 const orbitDriver = {
   still: false,
   renderer: (R, ctx, view) => R.createOrbitRenderer(ctx, view),
-  advance(model, seconds, after, stopAt) {
-    let dt = seconds * model.tags.warp;
-    if (stopAt !== null) dt = Math.min(dt, stopAt - model.time);
-    if (dt > 0) model.advance(dt);
-    after();
-  },
-  time: (model) => model.time,
   draw(model, renderer, view, size, prefs, R, E) {
     const aim = model.tags.aim,
       p = model.preview(aim),
@@ -182,22 +198,18 @@ const fieldDriver = {
   // Nothing moves: the sources are fixed.
   still: true,
   renderer: (R, ctx, view) => R.createFieldRenderer(ctx, view),
-  advance(model, seconds, after) {
-    after();
-  },
-  time: () => 0,
   draw(model, renderer, view, size, prefs, R, E, ctx) {
     const half = model.tags.view,
       state = {
         mode: model.tags.mode,
-        density: 1,
+        density: model.tags.density ?? 1,
         selected: { electric: null, magnetic: null },
         show: {
           lines: true,
           arrows: false,
           equipotentials: false,
-          forces: false,
-          labels: true,
+          forces: !!model.tags.forces,
+          labels: model.tags.labels !== false,
         },
       };
     view.scale = Math.min(size.width, size.height) / (2 * half);
@@ -239,13 +251,6 @@ const fieldDriver = {
 const circuitDriver = {
   still: false,
   renderer: (R, ctx, view) => R.createCircuitRenderer(ctx, view),
-  advance(model, seconds, after, stopAt) {
-    let dt = seconds;
-    if (stopAt !== null) dt = Math.min(dt, stopAt - model.time);
-    if (dt > 0) model.advance(dt);
-    after();
-  },
-  time: (model) => model.time,
   draw(model, renderer, view, size, prefs, R) {
     let minX = Infinity,
       maxX = -Infinity,
@@ -306,63 +311,37 @@ export async function createMiniSim(box, options) {
   const driver = await ENGINES[sim.engine]();
   const view = { scale: 1, x: 0, y: 0, width: 0, height: 0 },
     renderer = driver.renderer(driver.R, ctx, view);
-  let model = null,
-    running = !driver.still,
-    stopped = false,
-    last = 0,
-    measured = null;
+  let run = null,
+    running = !driver.still;
 
-  const watchFor = (unknown) =>
-    typeof sim.watch === "function" ? sim.watch : sim.watch?.[unknown];
-
-  function measure() {
-    const watch = watchFor(options.unknown());
-    if (!model || !watch) return;
-    try {
-      const m = watch(model, options.unknown(), options.values());
-      if (m !== null && m !== undefined) measured = m;
-    } catch {
-      // A measurement that cannot be taken yet stays blank.
-    }
-  }
-  // Stop at the tool's duration or condition: the measurement is then of
-  // that moment, and the scene stays on show.
-  function done() {
-    const v = options.values(),
-      end = sim.duration ? sim.duration(v) : null;
-    return (
-      (end !== null && driver.time(model) >= end - 1e-9) ||
-      !!sim.until?.(model, v)
-    );
-  }
   function setRunning(on) {
     running = on && !driver.still;
     play.textContent = running ? "Pause" : "Play";
     play.setAttribute("aria-pressed", String(!running));
   }
+  // The scene is built, stepped and measured by runner.js, the same code
+  // the tests run.
   function build() {
-    model?.dispose?.();
-    model = null;
-    measured = null;
-    stopped = false;
+    run?.dispose();
+    run = null;
     try {
-      model = sim.build(options.values(), driver.E);
+      run = startRun(sim, driver.E, options.values, options.unknown);
       message.hidden = true;
       canvas.hidden = false;
     } catch (error) {
       message.hidden = false;
       canvas.hidden = true;
-      message.textContent = `The simulation cannot show these values: ${error.message}`;
+      message.textContent = `The simulation cannot show these values: ${explain(error)} The equation above still holds.`;
+      clock.textContent = "";
     }
     setRunning(true);
-    measure();
-    options.onMeasure(measured, !!model);
+    options.onMeasure(run?.measured ?? null, !!run);
   }
 
   play.disabled = driver.still;
   if (driver.still) play.title = "Nothing moves in this scene";
   play.addEventListener("click", () => {
-    if (stopped) build();
+    if (run?.stopped) build();
     else setRunning(!running);
   });
   box.querySelector(".mt-restart").addEventListener("click", () => build());
@@ -372,28 +351,16 @@ export async function createMiniSim(box, options) {
     const elapsed = last ? Math.min((now - last) / 1000, 0.05) : 0,
       began = performance.now();
     last = now;
-    if (model && running && !stopped && elapsed > 0) {
-      const v = options.values(),
-        stopAt = sim.duration ? sim.duration(v) : null;
-      driver.advance(
-        model,
-        elapsed,
-        () => {
-          measure();
-          if (done()) {
-            stopped = true;
-            setRunning(false);
-            play.textContent = "Play again";
-            return true;
-          }
-          return false;
-        },
-        stopAt,
-      );
+    if (run && running && !run.stopped && elapsed > 0) {
+      run.advance(elapsed);
+      if (run.stopped) {
+        setRunning(false);
+        play.textContent = "Play again";
+      }
     }
     const r = canvas.getBoundingClientRect(),
       dpr = window.devicePixelRatio || 1;
-    if (model && r.width > 0) {
+    if (run && r.width > 0) {
       if (
         canvas.width !== Math.round(r.width * dpr) ||
         canvas.height !== Math.round(r.height * dpr)
@@ -405,7 +372,7 @@ export async function createMiniSim(box, options) {
       ctx.clearRect(0, 0, r.width, r.height);
       try {
         driver.draw(
-          model,
+          run.model,
           renderer,
           view,
           { width: r.width, height: r.height },
@@ -418,13 +385,24 @@ export async function createMiniSim(box, options) {
         message.hidden = false;
         message.textContent = `The simulation could not be drawn: ${error.message}`;
       }
-      if (!driver.still)
-        clock.textContent = `t = ${formatTime(driver.time(model))}`;
+      if (!driver.still) {
+        // Slow things are played faster than life and quick things slower;
+        // the clock is the simulation's own.
+        const rate = run.speed(),
+          pace =
+            Math.abs(rate - 1) < 0.05
+              ? ""
+              : rate > 1
+                ? ` · played ${Number(rate.toPrecision(2))}× faster`
+                : ` · played ${Number((1 / rate).toPrecision(2))}× slower`;
+        clock.textContent = `t = ${formatTime(run.time())}${pace}`;
+      }
     }
-    options.onMeasure(measured, !!model);
+    options.onMeasure(run?.measured ?? null, !!run);
     reportFrame({ ms: performance.now() - began });
     requestAnimationFrame(frame);
   }
+  let last = 0;
   build();
   requestAnimationFrame(frame);
   return { rebuild: build };

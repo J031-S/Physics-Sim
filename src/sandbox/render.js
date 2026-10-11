@@ -292,6 +292,9 @@ export function createSceneRenderer(ctx, view) {
   function drawScene(sim, options) {
     const o = {
         grid: true,
+        // The pin and no-turn marks on locked bodies (off in the minitools,
+        // where nothing can be unlocked).
+        locks: true,
         vectors: false,
         forceVectors: false,
         highlighted: () => false,
@@ -495,7 +498,7 @@ export function createSceneRenderer(ctx, view) {
           p.y + 20,
         );
       }
-      if (body.lockPosition || body.lockRotation)
+      if (o.locks && (body.lockPosition || body.lockRotation))
         lockGlyph(
           body,
           p,

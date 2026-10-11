@@ -1,7 +1,7 @@
-// Minitools: structure only. Every entry is complete and self-consistent,
-// every mini simulation builds at its defaults with the real engine, and the
-// stub pages match the catalogue. Numbers are checked against textbook
-// values in the physics review, not here.
+// Minitools: every entry is complete and self-consistent, every unknown has
+// its rearranging steps (each worked-out line checked with numbers), every
+// mini simulation is run with the real engine and compared with its formula
+// at the defaults, and the stub pages match the catalogue.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
@@ -185,4 +185,77 @@ test("the stub pages match the catalogue", async () => {
       text,
       `${name} is out of date: run npm run pages`,
     );
+});
+
+// ---------------------------------------------------------------------------
+// Explanations, and the mini simulations against their formulas.
+
+test("every tool says where its equation comes from, with one change a step", () => {
+  for (const t of tools) {
+    assert.ok(t.derivation.length >= 3, `${t.id}: at least three steps`);
+    for (const step of t.derivation) {
+      assert.ok(step.say.length > 8, `${t.id}: a step without a reason`);
+      assert.ok(step.latex, `${t.id}: a step without its equation`);
+      assert.equal(step.say.split("$").length % 2, 1, `${t.id}: unpaired $`);
+    }
+  }
+});
+
+test("every unknown has its rearranging steps, and each worked-out line is true", async () => {
+  const { rearrangement } = await import("../src/minitools/catalogue.js"),
+    { holds } = await import("../src/minitools/algebra.js");
+  let checked = 0;
+  for (const t of tools)
+    for (const key of t.solveFor) {
+      const v = Object.fromEntries([
+        ...t.variables.map((q) => [q.key, q.value]),
+        ...t.constants.map((c) => [c.key, c.value]),
+      ]);
+      v[key] = t.solve[key](v);
+      const steps = rearrangement(t, key);
+      assert.ok(steps.length >= 1, `${t.id}, ${key}: no steps`);
+      for (const step of steps) {
+        assert.equal(step.say.split("$").length % 2, 1, `${t.id}: unpaired $`);
+        if (!step.equation) continue;
+        checked++;
+        // The tool's own numbers must satisfy every line of the algebra.
+        assert.ok(holds(step.equation, v), `${t.id}, ${key}: ${step.latex}`);
+      }
+    }
+  assert.ok(checked > 300, `only ${checked} lines were checked`);
+});
+
+test("each mini simulation measures what its formula gives, at the defaults", async () => {
+  const { startRun } = await import("../src/minitools/runner.js");
+  // What is left is real: plates of finite width (0.1%), a pendulum's swing
+  // of 5° (0.05%), and the sandbox's step of 1/120 s.
+  const TOLERANCE = 2e-3;
+  let compared = 0;
+  for (const t of tools.filter((t) => t.sim))
+    for (const key of t.solveFor) {
+      if (!t.sim.watch?.[key]) continue;
+      const v = Object.fromEntries([
+        ...t.variables.map((q) => [q.key, q.value]),
+        ...t.constants.map((c) => [c.key, c.value]),
+      ]);
+      v[key] = t.solve[key](v);
+      const run = startRun(t.sim, engines[t.sim.engine], () => v, () => key);
+      for (let s = 0; s < 60 && !run.stopped && !run.still; s += 1 / 60) {
+        run.advance(1 / 60);
+        if (run.measured !== null && !t.sim.duration && !t.sim.until) break;
+      }
+      // Orbits and oscillations report once a turn is complete.
+      for (let s = 0; s < 60 && run.measured === null && !run.stopped; s += 1 / 60)
+        run.advance(1 / 60);
+      const m = run.measured,
+        value = m && typeof m === "object" ? m.value : m;
+      run.dispose();
+      assert.ok(Number.isFinite(value), `${t.id}, ${key}: nothing measured`);
+      assert.ok(
+        Math.abs(value - v[key]) <= TOLERANCE * Math.abs(v[key]),
+        `${t.id}, ${key}: measured ${value}, formula ${v[key]}`,
+      );
+      compared++;
+    }
+  assert.ok(compared >= 60, `only ${compared} compared`);
 });
