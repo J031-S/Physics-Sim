@@ -275,12 +275,31 @@ const fieldDriver = {
 
 // ---------------------------------------------------------------- circuits
 
+const DOT_SPEED = 3.2; // grid squares a second, as on the circuits page
+
 const circuitDriver = {
   still: false,
   // A circuit has no velocity or force arrows.
   arrows: () => ({ velocity: false, force: false }),
   renderer: (R, ctx, view) => R.createCircuitRenderer(ctx, view),
-  draw(model, renderer, view, size, prefs, R) {
+  draw(model, renderer, view, size, prefs, R, E, ctx, shown) {
+    // The current dots flow as on the circuits page: the largest current
+    // seen in this scene moves DOT_SPEED squares a second of playing time,
+    // the others in proportion, and never more than half a gap in a frame.
+    const solution = model.solve(),
+      runs = R.dotRuns(model, solution),
+      phase = (model.tags.phase ??= new Map());
+    let peak = model.tags.peak ?? 0;
+    for (const run of runs) peak = Math.max(peak, Math.abs(run.current));
+    model.tags.peak = peak;
+    if (peak > 0 && shown.elapsed > 0) {
+      const step = Math.min(DOT_SPEED * shown.elapsed, 0.45 * R.DOT_SPACING);
+      for (const run of runs)
+        phase.set(
+          run.key,
+          (phase.get(run.key) || 0) + (step * run.current) / peak,
+        );
+    }
     let minX = Infinity,
       maxX = -Infinity,
       minY = Infinity,
@@ -303,7 +322,7 @@ const circuitDriver = {
     view.height = size.height;
     renderer.drawScene(model, {
       colours: R.circuitPalette(isDark()),
-      solution: model.solve(),
+      solution,
       grid: prefs.grid,
       selected: null,
       labels: view.scale >= 24,
@@ -311,7 +330,7 @@ const circuitDriver = {
       ac: false,
       current: true,
       electrons: false,
-      phase: (model.tags.phase ??= new Map()),
+      phase,
     });
   },
 };
@@ -357,8 +376,11 @@ export async function createMiniSim(box, options) {
   const driver = await ENGINES[sim.engine]();
   const view = { scale: 1, x: 0, y: 0, width: 0, height: 0 },
     renderer = driver.renderer(driver.R, ctx, view);
+  // Nothing moves until Play is pressed; after that, changing a value
+  // restarts the scene playing, and Pause holds it across changes too.
   let run = null,
-    running = !driver.still;
+    wanted = false,
+    running = false;
 
   function setRunning(on) {
     running = on && !driver.still;
@@ -383,24 +405,29 @@ export async function createMiniSim(box, options) {
       message.textContent = `The simulation cannot show these values: ${explain(error)} The equation above still holds.`;
       clock.textContent = "";
     }
-    setRunning(true);
+    setRunning(wanted);
     options.onMeasure(run?.measured ?? null, !!run);
   }
 
   play.disabled = driver.still;
   if (driver.still) play.title = "Nothing moves in this scene";
   play.addEventListener("click", () => {
+    wanted = run?.stopped ? true : !running;
     if (run?.stopped) build();
-    else setRunning(!running);
+    else setRunning(wanted);
   });
-  box.querySelector(".mt-restart").addEventListener("click", () => build());
+  box.querySelector(".mt-restart").addEventListener("click", () => {
+    wanted = true;
+    build();
+  });
 
   function frame(now) {
     if (!box.isConnected) return;
     const elapsed = last ? Math.min((now - last) / 1000, 0.05) : 0,
       began = performance.now();
     last = now;
-    if (run && running && !run.stopped && elapsed > 0) {
+    const playing = run && running && !run.stopped && elapsed > 0;
+    if (playing) {
       run.advance(elapsed);
       if (run.stopped) {
         setRunning(false);
@@ -432,6 +459,8 @@ export async function createMiniSim(box, options) {
           {
             velocity: toggles.velocity.querySelector("input").checked,
             force: toggles.force.querySelector("input").checked,
+            // Real seconds of playing in this frame.
+            elapsed: playing ? elapsed : 0,
           },
         );
       } catch (error) {

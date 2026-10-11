@@ -24,7 +24,10 @@ export function toolCard(tool) {
   card.querySelector(".mt-card-kind").textContent =
     tool.kind === "combined" ? "Combination" : "One equation";
   card.querySelector(".mt-card-title").textContent = tool.title;
-  card.querySelector(".mt-card-equation").dataset.math = tool.latex;
+  // Full-size fractions and roots, as on the tool's own page (the box in
+  // minitools.css is sized for them).
+  card.querySelector(".mt-card-equation").dataset.math =
+    "\\displaystyle " + tool.latex;
   card.querySelector(".mt-card-purpose").textContent = tool.purpose;
   return card;
 }

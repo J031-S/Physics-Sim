@@ -69,7 +69,7 @@
 }
 .mt-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
   gap: 12px;
 }
 
@@ -104,11 +104,18 @@
 .mt-card-title {
   font-size: 15px;
 }
+/* Every card's equation is set at one size, in a box tall enough for the
+   tallest (a fraction with a root or powers in it) and, at the narrowest
+   card, wide enough for the widest (the collision formula), so that none is
+   cut off and the text below lines up from card to card. */
 .mt-card-equation {
-  min-height: 2.2em;
-  font-size: 14px;
-  overflow-x: auto;
-  overflow-y: hidden;
+  display: flex;
+  align-items: center;
+  height: 64px;
+  overflow: visible;
+}
+.mt-card-equation .katex {
+  font-size: 16px;
 }
 .mt-card-purpose {
   font-size: 12.5px;
