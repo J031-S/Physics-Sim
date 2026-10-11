@@ -61,5 +61,50 @@ search.addEventListener("input", filter);
 topic.addEventListener("change", filter);
 for (const radio of document.querySelectorAll('input[name="tool-kind"]'))
   radio.addEventListener("change", filter);
+
+// Coming back with a tool's "All minitools" button returns to where the
+// catalogue was left: the same filters and the same scroll position. The
+// place is kept for this tab only (sessionStorage), written on leaving, and
+// used once, only when that button asked for it; opening the catalogue any
+// other way starts at the top.
+const PLACE = "physium-catalogue-place";
+function place() {
+  try {
+    return JSON.parse(sessionStorage.getItem(PLACE)) ?? {};
+  } catch {
+    return {};
+  }
+}
+const left = place();
+if (left.back) {
+  search.value = left.search ?? "";
+  if ([...topic.options].some((o) => o.value === left.topic))
+    topic.value = left.topic;
+  const radio = document.querySelector(
+    `input[name="tool-kind"][value="${CSS.escape(left.kind ?? "all")}"]`,
+  );
+  if (radio) radio.checked = true;
+}
 filter();
 renderAllMath(list);
+if (left.back) {
+  // The cards have a fixed height for their equations, so the page is its
+  // full length before the equations are typeset.
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  window.scrollTo(0, left.y ?? 0);
+}
+window.addEventListener("pagehide", () => {
+  try {
+    sessionStorage.setItem(
+      PLACE,
+      JSON.stringify({
+        y: window.scrollY,
+        search: search.value,
+        topic: topic.value,
+        kind: document.querySelector('input[name="tool-kind"]:checked').value,
+      }),
+    );
+  } catch {
+    // Without storage the catalogue simply opens at the top.
+  }
+});

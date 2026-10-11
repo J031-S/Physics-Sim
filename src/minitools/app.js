@@ -31,6 +31,18 @@ const id = decodeURIComponent(
 );
 const tool = toolById(id),
   main = $("minitool");
+// The "All minitools" button asks the catalogue to open where it was left
+// (see index.js).
+main.addEventListener("click", (e) => {
+  if (!e.target.closest(".mt-back a")) return;
+  try {
+    const key = "physium-catalogue-place",
+      left = JSON.parse(sessionStorage.getItem(key)) ?? {};
+    sessionStorage.setItem(key, JSON.stringify({ ...left, back: true }));
+  } catch {
+    // Without storage the catalogue opens at the top.
+  }
+});
 
 // A sentence that may hold mathematics between $ signs, typeset in place.
 function say(element, text) {
