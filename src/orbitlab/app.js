@@ -1,8 +1,8 @@
+import { $, isDark, showToast } from "../site/dom.js";
 // Orbits & gravitation page: canvas drawing, pointer and keyboard input,
 // panels, the frame loop. All physics lives in model.js.
-import { setupPreferences } from "../preferences.js";
-import { setupNav } from "../nav.js";
-import { setPlaybackIcon } from "../icons.js";
+import { setupSite } from "../site/shell.js";
+import { setPlaybackIcon } from "../site/icons.js";
 import {
   OrbitLab,
   BODIES,
@@ -15,11 +15,9 @@ import {
 import { presets } from "./presets.js";
 import { setupSceneFiles } from "../scene-file.js";
 
-const $ = (id) => document.getElementById(id),
-  canvas = $("canvas"),
+const canvas = $("canvas"),
   ctx = canvas.getContext("2d");
-setupNav();
-const prefs = setupPreferences($);
+const prefs = setupSite();
 const lab = new OrbitLab();
 
 const TAU = 2 * Math.PI,
@@ -64,7 +62,6 @@ const state = {
 };
 let last = 0,
   drag = null,
-  toastTimer,
   ghost = null, // preview of the next launch, rebuilt when it changes
   fitted = false,
   previewTheme = null;
@@ -74,11 +71,7 @@ const rows = []; // form rows, each with a sync()
 // ---------------------------------------------------------------- helpers
 
 function toast(message) {
-  const el = $("toast");
-  el.textContent = message;
-  el.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove("show"), 3600);
+  showToast(message, 3600);
 }
 function attempt(fn) {
   try {
@@ -105,7 +98,6 @@ function capture(e) {
 }
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const tidy = (v, places = 4) => String(Number(v.toFixed(places)));
-const isDark = () => document.documentElement.dataset.theme === "dark";
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 function put(el, text) {
   if (el.textContent !== text) el.textContent = text;

@@ -1,4 +1,4 @@
-import { iconSets } from "../vendor/icons/sets.js";
+import { iconSets } from "../../vendor/icons/sets.js";
 export const iconSetNames = Object.keys(iconSets);
 export function renderIcons(set = "material") {
   const icons = iconSets[set] || iconSets.material;

@@ -1,12 +1,12 @@
-// Drives the real orbits.html through happy-dom with a stubbed canvas
+// Drives the real sims/Orbits.html through happy-dom with a stubbed canvas
 // context. It checks controls, readouts and model state as shown on the
 // page; it cannot see pixels.
 import { Window } from "happy-dom";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
-const window = new Window({ url: "http://localhost:3000/orbits.html" });
+const window = new Window({ url: "http://localhost:3000/sims/Orbits" });
 window.document.write(
-  await readFile(new URL("../orbits.html", import.meta.url), "utf8"),
+  await readFile(new URL("../sims/Orbits.html", import.meta.url), "utf8"),
 );
 globalThis.document = window.document;
 globalThis.window = window;
@@ -110,7 +110,9 @@ assert.equal($("nav-menu").hidden, false);
 const links = [...$("nav-menu").querySelectorAll("a")];
 assert.deepEqual(
   links.map((a) => a.getAttribute("href")),
-  ["./", "fields.html", "orbits.html", "circuits.html"],
+  ["Mechanics", "EMFields", "Orbits", "Circuits"].map(
+    (name) => new URL("../sims/" + name, import.meta.url).href,
+  ),
 );
 assert.equal(links[2].getAttribute("aria-current"), "page");
 nav.click();

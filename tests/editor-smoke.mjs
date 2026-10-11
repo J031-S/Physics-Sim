@@ -3,9 +3,9 @@ import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import Matter from "../vendor/matter.js";
 import { presets } from "../src/presets.js";
-const window = new Window({ url: "http://localhost:3000" });
+const window = new Window({ url: "http://localhost:3000/sims/Mechanics" });
 window.document.write(
-  await readFile(new URL("../index.html", import.meta.url), "utf8"),
+  await readFile(new URL("../sims/Mechanics.html", import.meta.url), "utf8"),
 );
 for (const key of ["document"]) globalThis[key] = window[key];
 globalThis.window = window;
@@ -717,7 +717,7 @@ assert.equal(document.documentElement.dataset.theme, "dark");
 change($("ui-size"), "125", "input");
 assert.equal($("ui-size-value").textContent, "125%");
 assert.equal(
-  JSON.parse(window.localStorage.getItem("physics-sim-ui")).size,
+  JSON.parse(window.localStorage.getItem("physium-ui")).size,
   125,
 );
 $("close-settings").click();
@@ -785,7 +785,7 @@ for (const name of ["lucide", "tabler", "material"]) {
   assert.equal($("pause").textContent, "Run");
   assert.ok($("pause").querySelector("svg"));
   assert.equal(
-    JSON.parse(window.localStorage.getItem("physics-sim-ui")).iconSet,
+    JSON.parse(window.localStorage.getItem("physium-ui")).iconSet,
     name,
   );
   for (const button of document.querySelectorAll("[data-icon]"))

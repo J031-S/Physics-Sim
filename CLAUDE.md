@@ -2,7 +2,7 @@
 
 Interactive 2D mechanics and electromagnetism sandbox for teaching high-school / introductory physics (kinematics, forces, springs, pulleys, electric and magnetic fields). Students use it to check their intuition against "what really happens", so **physical correctness matters more than visual polish**: a result that looks plausible but disagrees with the textbook formula is a bug.
 
-The site has four pages, switched from the drop-down at the left of the top bar (`src/nav.js`): the mechanics sandbox (`index.html`), the electric & magnetic fields tool (`fields.html`, code in `src/fieldlab/`), the orbits & gravitation tool (`orbits.html`, code in `src/orbitlab/`) and the electric circuits tool (`circuits.html`, code in `src/circuitlab/`). Most of this file is about the sandbox; the other three tools each have their own section below.
+The site has four simulation pages, switched from the drop-down at the left of the top bar: the mechanics sandbox (`/sims/Mechanics`, file `sims/Mechanics.html`), the electric & magnetic fields tool (`/sims/EMFields`, code in `src/fieldlab/`), the orbits & gravitation tool (`/sims/Orbits`, code in `src/orbitlab/`) and the electric circuits tool (`/sims/Circuits`, code in `src/circuitlab/`). See "Pages, addresses and the site shell" below. Most of this file is about the sandbox; the other three tools each have their own section below.
 
 `README.md` is the user-facing manual (controls, feature behaviour, model assumptions). Keep it in sync when behaviour changes.
 
@@ -17,42 +17,63 @@ node --test tests/wedge.test.mjs                       # one file
 node --test --test-name-pattern="Atwood" tests/*.test.mjs   # one test
 ```
 
-Run `npm run check && npm test` before finishing any change. Run `npm run test:ui` as well when touching `src/app.js`, `index.html`, `fields.html`, `src/fieldlab/app.js`, `orbits.html`, `src/orbitlab/app.js`, `circuits.html`, `src/circuitlab/app.js`, or anything a control binds to. Node 20.11+.
+Run `npm run check && npm test` before finishing any change. Run `npm run test:ui` as well when touching any page under `sims/`, `src/site/`, an `app.js`, or anything a control binds to. Node 20.11+.
 
 ## Architecture
 
-No bundler, no framework, no runtime dependencies. `index.html` loads `vendor/matter.js` (Matter.js 0.20.0, UMD, sets `globalThis.Matter`) and then `src/app.js` as an ES module. Opening via `file://` does not work.
+No bundler, no framework, no runtime dependencies. `sims/Mechanics.html` loads `vendor/matter.js` (Matter.js 0.20.0, UMD, sets `globalThis.Matter`) and then `src/app.js` as an ES module. Opening via `file://` does not work.
 
-| File | Owns |
-| --- | --- |
-| `src/physics.js` | `Sandbox`: bodies, global settings, locks, grab/throw, resize, springs, rods, spring guides, the fixed-step `step()` |
-| `src/contacts.js` | Contact response: Coulomb friction, restitution, exact circle contact. Replaces Matter's velocity resolver; runs a resting-contact pass before `Engine.update` |
-| `src/presets.js` | Ready-made experiment scenes, each built through the public `Sandbox` API and checked against its textbook result in `tests/scenes.test.mjs` |
-| `src/fields.js` | Field regions, gradient profiles, superposition, Lorentz velocity update, pairwise Coulomb forces |
-| `src/mechanisms.js` | Belts, conveyor contact, delegation to pulley cables |
-| `src/pulley.js` | Tangent cable geometry and the coupled position/velocity cable solver |
-| `src/group-move.js` | Layout translation of connected assemblies (Select tool) |
-| `src/field-view.js` | Field rendering and field drag/rotate/resize gestures |
-| `src/app.js` | Canvas drawing, pointer/keyboard input, menus, settings panel, the `requestAnimationFrame` loop |
-| `src/preferences.js`, `src/icons.js` | Persistent website preferences (localStorage key `physics-sim-ui`), icon sets. Shared by every page, so every control they touch is optional |
-| `src/scene-format.js` | The file format name of each tool and `checkFormat`, which every loader calls first (a file from another tool is refused by name). No DOM |
-| `src/scene-file.js` | The Save scene / Load scene buttons shared by the fields, orbits and circuits pages (`#save-scene`, `#load-scene`, `#scene-file`) |
-| `src/nav.js` | The drop-down of links that switches between the pages. The links themselves are written out in each page's HTML: a new page is added to all of them |
-| `src/fieldlab/model.js` | `FieldLab`: sources, E, V, B, A_z, forces, field-line tracing, contours. No DOM |
-| `src/fieldlab/presets.js` | Field arrangements with the textbook result each one shows |
-| `src/fieldlab/arrows.js` | Where the direction arrows sit on a field line. No DOM |
-| `src/fieldlab/app.js` | The fields page: drawing, input, panels |
-| `src/orbitlab/model.js` | `OrbitLab`: central body, satellites, the leapfrog integrator, orbital elements from the state vector, predicted paths, swept areas, third-law points. No DOM |
-| `src/orbitlab/presets.js` | Ready-made launches with the textbook result each one shows |
-| `src/orbitlab/app.js` | The orbits page: drawing, input, panels, graphs, the frame loop |
-| `src/circuitlab/model.js` | `CircuitLab`: components on a grid, modified nodal analysis, the linear solver, capacitor time stepping, fault detection. No DOM |
-| `src/circuitlab/presets.js` | Ready-made circuits with the readings each one should show |
-| `src/circuitlab/app.js` | The circuits page: drawing, input, panels, graphs, the frame loop |
-| `assets/logo.svg` | The Physium mark: the `\varphi` outline from KaTeX's Math Italic font, filled with `currentColor`. Used for the header mark (as a CSS mask), the favicon and the homepage hero |
-| `server.mjs` | Tiny static server for local use only |
-| `vendor/` | Third-party code and licences. Do not edit `vendor/matter.js` |
+| File                                           | Owns                                                                                                                                                                                                                                                                                                        |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/physics.js`                               | `Sandbox`: bodies, global settings, locks, grab/throw, resize, springs, rods, spring guides, the fixed-step `step()`                                                                                                                                                                                        |
+| `src/contacts.js`                              | Contact response: Coulomb friction, restitution, exact circle contact. Replaces Matter's velocity resolver; runs a resting-contact pass before `Engine.update`                                                                                                                                              |
+| `src/presets.js`                               | Ready-made experiment scenes, each built through the public `Sandbox` API and checked against its textbook result in `tests/scenes.test.mjs`                                                                                                                                                                |
+| `src/fields.js`                                | Field regions, gradient profiles, superposition, Lorentz velocity update, pairwise Coulomb forces                                                                                                                                                                                                           |
+| `src/mechanisms.js`                            | Belts, conveyor contact, delegation to pulley cables                                                                                                                                                                                                                                                        |
+| `src/pulley.js`                                | Tangent cable geometry and the coupled position/velocity cable solver                                                                                                                                                                                                                                       |
+| `src/group-move.js`                            | Layout translation of connected assemblies (Select tool)                                                                                                                                                                                                                                                    |
+| `src/field-view.js`                            | Field rendering and field drag/rotate/resize gestures                                                                                                                                                                                                                                                       |
+| `src/app.js`                                   | Canvas drawing, pointer/keyboard input, menus, settings panel, the `requestAnimationFrame` loop                                                                                                                                                                                                             |
+| `src/site/pages.js`                            | The one list of pages: id, address, file, title, description, group (home, simulation, minitools); old addresses and `findPage` for the 404 page. No DOM                                                                                                                                                    |
+| `src/site/shell.js`                            | `setupSite()`: builds the header brand, the navigation drop-down and the Website settings section into each page's placeholders, sets up navigation and preferences, and returns the preferences. Works out the site root from its own `import.meta.url`, so every link is independent of the page's folder |
+| `src/site/preferences.js`, `src/site/icons.js` | Website preferences (localStorage key `physium-ui`; the old `physics-sim-ui` key is read once) and icon sets                                                                                                                                                                                                |
+| `src/site/nav.js`                              | Keyboard and pointer behaviour of the navigation drop-down (the links come from `pages.js`)                                                                                                                                                                                                                 |
+| `src/site/dom.js`                              | `$`, `isDark`, `showToast`: helpers the pages used to define for themselves                                                                                                                                                                                                                                 |
+| `src/site/not-found.js`, `404.html`            | The page-not-found page: redirects a request that names a page in another case, with `.html`, or by an old address; otherwise shows "page not found" in the shell                                                                                                                                           |
+| `src/scene-format.js`                          | The file format name of each tool and `checkFormat`, which every loader calls first (a file from another tool is refused by name). No DOM                                                                                                                                                                   |
+| `src/scene-file.js`                            | The Save scene / Load scene buttons shared by the fields, orbits and circuits pages (`#save-scene`, `#load-scene`, `#scene-file`)                                                                                                                                                                           |
+| `src/fieldlab/model.js`                        | `FieldLab`: sources, E, V, B, A_z, forces, field-line tracing, contours. No DOM                                                                                                                                                                                                                             |
+| `src/fieldlab/presets.js`                      | Field arrangements with the textbook result each one shows                                                                                                                                                                                                                                                  |
+| `src/fieldlab/arrows.js`                       | Where the direction arrows sit on a field line. No DOM                                                                                                                                                                                                                                                      |
+| `src/fieldlab/app.js`                          | The fields page: drawing, input, panels                                                                                                                                                                                                                                                                     |
+| `src/orbitlab/model.js`                        | `OrbitLab`: central body, satellites, the leapfrog integrator, orbital elements from the state vector, predicted paths, swept areas, third-law points. No DOM                                                                                                                                               |
+| `src/orbitlab/presets.js`                      | Ready-made launches with the textbook result each one shows                                                                                                                                                                                                                                                 |
+| `src/orbitlab/app.js`                          | The orbits page: drawing, input, panels, graphs, the frame loop                                                                                                                                                                                                                                             |
+| `src/circuitlab/model.js`                      | `CircuitLab`: components on a grid, modified nodal analysis, the linear solver, capacitor time stepping, fault detection. No DOM                                                                                                                                                                            |
+| `src/circuitlab/presets.js`                    | Ready-made circuits with the readings each one should show                                                                                                                                                                                                                                                  |
+| `src/circuitlab/app.js`                        | The circuits page: drawing, input, panels, graphs, the frame loop                                                                                                                                                                                                                                           |
+| `assets/logo.svg`                              | The Physium mark: the `\varphi` outline from KaTeX's Math Italic font, filled with `currentColor`. Used for the header mark (as a CSS mask), the favicon and the homepage hero                                                                                                                              |
+| `server.mjs`                                   | Tiny static server for local use only                                                                                                                                                                                                                                                                       |
+| `vendor/`                                      | Third-party code and licences. Do not edit `vendor/matter.js`                                                                                                                                                                                                                                               |
 
 `Sandbox` has no DOM dependency: everything physical must stay testable from Node by importing `src/physics.js` after setting `globalThis.Matter`. Keep DOM and canvas code in `app.js` / `field-view.js`.
+
+## Pages, addresses and the site shell
+
+The site is served by GitHub Pages at `https://physium.j031.dev` (the `CNAME` file; `.nojekyll` stops Jekyll processing). **No address ever ends in `.html`**: GitHub Pages serves `sims/Mechanics.html` at `/sims/Mechanics`, and `server.mjs` does the same locally (the path, then the path plus `.html`, then a folder's `index.html` after adding the trailing slash, otherwise `404.html` with status 404). Addresses are case-sensitive, as on GitHub Pages; `404.html` redirects a wrong case, a trailing `.html` and the old addresses (`fields.html` and so on).
+
+| Page                       | Address           | File                   |
+| -------------------------- | ----------------- | ---------------------- |
+| Homepage                   | `/`               | `index.html`           |
+| Mechanics sandbox          | `/sims/Mechanics` | `sims/Mechanics.html`  |
+| Electric & magnetic fields | `/sims/EMFields`  | `sims/EMFields.html`   |
+| Orbits & gravitation       | `/sims/Orbits`    | `sims/Orbits.html`     |
+| Electric circuits          | `/sims/Circuits`  | `sims/Circuits.html`   |
+| Minitool catalogue         | `/minitools/`     | `minitools/index.html` |
+
+- Every page has the placeholders `<a class="brand"></a>`, `<nav class="site-nav"></nav>` and `<details id="website-settings" class="settings-section">` (with `open` if the section should start open), sets `<body data-page="<id from pages.js>">`, and calls `setupSite()` at the top of its script, before anything looks up a control. The Website section is identical on every page; a control with no effect on a page still appears there. Page-specific settings (such as the fields page's Snapping) live in the page's own sections.
+- Links are built from `siteRoot` in `shell.js`, never written into the HTML. Stylesheets and scripts in a page use relative paths (`../styles.css`); only `404.html` uses root paths, because GitHub Pages serves it at whatever address was missed.
+- **Adding a page** means adding one entry to `src/site/pages.js` and the HTML file with the placeholders. `tests/site-smoke.mjs` loads every page and checks the shell is the same on each.
 
 ## Units and conventions (easy to get wrong)
 
@@ -101,7 +122,7 @@ The sources are static and the canvas is redrawn on change. The one thing integr
 
 ## Orbits tool (`src/orbitlab/`)
 
-One fixed central body and up to 8 satellites of negligible mass under `F = GMm/r²`. `OrbitLab` is independent of `Sandbox`, `FieldLab` and Matter. `orbits.html` loads `styles.css`, then `fields.css` for the shared `.fl-*` panel pieces, then `orbits.css`.
+One fixed central body and up to 8 satellites of negligible mass under `F = GMm/r²`. `OrbitLab` is independent of `Sandbox`, `FieldLab` and Matter. `sims/Orbits.html` loads `styles.css`, then `fields.css` for the shared `.fl-*` panel pieces, then `orbits.css`.
 
 - The model is **SI throughout** (m, kg, s, J), y up, anticlockwise positive, `G = 6.674e-11`. `app.js` converts to km, km/s, minutes/hours/days and prefixed joules for display; the forms there mirror `LIMITS` in `model.js`. The scene is ~10⁷ m across, so the view scale is pixels per metre of order 10⁻⁵.
 - The launch point is on +y at distance `radius` from the centre; `angle` is the velocity's direction above the local horizontal, which there is +x. A horizontal launch therefore goes **clockwise** and has negative angular momentum; the page shows its magnitude.
@@ -118,7 +139,7 @@ One fixed central body and up to 8 satellites of negligible mass under `F = GMm/
 
 ## Circuits tool (`src/circuitlab/`)
 
-DC and AC circuits of ideal components, solved exactly at each instant and stepped in time. `CircuitLab` is independent of `Sandbox`, `FieldLab`, `OrbitLab` and Matter. `circuits.html` loads `styles.css`, then `fields.css` for the shared `.fl-*` pieces (toolbar, view buttons, forms), then `circuits.css`.
+DC and AC circuits of ideal components, solved exactly at each instant and stepped in time. `CircuitLab` is independent of `Sandbox`, `FieldLab`, `OrbitLab` and Matter. `sims/Circuits.html` loads `styles.css`, then `fields.css` for the shared `.fl-*` pieces (toolbar, view buttons, forms), then `circuits.css`.
 
 - The model is **SI throughout** (V, A, Ω, F, s, W, J, C). `app.js` formats with prefixes (`si`, four significant figures); its `FIELDS` mirror `LIMITS` in `model.js`.
 - **Every number on the page comes from `lab.solve()`** (a `Solution`: `status`, `problems`, `notices`, and a reading for each component). Do not compute a current or p.d. in `app.js`.
@@ -155,7 +176,7 @@ DC and AC circuits of ideal components, solved exactly at each instant and stepp
 - Tests are numerical regressions: build a scene, `run(s, seconds)`, compare against the **analytic** result with a stated tolerance. New physics needs a test of this kind, checked against the textbook formula rather than against whatever the engine currently outputs.
 - Each test creates its own `Sandbox` and calls `s.dispose()`.
 - When fixing a realism bug, add the failing analytic case first.
-- `tests/editor-smoke.mjs` drives the real `index.html` through happy-dom with a stubbed canvas context. It cannot see pixels, so describe any visual change you could not verify.
+- `tests/editor-smoke.mjs` drives the real `sims/Mechanics.html` through happy-dom with a stubbed canvas context. It cannot see pixels, so describe any visual change you could not verify.
 
 ## Known physics gaps
 

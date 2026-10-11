@@ -1,24 +1,16 @@
+import { $, isDark, showToast } from "../site/dom.js";
 // Electric circuits page: canvas drawing, pointer and keyboard input,
 // panels, graphs, the frame loop. All physics lives in model.js: every
 // number shown here is read from `lab.solve()`.
-import { setupPreferences } from "../preferences.js";
-import { setupNav } from "../nav.js";
-import { setPlaybackIcon } from "../icons.js";
-import {
-  CircuitLab,
-  KINDS,
-  LIMITS,
-  STEPS_PER_TAU,
-  turnsOf,
-} from "./model.js";
+import { setupSite } from "../site/shell.js";
+import { setPlaybackIcon } from "../site/icons.js";
+import { CircuitLab, KINDS, LIMITS, STEPS_PER_TAU, turnsOf } from "./model.js";
 import { presets } from "./presets.js";
 import { setupSceneFiles } from "../scene-file.js";
 
-const $ = (id) => document.getElementById(id),
-  canvas = $("canvas"),
+const canvas = $("canvas"),
   ctx = canvas.getContext("2d");
-setupNav();
-const prefs = setupPreferences($);
+const prefs = setupSite();
 
 // One circuit for each view of the page, "dc" and "ac", switched by
 // `setMode` as on the fields page. A view has its own circuit, its own
@@ -63,7 +55,6 @@ let last = 0,
   // or its file's). The dots move at their standard speed at this scale,
   // and faster or slower in step with the time scale from there.
   bases = { dc: 1, ac: 0.02 },
-  toastTimer,
   fitted = false,
   previewTheme = null,
   budget = 2000, // time steps allowed in one frame
@@ -284,14 +275,7 @@ const OHMS = [
 // ---------------------------------------------------------------- helpers
 
 function toast(message, long) {
-  const el = $("toast");
-  el.textContent = message;
-  el.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(
-    () => el.classList.remove("show"),
-    long ? 9000 : 3200,
-  );
+  showToast(message, long ? 9000 : 3200);
 }
 function attempt(fn) {
   try {
@@ -319,7 +303,6 @@ function capture(e) {
 }
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const tidy = (v, places = 6) => String(Number(v.toPrecision(places)));
-const isDark = () => document.documentElement.dataset.theme === "dark";
 function put(el, text) {
   if (el.textContent !== text) el.textContent = text;
 }
@@ -575,8 +558,7 @@ function hitTest(sx, sy) {
         0,
         1,
       );
-    if (Math.hypot(p.x - w.x1 - t * dx, p.y - w.y1 - t * dy) <= slack)
-      return w;
+    if (Math.hypot(p.x - w.x1 - t * dx, p.y - w.y1 - t * dy) <= slack) return w;
   }
   return null;
 }
@@ -933,10 +915,7 @@ function drawComponent(g, item, reading, o) {
     case "switch":
       leads(0.42);
       line(
-        [
-          [-0.42, 0],
-          item.closed ? [0.42, 0] : [0.34, 0.36],
-        ],
+        [[-0.42, 0], item.closed ? [0.42, 0] : [0.34, 0.36]],
         ink,
         thin * 1.4,
       );
@@ -1000,7 +979,10 @@ function drawComponent(g, item, reading, o) {
       // way the source is turned, so the symbol never reads backwards.
       const wave = [];
       for (let k = 0; k <= 16; k++)
-        wave.push([-0.22 + 0.0275 * k, 0.13 * Math.sin((k / 16) * 2 * Math.PI)]);
+        wave.push([
+          -0.22 + 0.0275 * k,
+          0.13 * Math.sin((k / 16) * 2 * Math.PI),
+        ]);
       g.restore();
       g.save();
       g.translate(cx, cy);
@@ -1495,7 +1477,10 @@ function readingsAC(item, r) {
     add(
       "mean-power",
       supply ? "Mean power supplied" : "Mean power",
-      si(r.meanPower === null ? null : supply ? -r.meanPower : r.meanPower, "W"),
+      si(
+        r.meanPower === null ? null : supply ? -r.meanPower : r.meanPower,
+        "W",
+      ),
     );
     if (supply) {
       const lead = leadOf(r);

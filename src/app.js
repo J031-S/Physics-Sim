@@ -1,10 +1,12 @@
-import { canvasIcon, renderIcons, setPlaybackIcon } from "./icons.js";
+import { $ } from "./site/dom.js";
+import { canvasIcon, renderIcons, setPlaybackIcon } from "./site/icons.js";
 import { Sandbox, DT, GRID, snap } from "./physics.js";
 import { presets } from "./presets.js";
-import { setupPreferences } from "./preferences.js";
 import { drawFields, FieldDrag } from "./field-view.js";
-import { setupNav } from "./nav.js";
-setupNav();
+import { setupSite } from "./site/shell.js";
+// Builds the brand, navigation and Website settings before anything below
+// looks up a control.
+const prefs = setupSite();
 let fieldDrag = null,
   impulseDrag = null,
   panDrag = null;
@@ -15,8 +17,7 @@ const settingKeys = [
   "electricY",
   "magneticZ",
 ];
-const $ = (id) => document.getElementById(id),
-  canvas = $("canvas"),
+const canvas = $("canvas"),
   ctx = canvas.getContext("2d");
 let sim = new Sandbox(),
   running = true,
@@ -39,7 +40,6 @@ let sim = new Sandbox(),
   startScene = null,
   toastTimer;
 sim.updateSettings({ walls: true });
-const prefs = setupPreferences($);
 prefs.onchange = () => showDimensions();
 const view = { scale: 65, x: 0, y: 0, width: 0, height: 0 };
 function toast(message) {

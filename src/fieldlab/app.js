@@ -1,7 +1,7 @@
+import { $, isDark, showToast } from "../site/dom.js";
 // Electric & magnetic fields page: canvas drawing, pointer and keyboard
 // input, panels. All physics lives in model.js.
-import { setupPreferences } from "../preferences.js";
-import { setupNav } from "../nav.js";
+import { setupSite } from "../site/shell.js";
 import {
   FieldLab,
   KINDS,
@@ -16,11 +16,9 @@ import { arrowFeatures, lineArrows } from "./arrows.js";
 import { presets } from "./presets.js";
 import { setupSceneFiles } from "../scene-file.js";
 
-const $ = (id) => document.getElementById(id),
-  canvas = $("canvas"),
+const canvas = $("canvas"),
   ctx = canvas.getContext("2d");
-setupNav();
-const prefs = setupPreferences($);
+const prefs = setupSite();
 const lab = new FieldLab();
 
 const BASE_SCALE = 100, // pixels per metre at 100% zoom
@@ -51,8 +49,7 @@ let drag = null,
   computed = null,
   stale = true,
   queued = false,
-  pointer = null,
-  toastTimer;
+  pointer = null;
 
 const ADD = {
   positive: {
@@ -208,11 +205,7 @@ const POSITION = [
 // ---------------------------------------------------------------- helpers
 
 function toast(message) {
-  const el = $("toast");
-  el.textContent = message;
-  el.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove("show"), 3200);
+  showToast(message, 3200);
 }
 function attempt(fn) {
   try {
@@ -242,7 +235,6 @@ function capture(e) {
 const snapTo = (v, step) => Math.round(v / step) * step;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const tidy = (v, places = 4) => String(Number(v.toFixed(places)));
-const isDark = () => document.documentElement.dataset.theme === "dark";
 
 // Three significant figures with an SI prefix: 0.0000123 T → "12.3 µT".
 const PREFIXES = [

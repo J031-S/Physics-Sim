@@ -4,46 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Physium · Electric circuits</title>
-    <link rel="icon" type="image/svg+xml" href="assets/logo.svg" />
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="fields.css" />
-    <link rel="stylesheet" href="circuits.css" />
+    <link rel="icon" type="image/svg+xml" href="../assets/logo.svg" />
+    <link rel="stylesheet" href="../styles.css" />
+    <link rel="stylesheet" href="../fields.css" />
+    <link rel="stylesheet" href="../circuits.css" />
   </head>
-  <body class="circuit-lab">
+  <body class="circuit-lab" data-page="circuits">
     <header>
-      <a class="brand" href="./"
-        ><span class="brand-mark" aria-hidden="true"></span>Physium</a
-      >
-      <nav class="site-nav" aria-label="Simulations">
-        <button
-          id="nav-toggle"
-          class="nav-toggle"
-          aria-haspopup="true"
-          aria-expanded="false"
-          aria-controls="nav-menu"
-          title="Switch simulation"
-        >
-          Electric circuits
-        </button>
-        <div id="nav-menu" class="nav-menu" hidden>
-          <a href="./"
-            ><strong>Mechanics sandbox</strong
-            ><small>Kinematics, forces, springs and pulleys</small></a
-          >
-          <a href="fields.html"
-            ><strong>Electric &amp; magnetic fields</strong
-            ><small>Charges, currents and their field lines</small></a
-          >
-          <a href="orbits.html"
-            ><strong>Orbits &amp; gravitation</strong
-            ><small>Satellites, escape speed and Kepler's laws</small></a
-          >
-          <a href="circuits.html" aria-current="page"
-            ><strong>Electric circuits</strong
-            ><small>Build circuits; read current, p.d. and power</small></a
-          >
-        </div>
-      </nav>
+      <a class="brand"></a>
+      <nav class="site-nav"></nav>
       <div class="playback">
         <button
           id="settings-toggle"
@@ -81,7 +50,8 @@
           aria-controls="presets-panel"
         >
           Presets</button
-        ><button id="save-scene" title="Save circuit to a file">Save scene</button
+        ><button id="save-scene" title="Save circuit to a file">
+          Save scene</button
         ><button id="load-scene" title="Load a saved circuit file">
           Load scene</button
         ><input
@@ -268,7 +238,10 @@
               <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="6.5" class="glyph-line" />
                 <path d="M2 12h3.5M18.5 12H22" class="glyph-line" />
-                <path d="M9.6 15l2.4-6.4 2.4 6.4M10.5 13h3" class="glyph-line" />
+                <path
+                  d="M9.6 15l2.4-6.4 2.4 6.4M10.5 13h3"
+                  class="glyph-line"
+                />
               </svg>
               <span>Ammeter</span></button
             ><button
@@ -438,37 +411,7 @@
         ><button id="close-settings" aria-label="Close settings">×</button>
       </div>
       <p>Changes apply immediately.</p>
-      <details class="settings-section" open>
-        <summary>Website</summary>
-        <label class="select-row"
-          >Theme
-          <select id="ui-theme">
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-            <option value="system">System</option>
-          </select></label
-        >
-        <div class="prop-row">
-          <label for="ui-size">GUI size</label
-          ><input
-            id="ui-size"
-            type="range"
-            min="80"
-            max="140"
-            step="5"
-            value="100"
-          /><span class="prop-value"
-            ><output id="ui-size-value" for="ui-size">100%</output></span
-          >
-        </div>
-        <label class="setting-toggle"
-          ><input id="ui-grid" type="checkbox" checked /> Show grid</label
-        >
-        <small
-          >Website preferences are remembered on this browser and shared with
-          the other simulations.</small
-        >
-      </details>
+      <details id="website-settings" class="settings-section" open></details>
     </section>
     <section
       id="clear-confirm"
@@ -551,12 +494,12 @@
         Every component is ideal. Wires, ammeters and closed switches have no
         resistance at all; voltmeters and open switches pass no current at all.
         A cell is an EMF with an optional internal resistance. In the AC view
-        the meters read RMS values over the last whole cycle, and the graphs
-        are an oscilloscope showing the last three cycles. A lamp is a fixed
+        the meters read RMS values over the last whole cycle, and the graphs are
+        an oscilloscope showing the last three cycles. A lamp is a fixed
         resistance, whatever its brightness. Current is conventional (from +
         round to −) unless Electron flow is on.
       </p>
     </section>
-    <script type="module" src="src/circuitlab/app.js"></script>
+    <script type="module" src="../src/circuitlab/app.js"></script>
   </body>
 </html>

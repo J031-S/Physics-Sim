@@ -1,8 +1,17 @@
 import { prepareIcons, renderIcons, iconSetNames } from "./icons.js";
+// Website preferences: loaded, applied and saved here for every page.
+export const STORAGE_KEY = "physium-ui";
+const OLD_STORAGE_KEY = "physics-sim-ui";
 export function setupPreferences($) {
   let saved = {};
   try {
-    saved = JSON.parse(window.localStorage.getItem("physics-sim-ui") || "{}");
+    // Preferences moved from "physics-sim-ui" when the site became Physium;
+    // read the old key once so nobody loses their settings.
+    saved = JSON.parse(
+      window.localStorage.getItem(STORAGE_KEY) ||
+        window.localStorage.getItem(OLD_STORAGE_KEY) ||
+        "{}",
+    );
   } catch {}
   if (!saved || typeof saved !== "object") saved = {};
   prepareIcons();
@@ -35,7 +44,7 @@ export function setupPreferences($) {
     $("ui-grid").checked = prefs.grid;
     if ($("ui-angle-unit")) $("ui-angle-unit").value = prefs.angleUnit;
     try {
-      window.localStorage.setItem("physics-sim-ui", JSON.stringify(prefs));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
     } catch {}
   };
   if ($("ui-icons"))

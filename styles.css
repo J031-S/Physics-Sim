@@ -1412,3 +1412,25 @@ header {
     font-size: 11px;
   }
 }
+/* Ordinary scrolling pages (page not found; later the homepage and
+   minitools): the simulations fix the body, these do not. */
+body.doc-page {
+  overflow: auto;
+}
+.doc-page main {
+  height: auto;
+  min-height: calc(100dvh - var(--header-h) * var(--ui-scale));
+}
+.doc-main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 24px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.doc-main a {
+  color: #4f7547;
+}
+:root[data-theme="dark"] .doc-main a {
+  color: #a9c49d;
+}

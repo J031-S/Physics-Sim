@@ -12,7 +12,7 @@ npm start
 
 Open http://localhost:3000. Running the app needs no package installation or build step. The bundled Matter.js 0.20.0 engine includes its MIT licence. Any ordinary static server also works; opening via `file://` does not.
 
-The site has four tools. The drop-down at the left of the top bar switches between them: the **Mechanics sandbox** (`index.html`, described first below), **Electric & magnetic fields** (`fields.html`), **Orbits & gravitation** (`orbits.html`) and **Electric circuits** (`circuits.html`), each of the last three described in its own section.
+The site has four tools. The drop-down at the left of the top bar switches between them: the **Mechanics sandbox** (`/sims/Mechanics`, described first below), **Electric & magnetic fields** (`/sims/EMFields`), **Orbits & gravitation** (`/sims/Orbits`) and **Electric circuits** (`/sims/Circuits`), each of the last three described in its own section. Addresses never end in `.html`; old addresses such as `fields.html` are redirected by the site's page-not-found page. The **Physium** mark at the top left always returns to the homepage. Website preferences (theme, GUI size, grid, angle unit) are in the **Website** section of every page's settings, are the same on every page, and are remembered in this browser.
 
 ## Controls
 
@@ -346,20 +346,20 @@ The **DC** and **AC** buttons at the left of the toolbar switch between the page
 
 ### Components
 
-| Component | What it is | Values |
-| --- | --- | --- |
-| Cell | An EMF `E` in series with an internal resistance `r`. The long plate, marked +, is the positive terminal. | `E` up to 1000 V; `r` from 0 (ideal, the default) to 1 MΩ |
-| Resistor | Obeys `V = IR` exactly. | 0 to 1 GΩ (0 Ω behaves as a wire) |
-| Variable resistor | A resistor with a slider from 0 to its maximum. | maximum up to 1 GΩ |
-| Lamp | A fixed resistance. Its glow is drawn from its power as a fraction of its rated power. | 0.01 Ω to 1 MΩ; rated power 1 mW to 10 kW |
-| Switch | Open: no current at all. Closed: no resistance at all. Click it to work it, also while running. | |
-| Two-way switch | Joins its common contact to one of two others; click it to change over. | |
-| AC source (AC view) | An EMF `e = V₀ sin(2πft + φ)`, with an optional internal resistance. Set by its RMS voltage or its peak voltage (`V₀ = √2 × V_rms`; changing one changes the other), frequency and starting phase. The terminal marked + is the one that goes positive first. | up to 1000 V peak; 0.01 Hz to 1 MHz |
-| Inductor | `V = L dI/dt`: it opposes any change in its current. Ideal, with no resistance of its own; starts with no current. | 1 nH to 1000 H |
-| Capacitor | `Q = CV`. Uncharged to begin with unless given a **starting p.d.** The plate marked + is the one the p.d. is measured from. | 1 pF to 100 F; starting p.d. up to ±1000 V |
-| Ammeter | Ideal: zero resistance. Goes in series. | |
-| Voltmeter | Ideal: infinite resistance, takes no current. Goes in parallel. | |
-| Wire | Ideal: zero resistance, so no p.d. along it. | |
+| Component           | What it is                                                                                                                                                                                                                                                    | Values                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Cell                | An EMF `E` in series with an internal resistance `r`. The long plate, marked +, is the positive terminal.                                                                                                                                                     | `E` up to 1000 V; `r` from 0 (ideal, the default) to 1 MΩ |
+| Resistor            | Obeys `V = IR` exactly.                                                                                                                                                                                                                                       | 0 to 1 GΩ (0 Ω behaves as a wire)                         |
+| Variable resistor   | A resistor with a slider from 0 to its maximum.                                                                                                                                                                                                               | maximum up to 1 GΩ                                        |
+| Lamp                | A fixed resistance. Its glow is drawn from its power as a fraction of its rated power.                                                                                                                                                                        | 0.01 Ω to 1 MΩ; rated power 1 mW to 10 kW                 |
+| Switch              | Open: no current at all. Closed: no resistance at all. Click it to work it, also while running.                                                                                                                                                               |                                                           |
+| Two-way switch      | Joins its common contact to one of two others; click it to change over.                                                                                                                                                                                       |                                                           |
+| AC source (AC view) | An EMF `e = V₀ sin(2πft + φ)`, with an optional internal resistance. Set by its RMS voltage or its peak voltage (`V₀ = √2 × V_rms`; changing one changes the other), frequency and starting phase. The terminal marked + is the one that goes positive first. | up to 1000 V peak; 0.01 Hz to 1 MHz                       |
+| Inductor            | `V = L dI/dt`: it opposes any change in its current. Ideal, with no resistance of its own; starts with no current.                                                                                                                                            | 1 nH to 1000 H                                            |
+| Capacitor           | `Q = CV`. Uncharged to begin with unless given a **starting p.d.** The plate marked + is the one the p.d. is measured from.                                                                                                                                   | 1 pF to 100 F; starting p.d. up to ±1000 V                |
+| Ammeter             | Ideal: zero resistance. Goes in series.                                                                                                                                                                                                                       |                                                           |
+| Voltmeter           | Ideal: infinite resistance, takes no current. Goes in parallel.                                                                                                                                                                                               |                                                           |
+| Wire                | Ideal: zero resistance, so no p.d. along it.                                                                                                                                                                                                                  |                                                           |
 
 Click a component to see and change its values. The number box is in the unit shown beside it; choosing another unit (Ω, kΩ, MΩ; pF to F) re-expresses the number without changing the value. A value outside its range is refused with a message and nothing changes.
 

@@ -4,45 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Physium · Electric &amp; magnetic fields</title>
-    <link rel="icon" type="image/svg+xml" href="assets/logo.svg" />
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="fields.css" />
+    <link rel="icon" type="image/svg+xml" href="../assets/logo.svg" />
+    <link rel="stylesheet" href="../styles.css" />
+    <link rel="stylesheet" href="../fields.css" />
   </head>
-  <body class="field-lab">
+  <body class="field-lab" data-page="fields">
     <header>
-      <a class="brand" href="./"
-        ><span class="brand-mark" aria-hidden="true"></span>Physium</a
-      >
-      <nav class="site-nav" aria-label="Simulations">
-        <button
-          id="nav-toggle"
-          class="nav-toggle"
-          aria-haspopup="true"
-          aria-expanded="false"
-          aria-controls="nav-menu"
-          title="Switch simulation"
-        >
-          Electric &amp; magnetic fields
-        </button>
-        <div id="nav-menu" class="nav-menu" hidden>
-          <a href="./"
-            ><strong>Mechanics sandbox</strong
-            ><small>Kinematics, forces, springs and pulleys</small></a
-          >
-          <a href="fields.html" aria-current="page"
-            ><strong>Electric &amp; magnetic fields</strong
-            ><small>Charges, currents and their field lines</small></a
-          >
-          <a href="orbits.html"
-            ><strong>Orbits &amp; gravitation</strong
-            ><small>Satellites, escape speed and Kepler's laws</small></a
-          >
-          <a href="circuits.html"
-            ><strong>Electric circuits</strong
-            ><small>Build circuits; read current, p.d. and power</small></a
-          >
-        </div>
-      </nav>
+      <a class="brand"></a>
+      <nav class="site-nav"></nav>
       <div class="playback">
         <button
           id="settings-toggle"
@@ -457,47 +426,13 @@
         >
       </details>
       <details class="settings-section" open>
-        <summary>Website</summary>
+        <summary>Editing</summary>
         <label class="setting-toggle"
           ><input id="setting-snapping" type="checkbox" /> Snapping (Z) — 0.25 m
           / 15°</label
         >
-        <label class="select-row"
-          >Theme
-          <select id="ui-theme">
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-            <option value="system">System</option>
-          </select></label
-        >
-        <div class="prop-row">
-          <label for="ui-size">GUI size</label
-          ><input
-            id="ui-size"
-            type="range"
-            min="80"
-            max="140"
-            step="5"
-            value="100"
-          /><span class="prop-value"
-            ><output id="ui-size-value" for="ui-size">100%</output></span
-          >
-        </div>
-        <label class="setting-toggle"
-          ><input id="ui-grid" type="checkbox" checked /> Show grid</label
-        >
-        <label class="select-row"
-          >Angle unit
-          <select id="ui-angle-unit">
-            <option value="degrees">Degrees (°)</option>
-            <option value="radians">Radians (rad)</option>
-          </select></label
-        >
-        <small
-          >Website preferences are remembered on this browser and shared with
-          the mechanics sandbox.</small
-        >
       </details>
+      <details id="website-settings" class="settings-section" open></details>
     </section>
     <section
       id="clear-confirm"
@@ -583,6 +518,6 @@
         into it (⊗).
       </p>
     </section>
-    <script type="module" src="src/fieldlab/app.js"></script>
+    <script type="module" src="../src/fieldlab/app.js"></script>
   </body>
 </html>
