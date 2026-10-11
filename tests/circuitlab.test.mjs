@@ -910,12 +910,31 @@ test("on the grid: terminals that touch are joined, wires split and follow", () 
     lab.list().some((i) => i.kind === "wire" && i.x1 === 0 && i.y2 === 3),
     "the wire from the cell stretched to follow",
   );
+  // Dragging a wire's end: nothing is committed until the gesture ends.
+  const loose = lab.wire([10, 6], [12, 6])[0];
+  lab.update(loose, { x2: 12, y2: 8 });
+  assert.equal(lab.advance(1), 0, "the clock waits for the drag to end");
+  lab.settle();
+  assert.deepEqual(
+    lab.terminals(loose).map((t) => [t.x, t.y]),
+    [
+      [10, 6],
+      [12, 8],
+    ],
+  );
+  lab.remove(loose);
   // Duplicate and zero-length wires are tidied away.
   const count = lab.list().length;
   lab.wire([3, 3], [3, 2]);
   lab.wire([8, 8], [8, 8]);
   assert.equal(lab.list().length, count);
-  // Turning a component about its centre.
+  // Turning a component about its centre leaves the wires where they are.
+  const wiring = () =>
+    lab
+      .list()
+      .filter((i) => i.kind === "wire")
+      .map((w) => [w.x1, w.y1, w.x2, w.y2].join());
+  const before = wiring();
   lab.rotate(r2);
   assert.deepEqual(
     lab.terminals(r2).map((t) => [t.x, t.y]),
@@ -924,6 +943,18 @@ test("on the grid: terminals that touch are joined, wires split and follow", () 
       [4, 3],
     ],
   );
+  assert.deepEqual(wiring(), before);
+  assert.equal(lab.solve().status, "open", "a quarter-turn takes it off");
+  // A second quarter-turn puts it back the other way round.
+  lab.rotate(r2);
+  s = solved(lab);
+  close(s.of(r2).voltage, -8, STEADY, "reversed: terminal 0 is now the low end");
+  close(s.of(r1).voltage, 4, STEADY);
+  // A cell turned round drives the current the other way.
+  lab.rotate(cell, 2);
+  s = solved(lab);
+  close(s.of(cell).current, 1, STEADY, "still out of its + terminal");
+  close(s.of(r1).voltage, -4, STEADY, "but the other way round the loop");
   lab.clear();
   assert.equal(lab.list().length, 0);
   assert.equal(lab.time, 0);

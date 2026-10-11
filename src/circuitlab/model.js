@@ -563,8 +563,9 @@ export class CircuitLab {
     return ids.filter((id) => this.get(id));
   }
 
-  // Changes values (and, for a component given by node names, its nodes).
-  // The whole patch is checked before any of it is applied.
+  // Changes values, or a position (then call `settle`, as after `move`),
+  // or the nodes of a component given by node names. The whole patch is
+  // checked before any of it is applied.
   update(id, patch) {
     const item = this.#need(id),
       allowed = new Set([
@@ -584,6 +585,9 @@ export class CircuitLab {
     if (patch.nodes) next.nodes = [...patch.nodes];
     validate(next);
     Object.assign(item, next);
+    // A change of position is part of a gesture: `settle` ends it.
+    if (["x", "y", "rot", "x1", "y1", "x2", "y2"].some((k) => k in patch))
+      this.#unsettled = true;
     // Setting the starting p.d. of a capacitor sets its p.d. now as well.
     if (patch.initialVoltage !== undefined) item.voltage = item.initialVoltage;
     this.#place(item);
@@ -722,10 +726,13 @@ export class CircuitLab {
   }
 
   // A quarter-turn anticlockwise (or `turns` of them) about the centre.
+  // The wires stay where they are: two quarter-turns put the component
+  // back on them the other way round, which is how a cell or a meter is
+  // reversed.
   rotate(id, turns = 1) {
     const item = this.#need(id);
     if (item.explicit || item.kind === "wire") return;
-    this.move(id, item.x, item.y, undefined, item.rot + turns);
+    this.move(id, item.x, item.y, [], item.rot + turns);
     this.settle();
   }
 
@@ -986,12 +993,13 @@ export class CircuitLab {
   // Current through every branch, from terminal a to terminal b.
   //
   // Potentials carry a rounding error of about one part in 10¹⁶ of the
-  // largest in their section, and a branch turns that into a current error
-  // of that p.d. times its conductance. A current no bigger than sixteen
+  // largest p.d. in their section (the largest potential or EMF, since a
+  // shorted cell has a large EMF and no potential anywhere), and a branch
+  // turns that into a current error of that p.d. times its conductance. A current no bigger than sixteen
   // times that floor cannot be told from zero and is reported as zero, so
   // that a balanced bridge reads 0 A and not 10⁻¹⁷ A. (`floor` is kept on
   // the view for p.d.s, which are treated the same way.)
-  #flows(st, x) {
+  #flows(st, x, t) {
     const potential = (i) => (st.col[i] >= 0 ? x[st.col[i]] : 0),
       size = new Map(),
       of = (i) => {
@@ -1007,6 +1015,7 @@ export class CircuitLab {
     for (const b of st.branches) {
       const entry = of(b.a);
       entry.G = Math.max(entry.G, b.type === "g" ? b.G : b.R > 0 ? 1 / b.R : 0);
+      if (b.type === "v") entry.V = Math.max(entry.V, Math.abs(b.e(t)));
     }
     st.floor = (i) => 16 * Number.EPSILON * of(i).V;
     st.currentFloor = 0;
@@ -1113,15 +1122,13 @@ export class CircuitLab {
     if (unequal.some((c) => !cache.broken.has(c.part)))
       this.#jump(cache, commit);
     const x = now.lu.ok ? this.#solveAt(now, t) : null;
-    cache.solution = this.#read(now, x, x && this.#flows(now, x), t, cache);
+    cache.solution = this.#read(now, x, x && this.#flows(now, x, t), t, cache);
     if (commit) {
       for (const item of this.#items)
         if (item.kind === "capacitor")
           item.current = cache.solution.of(item.id).flow || 0;
-      // Only a settled circuit is kept; a drag is solved afresh each time.
-      this.#cache = cache;
     } else for (const [item, voltage] of held) item.voltage = voltage;
-    return cache;
+    return (this.#cache = cache);
   }
 
   // Turns a solved view into readings.
@@ -1171,10 +1178,12 @@ export class CircuitLab {
       if (joined && Math.abs(across) <= st.floor(nodes[0])) across = 0;
       r.flow = (branch ? flowOf.get(item.id) : 0) + 0;
       if (!branch || item.kind === "switch2") r.voltage = across;
-      else if (branch.type === "v")
+      else if (branch.type === "v") {
         // From the branch law itself, so that a wire has exactly no p.d.
         r.voltage = branch.e(t) + branch.R * r.flow;
-      else if (branch.reactive) r.voltage = item.voltage;
+        if (branch.R > 0 && Math.abs(r.voltage) <= st.floor(nodes[0]))
+          r.voltage = 0;
+      } else if (branch.reactive) r.voltage = item.voltage;
       else r.voltage = st.bridge(branch) ? 0 : across;
       if (r.voltage !== null) r.voltage += 0;
       r.current = r.flow;
@@ -1444,7 +1453,7 @@ export class CircuitLab {
     for (let i = 0; i < steps; i++) {
       const t = this.#origin + (this.#count + 1) * h,
         x = this.#solveAt(st, t),
-        flows = this.#flows(st, x),
+        flows = this.#flows(st, x, t),
         potential = (k) => (st.col[k] >= 0 ? x[st.col[k]] : 0);
       st.branches.forEach((b, k) => {
         if (!b.reactive || cache.broken.has(st.parts.find(b.a))) return;
