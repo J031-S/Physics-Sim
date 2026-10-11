@@ -1,6 +1,6 @@
-import { $, isDark, showToast } from "../site/dom.js";
 // Orbits & gravitation page: canvas drawing, pointer and keyboard input,
 // panels, the frame loop. All physics lives in model.js.
+import { $, isDark, showToast } from "../site/dom.js";
 import { setupSite } from "../site/shell.js";
 import { setPlaybackIcon } from "../site/icons.js";
 import {

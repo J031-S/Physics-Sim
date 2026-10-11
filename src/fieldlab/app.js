@@ -1,6 +1,6 @@
-import { $, isDark, showToast } from "../site/dom.js";
 // Electric & magnetic fields page: canvas drawing, pointer and keyboard
 // input, panels. All physics lives in model.js.
+import { $, isDark, showToast } from "../site/dom.js";
 import { setupSite } from "../site/shell.js";
 import {
   FieldLab,

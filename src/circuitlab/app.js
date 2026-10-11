@@ -1,7 +1,7 @@
-import { $, isDark, showToast } from "../site/dom.js";
 // Electric circuits page: canvas drawing, pointer and keyboard input,
 // panels, graphs, the frame loop. All physics lives in model.js: every
 // number shown here is read from `lab.solve()`.
+import { $, isDark, showToast } from "../site/dom.js";
 import { setupSite } from "../site/shell.js";
 import { setPlaybackIcon } from "../site/icons.js";
 import { CircuitLab, KINDS, LIMITS, STEPS_PER_TAU, turnsOf } from "./model.js";

@@ -2,11 +2,9 @@
    panels, property rows, readout numbers, energy colours) and fields.css
    (.fl-centre, .fl-hint, .fl-form, .fl-check, .fl-note). */
 .orbit-lab {
-  --total: #354438;
+  --total: var(--orbit-total);
 }
-:root[data-theme="dark"] .orbit-lab {
-  --total: #ebe5d6;
-}
+
 /* One row across the top of the scene: the launch panel, the outcome strip,
    and the column of display, readout and graph panels. Only its children
    take pointer input. */
@@ -109,7 +107,7 @@
   width: 100%;
   min-width: 0;
   margin: 0;
-  accent-color: #58784f;
+  accent-color: var(--ol-panel-input-type-range-accent-color);
 }
 .ol-panel .fl-note {
   margin: 6px 0 0;
@@ -146,13 +144,13 @@
 #launch {
   flex: 1;
   padding: 6px 12px;
-  background: #435d49;
-  border-color: #435d49;
+  background: var(--launch-background);
+  border-color: var(--launch-background);
   color: white;
   font-weight: 600;
 }
 #launch:hover {
-  background: #37503d;
+  background: var(--launch-hover-background);
 }
 /* Satellites in flight: a colour chip that selects, and a remove button. */
 .ol-list {
@@ -181,12 +179,10 @@
   background: transparent;
 }
 .ol-chip button[aria-pressed="true"] {
-  background: #e5eedf;
+  background: var(--ol-chip-button-aria-pressed-true-background);
+  color: var(--active-ink);
 }
-:root[data-theme="dark"] .ol-chip button[aria-pressed="true"] {
-  background: #3b4c3f;
-  color: #ecf5e8;
-}
+
 .ol-chip .dot {
   width: 9px;
   height: 9px;
