@@ -131,11 +131,34 @@
                 aria-pressed="true"
                 title="Direct-current circuits"
               >
-                DC
+                DC</button
+              ><button
+                id="mode-ac"
+                data-mode="ac"
+                aria-pressed="false"
+                title="Alternating-current circuits"
+              >
+                AC
               </button>
             </div>
             <span class="cluster-divider" aria-hidden="true"></span>
             <button
+              data-add="source"
+              data-for="ac"
+              aria-pressed="false"
+              title="AC source: a sine-wave EMF of set RMS voltage and frequency (1)"
+              hidden
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="6.5" class="glyph-line" />
+                <path d="M2 12h3.5M18.5 12H22" class="glyph-line" />
+                <path
+                  d="M8.4 12c1.2-3.6 2.4-3.6 3.6 0s2.4 3.6 3.6 0"
+                  class="glyph-line"
+                />
+              </svg>
+              <span>AC source</span></button
+            ><button
               data-add="cell"
               data-for="dc"
               aria-pressed="false"
@@ -149,7 +172,7 @@
               <span>Cell</span></button
             ><button
               data-add="resistor"
-              data-for="dc"
+              data-for="dc ac"
               aria-pressed="false"
               title="Resistor (2)"
             >
@@ -159,7 +182,7 @@
               <span>Resistor</span></button
             ><button
               data-add="variable"
-              data-for="dc"
+              data-for="dc ac"
               aria-pressed="false"
               title="Variable resistor (3)"
             >
@@ -170,7 +193,7 @@
               <span>Variable</span></button
             ><button
               data-add="lamp"
-              data-for="dc"
+              data-for="dc ac"
               aria-pressed="false"
               title="Lamp: a fixed resistance that glows with its power (4)"
             >
@@ -184,7 +207,7 @@
               <span>Lamp</span></button
             ><button
               data-add="switch"
-              data-for="dc"
+              data-for="dc ac"
               aria-pressed="false"
               title="Switch: click it to open or close it (5)"
             >
@@ -196,7 +219,7 @@
               <span>Switch</span></button
             ><button
               data-add="switch2"
-              data-for="dc"
+              data-for="dc ac"
               aria-pressed="false"
               title="Two-way switch: joins its common contact to one of two others (6)"
             >
@@ -212,7 +235,7 @@
               <span>Two-way</span></button
             ><button
               data-add="capacitor"
-              data-for="dc"
+              data-for="dc ac"
               aria-pressed="false"
               title="Capacitor (7)"
             >
@@ -221,8 +244,21 @@
               </svg>
               <span>Capacitor</span></button
             ><button
+              data-add="inductor"
+              data-for="dc ac"
+              aria-pressed="false"
+              title="Inductor: opposes any change in its current (L)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M2 13h3a2 2 0 0 1 3.5 0a2 2 0 0 1 3.5 0a2 2 0 0 1 3.5 0a2 2 0 0 1 3.5 0h3"
+                  class="glyph-line"
+                />
+              </svg>
+              <span>Inductor</span></button
+            ><button
               data-add="ammeter"
-              data-for="dc"
+              data-for="dc ac"
               aria-pressed="false"
               title="Ammeter: ideal, no resistance. Put it in series (8)"
             >
@@ -234,7 +270,7 @@
               <span>Ammeter</span></button
             ><button
               data-add="voltmeter"
-              data-for="dc"
+              data-for="dc ac"
               aria-pressed="false"
               title="Voltmeter: ideal, takes no current. Put it in parallel (9)"
             >
@@ -246,7 +282,7 @@
               <span>Voltmeter</span></button
             ><button
               data-add="wire"
-              data-for="dc"
+              data-for="dc ac"
               aria-pressed="false"
               title="Wire: ideal, no resistance. Drag from one grid point to another (W)"
             >
@@ -351,7 +387,8 @@
           </details>
           <details id="graph-panel" class="cl-panel" open>
             <summary>
-              Graphs against time <small id="graph-subject"></small>
+              <span id="graph-title">Graphs against time</span>
+              <small id="graph-subject"></small>
             </summary>
             <canvas
               id="voltage-graph"
@@ -366,6 +403,16 @@
               aria-label="Current through the selected component against time"
             ></canvas>
             <p id="graph-note" class="fl-note"></p>
+          </details>
+          <details id="phasor-panel" class="cl-panel" data-for="ac" open hidden>
+            <summary>Phasor diagram</summary>
+            <canvas
+              id="phasor-diagram"
+              class="cl-phasors"
+              role="img"
+              aria-label="Phasor diagram: the RMS p.d. across each component as an arrow at its phase angle"
+            ></canvas>
+            <p id="phasor-note" class="fl-note"></p>
           </details>
         </div>
       </div>
@@ -482,10 +529,11 @@
         </dd>
         <dt>[ · ]</dt>
         <dd>Slower · faster time scale</dd>
-        <dt>1 – 9 · W</dt>
+        <dt>1 – 9 · L · W</dt>
         <dd>
-          Cell, resistor, variable resistor, lamp, switch, two-way switch,
-          capacitor, ammeter, voltmeter · wire
+          Cell (AC source in the AC view), resistor, variable resistor, lamp,
+          switch, two-way switch, capacitor, ammeter, voltmeter · inductor ·
+          wire
         </dd>
         <dt>C · E · P · V</dt>
         <dd>
@@ -499,7 +547,9 @@
       <p>
         Every component is ideal. Wires, ammeters and closed switches have no
         resistance at all; voltmeters and open switches pass no current at all.
-        A cell is an EMF with an optional internal resistance. A lamp is a fixed
+        A cell is an EMF with an optional internal resistance. In the AC view
+        the meters read RMS values over the last whole cycle, and the graphs
+        are an oscilloscope showing the last three cycles. A lamp is a fixed
         resistance, whatever its brightness. Current is conventional (from +
         round to −) unless Electron flow is on.
       </p>

@@ -20,10 +20,12 @@ const $ = (id) => document.getElementById(id),
 setupNav();
 const prefs = setupPreferences($);
 
-// One circuit for each view of the page. There is one view so far, "dc";
-// an AC view would add its own circuit, palette buttons (`data-for`) and
-// presets (`view`), and be switched to by `setMode`, as on the fields page.
-const labs = { dc: new CircuitLab() };
+// One circuit for each view of the page, "dc" and "ac", switched by
+// `setMode` as on the fields page. A view has its own circuit, its own
+// palette buttons and panels (`data-for`), presets (`view`) and time scale.
+// The AC view reads its meters as RMS and adds the phasor diagram; the
+// physics is the same model in both.
+const labs = { dc: new CircuitLab(), ac: new CircuitLab() };
 let lab = labs.dc;
 
 const BASE_SCALE = 44, // pixels per grid square at 100% zoom
@@ -56,6 +58,7 @@ let last = 0,
   ghost = null, // where the component about to be placed would go
   paletteDrag = null,
   suppressClick = false,
+  warps = { dc: 1, ac: 0.02 }, // the time scale last used in each view
   toastTimer,
   fitted = false,
   previewTheme = null,
@@ -70,6 +73,14 @@ const ADD = {
   cell: {
     name: "Cell",
     help: "Click the grid to place a cell. Its long plate is the + terminal.",
+  },
+  source: {
+    name: "AC source",
+    help: "Click the grid to place an AC source. Its EMF is a sine wave; the terminal marked + is the one that is positive first.",
+  },
+  inductor: {
+    name: "Inductor",
+    help: "Click the grid to place an inductor. It opposes any change in its current.",
   },
   resistor: { name: "Resistor", help: "Click the grid to place a resistor." },
   variable: {
@@ -113,7 +124,7 @@ const TOOL_HELP = {
   pan: ["Pan", "Drag to move the view. Scroll to zoom."],
 };
 const HOTKEYS = [
-  "cell",
+  "cell", // the AC source, in the AC view
   "resistor",
   "variable",
   "lamp",
@@ -194,6 +205,59 @@ const OHMS = [
         ],
         limit: LIMITS.ratedPower,
         help: "The power at which the lamp is drawn fully bright.",
+      },
+    ],
+    source: [
+      {
+        key: "amplitude",
+        id: "rms",
+        label: "RMS voltage",
+        units: [[1, "V"]],
+        limit: LIMITS.amplitude,
+        scale: Math.SQRT1_2,
+        help: "Peak voltage ÷ √2. Changing either changes the other.",
+      },
+      {
+        key: "amplitude",
+        label: "Peak voltage",
+        units: [[1, "V"]],
+        limit: LIMITS.amplitude,
+      },
+      {
+        key: "frequency",
+        label: "Frequency",
+        units: [
+          [1, "Hz"],
+          [1e3, "kHz"],
+        ],
+        limit: LIMITS.frequency,
+        slider: [10, 200, 0.5],
+      },
+      {
+        key: "phase",
+        label: "Starting phase",
+        units: [[1, "°"]],
+        limit: LIMITS.phase,
+        scale: 180 / Math.PI,
+        help: "0° starts the EMF from zero, rising; 90° starts it at its peak.",
+      },
+      {
+        key: "internal",
+        label: "Internal resistance",
+        units: OHMS,
+        limit: LIMITS.internal,
+      },
+    ],
+    inductor: [
+      {
+        key: "inductance",
+        label: "Inductance",
+        units: [
+          [1e-6, "µH"],
+          [1e-3, "mH"],
+          [1, "H"],
+        ],
+        limit: LIMITS.inductance,
       },
     ],
     capacitor: [
@@ -344,7 +408,38 @@ const valueText = (item) =>
     variable: given(item.resistance, "Ω"),
     lamp: given(item.resistance, "Ω"),
     capacitor: given(item.capacitance, "F"),
+    inductor: given(item.inductance, "H"),
+    source:
+      given(+(item.amplitude * Math.SQRT1_2).toPrecision(4), "V") +
+      " rms, " +
+      given(item.frequency, "Hz"),
   })[item.kind] || "";
+const isAC = () => state.mode === "ac";
+// What a meter shows: the value at this instant in the DC view, and in the
+// AC view the RMS value over the last whole cycle.
+function meterText(item, r) {
+  const amps = item.kind === "ammeter";
+  if (!isAC()) return amps ? si(r?.current, "A") : si(r?.voltage, "V");
+  const value = amps ? r?.rmsCurrent : r?.rmsVoltage;
+  return value === null || value === undefined
+    ? "– rms"
+    : si(value, amps ? "A" : "V") + " rms";
+}
+// How far the current through a component leads the p.d. across it, in
+// radians in (−π, π], from the last whole cycle; null if there is none.
+function leadOf(r) {
+  if (!r || r.phaseCurrent === null || !r.rmsCurrent || !r.rmsVoltage)
+    return null;
+  const d = r.phaseCurrent - r.phaseVoltage;
+  return Math.atan2(Math.sin(d), Math.cos(d));
+}
+function leadText(lead) {
+  if (lead === null) return "–";
+  const degrees = (lead * 180) / Math.PI;
+  return Math.abs(degrees) < 0.05
+    ? "in phase"
+    : `current ${degrees > 0 ? "leads" : "lags"} by ${Math.abs(degrees).toFixed(1)}°`;
+}
 
 // ---------------------------------------------------------------- playback
 
@@ -368,6 +463,13 @@ function record(force) {
     h.t.push(t);
     h.v.push(r.voltage);
     h.i.push(r.current);
+    const period = lab.period;
+    if (period) {
+      // The oscilloscope shows the last few cycles; older samples go.
+      let old = 0;
+      while (h.t[old] < t - 4 * period) old++;
+      if (old > 64) for (const key of ["t", "v", "i"]) h[key].splice(0, old);
+    }
     if (h.t.length > SAMPLES)
       // Thin the record to every second point; the latest is kept.
       for (const key of ["t", "v", "i"])
@@ -396,13 +498,20 @@ function setRunning(on) {
   $("pause").title = on ? "Pause (Space)" : "Run (Space)";
 }
 function advance(seconds) {
-  const done = lab.advance(seconds, {
-    maxSteps: Math.round(budget),
-    // At least two steps to a frame, so slow circuits still move smoothly.
-    resolution: (state.warp * FRAME) / 2,
-  });
+  // With an AC source the traces are sampled at least forty times a cycle,
+  // however much of a cycle one frame covers.
+  const period = lab.period,
+    slices = period ? clamp(Math.ceil(seconds / (period / 40)), 1, 64) : 1;
+  let done = 0;
+  for (let k = 0; k < slices; k++) {
+    done += lab.advance(seconds / slices, {
+      maxSteps: Math.max(1, Math.round(budget / slices)),
+      // At least two steps to a frame, so slow circuits still move smoothly.
+      resolution: (state.warp * FRAME) / 2,
+    });
+    record();
+  }
   for (const event of lab.takeEvents()) toast(event.message, true);
-  record();
   return done;
 }
 // One frame's worth of simulated time at the current time scale.
@@ -412,7 +521,7 @@ function stepOnce() {
 }
 const warpText = (w) => (w >= 1 ? tidy(w) : tidy(w, 3)) + "×";
 function setWarp(warp) {
-  state.warp = state.achieved = warp;
+  state.warp = state.achieved = warps[state.mode] = warp;
   $("warp").value = String(warp);
   $("step").title =
     `Advance ${si(warp * FRAME, "s", 3)} of simulated time: one frame at this time scale (.)`;
@@ -879,6 +988,31 @@ function drawComponent(g, item, reading, o) {
         );
       plus(-0.32, 0.3);
       break;
+    case "source": {
+      leads(0.37);
+      circle(0, 0, 0.37, c.back, ink);
+      plus(-0.56, 0.2);
+      // One cycle of a sine wave. It is drawn the same way up whichever
+      // way the source is turned, so the symbol never reads backwards.
+      const wave = [];
+      for (let k = 0; k <= 16; k++)
+        wave.push([-0.22 + 0.0275 * k, 0.13 * Math.sin((k / 16) * 2 * Math.PI)]);
+      g.restore();
+      g.save();
+      g.translate(cx, cy);
+      line(wave, ink);
+      break;
+    }
+    case "inductor":
+      leads(0.5);
+      // Four turns of a coil.
+      g.strokeStyle = ink;
+      g.lineWidth = thin;
+      g.beginPath();
+      for (let k = 0; k < 4; k++)
+        g.arc((-0.375 + 0.25 * k) * u, 0, 0.125 * u, Math.PI, 2 * Math.PI);
+      g.stroke();
+      break;
     default: {
       // Ammeter or voltmeter.
       leads(0.37);
@@ -899,9 +1033,9 @@ function drawComponent(g, item, reading, o) {
   // its reading there instead.
   const meter = item.kind === "ammeter" || item.kind === "voltmeter",
     text = meter
-      ? item.kind === "ammeter"
-        ? si(reading?.current, "A")
-        : si(reading?.voltage, "V")
+      ? o.preview
+        ? ""
+        : meterText(item, reading)
       : valueText(item),
     upright = item.rot % 2 !== 0,
     reach = item.kind === "switch2" ? 1.2 : 0.56,
@@ -933,65 +1067,73 @@ function drawComponent(g, item, reading, o) {
 // as another enters the other, and the number on the run never changes.
 function dotRuns(s) {
   const branches = [],
-    leaving = new Map(), // node → current-carrying branches that start there
-    ends = new Map(); // node → how many such branch ends meet there
+    meeting = new Map(); // node → the current-carrying branches that end there
   for (const item of lab.list()) {
     if (!placed(item)) continue;
     const flow = s.of(item.id)?.flow;
     if (!flow) continue;
-    // Followed the way the conventional current goes.
-    const points = pathOf(item),
-      to = item.kind === "switch2" && item.position === "b" ? 2 : 1,
-      nodes = [item.nodes[0], item.nodes[to]];
-    if (flow < 0) {
-      points.reverse();
-      nodes.reverse();
-    }
-    const branch = { item, points, from: nodes[0], to: nodes[1] };
-    branch.current = Math.abs(flow);
+    const to = item.kind === "switch2" && item.position === "b" ? 2 : 1,
+      branch = { item, flow, points: pathOf(item) };
+    branch.ends = [item.nodes[0], item.nodes[to]];
     branches.push(branch);
-    if (!leaving.has(branch.from)) leaving.set(branch.from, []);
-    leaving.get(branch.from).push(branch);
-    for (const node of nodes) ends.set(node, (ends.get(node) || 0) + 1);
+    for (const node of branch.ends) {
+      if (!meeting.has(node)) meeting.set(node, []);
+      meeting.get(node).push(branch);
+    }
   }
-  // A node where exactly two ends meet, one arriving and one leaving, is
-  // the middle of a run.
-  const through = (node) =>
-      ends.get(node) === 2 && leaving.get(node)?.length === 1,
+  // A node where exactly two branch ends meet is the middle of a run.
+  const through = (node) => meeting.get(node).length === 2,
     used = new Set(),
     runs = [],
-    follow = (first) => {
-      const chain = [];
-      for (let b = first; b && !used.has(b); ) {
-        used.add(b);
-        chain.push(b);
-        b = through(b.to) ? leaving.get(b.to)[0] : null;
-      }
+    // Follows a run from `first`, entering it at its end `entry` (0 or 1).
+    // Which end a run is followed from depends only on the wiring, never on
+    // which way the current is going: an alternating current then moves
+    // the same dots to and fro instead of laying out new ones.
+    follow = (first, entry) => {
       const run = { points: [], gaps: [], length: 0, ids: [] };
-      run.current = first.current;
-      run.closed = chain[chain.length - 1].to === first.from;
-      for (const b of chain) {
-        const began = run.length;
-        b.points.forEach((point, k) => {
+      let branch = first,
+        end = entry;
+      // Along the run, the current in the direction it is followed.
+      run.current = entry === 0 ? first.flow : -first.flow;
+      while (branch && !used.has(branch)) {
+        used.add(branch);
+        const began = run.length,
+          points = end === 0 ? branch.points : [...branch.points].reverse();
+        points.forEach((point, k) => {
           const last = run.points[run.points.length - 1];
           if (k && last)
             run.length += Math.hypot(point[0] - last[0], point[1] - last[1]);
           if (!last || last[0] !== point[0] || last[1] !== point[1])
             run.points.push(point);
         });
-        run.ids.push(b.item.id);
+        run.ids.push(branch.item.id);
         // Dots pass out of sight behind a component's symbol.
-        if (b.item.kind !== "wire" && b.item.kind !== "switch2") {
+        if (branch.item.kind !== "wire" && branch.item.kind !== "switch2") {
           const middle = (began + run.length) / 2;
           run.gaps.push([middle - 0.5, middle + 0.5]);
         }
+        const node = branch.ends[1 - end];
+        run.closed = node === first.ends[entry];
+        if (!through(node)) break;
+        const next = meeting.get(node).find((b) => b !== branch);
+        if (!next) break;
+        end = next.ends[0] === node ? 0 : 1;
+        branch = next;
       }
       run.key = [...run.ids].sort((a, b) => a - b).join("-");
       runs.push(run);
     };
-  for (const b of branches) if (!through(b.from)) follow(b);
-  // What is left is closed loops with no junction on them.
-  for (const b of branches) if (!used.has(b)) follow(b);
+  // Open runs, each from whichever of its two ends has the older component;
+  // then closed loops, from their oldest component.
+  const starts = [];
+  for (const b of branches)
+    b.ends.forEach((node, end) => {
+      if (!through(node)) starts.push([b, end]);
+    });
+  starts.sort((p, q) => p[0].item.id - q[0].item.id || p[1] - q[1]);
+  for (const [b, end] of starts) if (!used.has(b)) follow(b, end);
+  for (const b of [...branches].sort((p, q) => p.item.id - q.item.id))
+    if (!used.has(b)) follow(b, 0);
   return runs;
 }
 
@@ -1037,7 +1179,7 @@ function drawDots(c, s) {
 // `peak`, the largest current seen since the last reset, sets the scale.
 function moveDots(s, seconds) {
   const runs = dotRuns(s);
-  for (const run of runs) peak = Math.max(peak, run.current);
+  for (const run of runs) peak = Math.max(peak, Math.abs(run.current));
   if (!(peak > 0)) return;
   const sense = state.electrons ? -1 : 1,
     live = new Set();
@@ -1198,6 +1340,7 @@ function direction(item, flow) {
 
 // [key, label, text] for each line of the selected component's readout.
 function readingsOf(item, r) {
+  if (isAC()) return readingsAC(item, r);
   const rows = [],
     add = (key, label, text) => rows.push([key, label, text]),
     size = (v) => (v === null ? null : Math.abs(v)),
@@ -1266,6 +1409,15 @@ function readingsOf(item, r) {
       add("power", "Power, P = VI", si(r.power, "W"));
       add("heat", "Energy dissipated so far", si(r.heat, "J"));
     }
+    if (item.kind === "inductor") {
+      add("energy", "Energy stored, ½LI²", si(r.energy, "J"));
+      const taus = lab.timeConstants(item.id);
+      add(
+        "tau",
+        taus.length > 1 ? "Time constants" : "Time constant, τ = L/R",
+        taus.length ? taus.map((t) => si(t, "s")).join(", ") : "none",
+      );
+    }
     if (item.kind === "lamp")
       add(
         "brightness",
@@ -1276,6 +1428,71 @@ function readingsOf(item, r) {
       );
     ends();
   }
+  return rows;
+}
+
+// The same for the AC view: what a meter would read over the last whole
+// cycle, then the values at this instant.
+function readingsAC(item, r) {
+  const rows = [],
+    add = (key, label, text) => rows.push([key, label, text]),
+    frequency = lab.period ? 1 / lab.period : null,
+    size = (v) => (v === null ? null : Math.abs(v));
+  if (item.kind === "ammeter") {
+    add("current", "Reading (RMS)", meterText(item, r));
+    add("now", "Current now", si(r.current, "A"));
+    return rows;
+  }
+  if (item.kind === "voltmeter") {
+    add("voltage", "Reading (RMS)", meterText(item, r));
+    add("now", "P.d. now", si(r.voltage, "V"));
+    return rows;
+  }
+  add("rms-current", "RMS current, I", si(r.rmsCurrent, "A"));
+  if (item.kind === "wire") return rows;
+  const supply = item.kind === "source";
+  add(
+    "rms-voltage",
+    supply ? "RMS terminal p.d., V" : "RMS p.d. across it, V",
+    si(r.rmsVoltage, "V"),
+  );
+  if (!item.kind.startsWith("switch")) {
+    add("phase", "Phase", leadText(leadOf(r)));
+    add(
+      "impedance",
+      supply ? "Circuit impedance, Z = V/I" : "Impedance, V/I",
+      r.rmsCurrent ? si(r.rmsVoltage / r.rmsCurrent, "Ω") : "–",
+    );
+    if (frequency && item.kind === "capacitor")
+      add(
+        "reactance",
+        "Reactance, X = 1/(2πfC)",
+        si(1 / (2 * Math.PI * frequency * item.capacitance), "Ω"),
+      );
+    if (frequency && item.kind === "inductor")
+      add(
+        "reactance",
+        "Reactance, X = 2πfL",
+        si(2 * Math.PI * frequency * item.inductance, "Ω"),
+      );
+    add(
+      "mean-power",
+      supply ? "Mean power supplied" : "Mean power",
+      si(r.meanPower === null ? null : supply ? -r.meanPower : r.meanPower, "W"),
+    );
+    if (supply) {
+      const lead = leadOf(r);
+      add(
+        "power-factor",
+        "Power factor, cos φ",
+        lead === null ? "–" : Math.cos(lead).toFixed(3),
+      );
+    }
+  }
+  add("now-current", "Current now", si(size(r.current), "A"));
+  add("now-voltage", "P.d. now", si(r.voltage, "V"));
+  if (item.kind === "capacitor" || item.kind === "inductor")
+    add("energy", "Energy stored now", si(r.energy, "J"));
   return rows;
 }
 
@@ -1302,7 +1519,7 @@ function fillGrid(grid, prefix, rows) {
 }
 
 function unitOf(item, field) {
-  const key = item.id + ":" + field.key;
+  const key = item.id + ":" + (field.id || field.key);
   if (!units.has(key)) {
     const size = Math.abs(item[field.key]),
       fitting = field.units.filter(([f]) => f <= size * 1.0000001),
@@ -1335,7 +1552,9 @@ function buildForm() {
       name = document.createElement("label"),
       value = document.createElement("span"),
       number = document.createElement("input"),
-      id = "component-" + field.key;
+      fid = field.id || field.key,
+      scale = field.scale || 1,
+      id = "component-" + fid;
     row.className = "prop-row";
     name.textContent = field.label;
     name.htmlFor = id;
@@ -1343,13 +1562,13 @@ function buildForm() {
     number.type = "number";
     number.id = id;
     number.step = "any";
-    number.dataset.key = field.key;
+    number.dataset.key = fid;
     value.className = "prop-value";
     let unit;
     if (field.units.length > 1) {
       unit = document.createElement("select");
       unit.setAttribute("aria-label", field.label + " unit");
-      unit.dataset.unit = field.key;
+      unit.dataset.unit = fid;
       for (const [factor, symbol] of field.units) {
         const option = document.createElement("option");
         option.value = String(factor);
@@ -1359,7 +1578,7 @@ function buildForm() {
       unit.value = String(unitOf(item, field));
       // Choosing another unit re-expresses the value; it does not change it.
       unit.addEventListener("change", () => {
-        units.set(item.id + ":" + field.key, Number(unit.value));
+        units.set(item.id + ":" + fid, Number(unit.value));
         syncForm();
       });
     } else {
@@ -1372,7 +1591,7 @@ function buildForm() {
     if (field.slider) {
       range = document.createElement("input");
       range.type = "range";
-      range.dataset.key = field.key;
+      range.dataset.key = fid;
       range.dataset.slider = "true";
       range.setAttribute("aria-label", field.label + " slider");
     }
@@ -1386,7 +1605,9 @@ function buildForm() {
       if (ok || !typed) syncForm(ok ? typed : null);
     };
     const typedValue = () =>
-      number.value === "" ? NaN : Number(number.value) * unitOf(item, field);
+      number.value === ""
+        ? NaN
+        : (Number(number.value) * unitOf(item, field)) / scale;
     number.addEventListener("input", () => apply(typedValue(), number));
     number.addEventListener("change", () => apply(typedValue(), null));
     if (field.slider)
@@ -1413,7 +1634,10 @@ function syncForm(skip) {
   if (!item) return;
   for (const input of $("component-form").querySelectorAll("input")) {
     if (input === skip) continue;
-    const field = FIELDS[item.kind].find((f) => f.key === input.dataset.key);
+    const field = FIELDS[item.kind].find(
+        (f) => (f.id || f.key) === input.dataset.key,
+      ),
+      scale = field.scale || 1;
     if (input.dataset.slider) {
       const [min, max, step] =
         typeof field.slider === "function" ? field.slider(item) : field.slider;
@@ -1423,9 +1647,9 @@ function syncForm(skip) {
       input.value = item[field.key];
     } else {
       const factor = unitOf(item, field);
-      input.min = field.limit[0] / factor;
-      input.max = field.limit[1] / factor;
-      input.value = tidy(item[field.key] / factor);
+      input.min = (field.limit[0] * scale) / factor;
+      input.max = (field.limit[1] * scale) / factor;
+      input.value = tidy((item[field.key] * scale) / factor);
     }
   }
   const toggle = $("component-toggle");
@@ -1478,17 +1702,31 @@ function setTool(tool) {
 }
 
 // Switches between the page's views (one so far), as the fields page does.
-function setMode(mode) {
+// `keep` is set by `loadPreset`, which fills the view itself.
+function setMode(mode, keep) {
+  const changed = mode !== state.mode;
   state.mode = mode;
   lab = labs[mode];
   drag = null;
   for (const b of document.querySelectorAll("[data-mode]"))
     b.setAttribute("aria-pressed", String(b.dataset.mode === mode));
+  // Buttons and panels that belong to some views only.
   for (const b of document.querySelectorAll("[data-for]"))
-    b.hidden = b.dataset.for !== mode;
+    b.hidden = !b.dataset.for.split(" ").includes(mode);
+  put($("graph-title"), isAC() ? "Oscilloscope" : "Graphs against time");
+  if (!changed) return;
   state.selected = state.watched = null;
   setTool("grab");
   buildForm();
+  if (keep) return;
+  // The other view's circuit is as it was left; its clock is paused.
+  setRunning(false);
+  units.clear();
+  if (!lab.list().length)
+    return loadPreset(presets.find((p) => p.view === mode));
+  setWarp(warps[mode]);
+  restart();
+  fit();
 }
 
 // The time constant to mark on the graphs: that of the watched capacitor,
@@ -1530,16 +1768,16 @@ function updatePanels(c, s) {
     meters.map((m) => [
       m.name,
       (m.kind === "ammeter" ? "Ammeter " : "Voltmeter ") + m.name,
-      m.kind === "ammeter"
-        ? si(s.of(m.id).current, "A")
-        : si(s.of(m.id).voltage, "V"),
+      meterText(m, s.of(m.id)),
     ]),
   );
   put(
     $("meter-note"),
-    meters.length
-      ? ""
-      : "No meters yet. Put an ammeter in series, or a voltmeter in parallel.",
+    !meters.length
+      ? "No meters yet. Put an ammeter in series, or a voltmeter in parallel."
+      : isAC() && meters.some((m) => s.of(m.id).rmsCurrent === null)
+        ? "Meters read RMS over the last whole cycle. Run for at least one cycle to get a reading."
+        : "",
   );
   // Faults, loudly; other remarks, quietly.
   const fault = s.problems[0],
@@ -1571,6 +1809,7 @@ function updatePanels(c, s) {
       : "all at one potential",
   );
   drawGraphs(c, s);
+  if (isAC()) drawPhasors(c, s);
   const parts = lab.list().filter((i) => i.kind !== "wire").length,
     wires = lab.list().length - parts,
     step = lab.timestep,
@@ -1580,9 +1819,14 @@ function updatePanels(c, s) {
         : "";
   put(
     $("scene-status"),
-    `DC circuit · ${parts} component${parts === 1 ? "" : "s"}, ${wires} wire${wires === 1 ? "" : "s"} · ideal components` +
+    `${isAC() ? "AC" : "DC"} circuit · ${parts} component${parts === 1 ? "" : "s"}, ${wires} wire${wires === 1 ? "" : "s"} · ideal components` +
       (Number.isFinite(step)
-        ? ` · time step ${si(step, "s", 3)} (τ/${STEPS_PER_TAU})`
+        ? ` · time step ${si(step, "s", 3)}` +
+          (lab.period
+            ? ` (T/${Math.round(lab.period / step)})`
+            : lab.timeConstants().length
+              ? ` (τ/${STEPS_PER_TAU})`
+              : "")
         : ""),
   );
   put(
@@ -1643,7 +1887,7 @@ function graphFrame(el, c, o) {
   const X = (v) => left + ((v - x0) / (x1 - x0)) * (w - left - right),
     Y = (v) => top + ((y1 - v) / (y1 - y0)) * (h - top - bottom),
     places = (step) => clamp(-Math.floor(Math.log10(step) + 1e-9), 0, 12),
-    yStep = niceStep(y1 - y0, 3),
+    yStep = niceStep(y1 - y0, 4),
     xStep = niceStep(x1 - x0, 4);
   g.strokeStyle = c.axis;
   g.lineWidth = 1;
@@ -1692,29 +1936,43 @@ function graphFrame(el, c, o) {
 
 // P.d. and current of the watched component against time since the last
 // reset, with the time constant marked from the last change to the circuit.
-function drawGraphs(c) {
+function drawGraphs(c, s) {
   if (!$("graph-panel").open) return;
   const item = lab.get(state.watched),
     record = item && traces.get(item.id),
-    { taus, tau } = timeConstantOf(item);
+    period = lab.period,
+    { taus, tau: single } = timeConstantOf(item),
+    // With an AC source the graphs are an oscilloscope: the last three
+    // cycles, sliding along. No time constant is marked on that.
+    tau = period ? null : single,
+    start = period ? Math.max(0, lab.time - 3 * period) : 0,
+    span = period
+      ? 3 * period
+      : Math.max(lab.time, tau ? mark + 5 * tau : 0) || 1,
+    [tFactor, tPrefix] = axisUnit(start + span);
   put($("graph-subject"), item ? "· " + item.name : "");
   put(
     $("graph-note"),
     !item
       ? ""
-      : tau
-        ? `Time constant τ = ${si(tau, "s")}, marked from the last change (t = ${si(mark, "s")}). In one τ a charging p.d. covers 63% of the way to its final value; a discharging one falls to 37%.`
-        : taus.length > 1
-          ? `This circuit has ${taus.length} time constants (${taus.map((t) => si(t, "s")).join(", ")}), so its curves are sums of exponentials and no single τ is marked.`
-          : "Nothing here charges or discharges through a resistance, so the readings do not change with time.",
+      : period
+        ? `The last three cycles (T = ${si(period, "s")}). Across ${item.name}: ${leadText(leadOf(s.of(item.id)))}. A trace that peaks further to the left is ahead.`
+        : tau
+          ? `Time constant τ = ${si(tau, "s")}, marked from the last change (t = ${si(mark, "s")}). In one τ a rising curve covers 63% of the way to its final value; a falling one drops to 37%.`
+          : taus.length > 1
+            ? `This circuit has ${taus.length} time constants (${taus.map((t) => si(t, "s")).join(", ")}), so its curves are sums of exponentials and no single τ is marked.`
+            : lab.list().some((i) => i.kind === "inductor") &&
+                lab.list().some((i) => i.kind === "capacitor")
+              ? "A capacitor and an inductor together can oscillate, so there is no single time constant to mark."
+              : "Nothing here charges or discharges through a resistance, so the readings do not change with time.",
   );
-  const span = Math.max(lab.time, tau ? mark + 5 * tau : 0) || 1,
-    [tFactor, tPrefix] = axisUnit(span);
   for (const [el, key, unit, name, colour] of [
     [$("voltage-graph"), "v", "V", "p.d.", c.voltage],
     [$("current-graph"), "i", "A", "current", c.current],
   ]) {
-    const values = record ? record[key].filter((v) => v !== null) : [],
+    const values = record
+        ? record[key].filter((v, k) => v !== null && record.t[k] >= start)
+        : [],
       lo = Math.min(0, ...values),
       hi = Math.max(0, ...values),
       [factor, prefix] = axisUnit(Math.max(-lo, hi)),
@@ -1726,8 +1984,8 @@ function drawGraphs(c) {
           : !values.length
             ? "No reading to plot"
             : "",
-        x0: 0,
-        x1: span / tFactor,
+        x0: start / tFactor,
+        x1: (start + span) / tFactor,
         y0: lo / factor,
         y1: hi / factor,
       });
@@ -1744,8 +2002,18 @@ function drawGraphs(c) {
       g.stroke();
       g.setLineDash([]);
       g.textAlign = "center";
-      g.fillText("τ", x, frame.top - 3);
+      g.fillText("τ", x + 6, frame.top + 9);
     }
+    // Nothing is drawn outside the axes (the trace runs on to the left).
+    g.save();
+    g.beginPath();
+    g.rect(
+      X(start / tFactor),
+      frame.top - 3,
+      X((start + span) / tFactor) - X(start / tFactor) + 4,
+      frame.bottom - frame.top + 6,
+    );
+    g.clip();
     g.strokeStyle = colour;
     g.lineWidth = 1.6;
     g.lineJoin = "round";
@@ -1772,7 +2040,120 @@ function drawGraphs(c) {
       g.arc(X(lab.time / tFactor), Y(now / factor), 2.6, 0, 2 * Math.PI);
       g.fill();
     }
+    g.restore();
   }
+}
+
+// The phasor diagram: the p.d. across each component as an arrow whose
+// length is its RMS value and whose angle is its phase, measured from the
+// source's EMF, anticlockwise for ahead. The arrows of components in
+// series add, tip to tail, to the supply's. The current of the watched
+// component is drawn as a direction only, since it is not a p.d.
+function drawPhasors(c, s) {
+  const panel = $("phasor-panel");
+  if (!panel.open) return;
+  const el = $("phasor-diagram"),
+    g = el.getContext("2d"),
+    dpr = window.devicePixelRatio || 1,
+    w = el.clientWidth || 270,
+    h = el.clientHeight || 170;
+  if (!g?.setTransform) return;
+  if (el.width !== Math.round(w * dpr) || el.height !== Math.round(h * dpr)) {
+    el.width = Math.round(w * dpr);
+    el.height = Math.round(h * dpr);
+  }
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const colours = {
+      source: c.ink,
+      resistor: c.voltage,
+      variable: c.voltage,
+      lamp: c.voltage,
+      inductor: c.negative,
+      capacitor: c.positive,
+    },
+    shown = lab
+      .list()
+      .filter((i) => colours[i.kind] && s.of(i.id)?.rmsVoltage > 0),
+    largest = Math.max(0, ...shown.map((i) => s.of(i.id).rmsVoltage)),
+    watched = lab.get(state.watched),
+    supply = lab.list().find((i) => i.kind === "source"),
+    subject = watched && s.of(watched.id)?.rmsCurrent ? watched : supply,
+    current = subject && s.of(subject.id),
+    cx = w / 2,
+    cy = h / 2,
+    radius = Math.min(w, h) / 2 - 16;
+  g.font = "9px ui-monospace, monospace";
+  g.textBaseline = "middle";
+  if (!largest) {
+    g.fillStyle = c.ink;
+    g.textAlign = "center";
+    g.fillText("Run for one cycle to see the phasors", cx, cy);
+    put($("phasor-note"), "");
+    return;
+  }
+  g.strokeStyle = c.axis;
+  g.lineWidth = 1;
+  g.beginPath();
+  g.arc(cx, cy, radius, 0, 2 * Math.PI);
+  g.moveTo(cx - radius - 6, cy + 0.5);
+  g.lineTo(cx + radius + 6, cy + 0.5);
+  g.moveTo(cx + 0.5, cy - radius - 6);
+  g.lineTo(cx + 0.5, cy + radius + 6);
+  g.stroke();
+  const arrow = (length, angle, colour, label, dashed) => {
+    const x = cx + length * Math.cos(angle),
+      y = cy - length * Math.sin(angle);
+    g.strokeStyle = g.fillStyle = colour;
+    g.lineWidth = 2;
+    g.setLineDash(dashed ? [4, 3] : []);
+    g.beginPath();
+    g.moveTo(cx, cy);
+    g.lineTo(x, y);
+    g.stroke();
+    g.setLineDash([]);
+    g.beginPath();
+    g.moveTo(x, y);
+    for (const side of [-1, 1])
+      g.lineTo(
+        x - 7 * Math.cos(angle + side * 0.42),
+        y + 7 * Math.sin(angle + side * 0.42),
+      );
+    g.fill();
+    g.textAlign = Math.cos(angle) >= 0 ? "left" : "right";
+    g.fillText(
+      label,
+      x + 6 * Math.cos(angle),
+      y - 8 * Math.sin(angle) + (Math.abs(Math.sin(angle)) < 0.3 ? -7 : 0),
+    );
+  };
+  if (current?.rmsCurrent)
+    arrow(
+      radius * 0.62,
+      // A source's current is the one it drives; a component's, the one
+      // through it. Either way this is the current in the circuit.
+      current.phaseCurrent,
+      c.current,
+      "I",
+      true,
+    );
+  for (const item of shown) {
+    const r = s.of(item.id);
+    arrow(
+      (radius * r.rmsVoltage) / largest,
+      r.phaseVoltage,
+      colours[item.kind],
+      "V " + item.name,
+    );
+  }
+  const lead = supply && leadOf(s.of(supply.id));
+  put(
+    $("phasor-note"),
+    `Arrow lengths are RMS p.d.s, to one scale (circle = ${si(largest, "V", 3)}). Angles are from the source's EMF; anticlockwise is ahead. The dashed arrow is the direction of the current only.` +
+      (lead === null || lead === undefined
+        ? ""
+        : ` For the supply: ${leadText(lead)}.`),
+  );
 }
 
 // ---------------------------------------------------------------- loop
@@ -2190,7 +2571,9 @@ document.addEventListener("keydown", (e) => {
   } else if (key === "0") reset();
   else if (key === "[") shiftWarp(-1);
   else if (key === "]") shiftWarp(1);
-  else if (key >= "1" && key <= "9") setTool(HOTKEYS[Number(key) - 1]);
+  else if (key >= "1" && key <= "9")
+    setTool(key === "1" && isAC() ? "source" : HOTKEYS[Number(key) - 1]);
+  else if (key === "l") setTool("inductor");
   else if (key === "w") setTool("wire");
   else if (key === "g") setTool("grab");
   else if (key === "h") setTool("pan");
@@ -2278,10 +2661,17 @@ setupSceneFiles({
   toast,
   save: () => ({
     ...lab.exportScene(),
+    view: state.mode,
     scale: state.warp,
     watch: lab.get(state.watched)?.name ?? null,
   }),
   load(data) {
+    // Checked first, so that a bad file changes nothing, not even the view.
+    CircuitLab.fromScene(data);
+    // A file from before there were two views holds a DC circuit, unless
+    // it has an AC source in it.
+    const hasSource = data.items.some((i) => i?.kind === "source");
+    setMode(labs[data.view] ? data.view : hasSource ? "ac" : "dc", true);
     lab.loadScene(data);
     units.clear();
     setRunning(false);
@@ -2294,7 +2684,7 @@ setupSceneFiles({
 });
 
 function loadPreset(preset) {
-  setMode(preset.view);
+  setMode(preset.view, true);
   lab.clear();
   units.clear();
   preset.build(lab);
@@ -2307,7 +2697,10 @@ function loadPreset(preset) {
 }
 
 const list = $("preset-list");
-for (const [mode, title] of [["dc", "DC circuits"]]) {
+for (const [mode, title] of [
+  ["dc", "DC circuits"],
+  ["ac", "AC circuits"],
+]) {
   const heading = document.createElement("h3");
   heading.textContent = title;
   list.append(heading);
@@ -2401,6 +2794,7 @@ if (window.innerWidth < 900)
   for (const id of ["display-panel", "meters-panel", "graph-panel"])
     $(id).open = false;
 // Start with a circuit on the page, not an empty grid.
+setTool("grab");
 setWarp(1);
 loadPreset(presets[0]);
 fitHeader();

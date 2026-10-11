@@ -127,11 +127,18 @@ assert.equal(links[3].getAttribute("aria-current"), "page");
 nav.click();
 assert.equal($("nav-menu").hidden, true);
 
-// One view so far, switched the way the fields page switches its two.
+// Two views, switched the way the fields page switches its two. Each has
+// its own palette: the cell belongs to DC and the AC source to AC.
 assert.equal($("mode-dc").getAttribute("aria-pressed"), "true");
-const paletteButtons = [...document.querySelectorAll("[data-add]")];
-assert.equal(paletteButtons.length, 10);
-assert.ok(paletteButtons.every((b) => b.dataset.for === "dc" && !b.hidden));
+assert.equal($("mode-ac").getAttribute("aria-pressed"), "false");
+const paletteButtons = [...document.querySelectorAll("[data-add]")],
+  offered = () =>
+    paletteButtons.filter((b) => !b.hidden).map((b) => b.dataset.add);
+assert.equal(paletteButtons.length, 12);
+assert.ok(offered().includes("cell") && !offered().includes("source"));
+assert.ok(offered().includes("inductor"));
+assert.equal($("phasor-panel").hidden, true);
+assert.equal(text("graph-title"), "Graphs against time");
 $("mode-dc").click();
 assert.equal($("mode-dc").getAttribute("aria-pressed"), "true");
 
@@ -355,6 +362,101 @@ key("r");
 await frame();
 assert.equal(meter("A1"), "545.5 mA");
 assert.equal(reading("current"), "545.5 mA ↓");
+
+// An inductor in a DC circuit: L/R = 0.5 H / 100 Ω = 5 ms.
+await preset("rl");
+assert.equal(meter("A1"), "0 A");
+assert.equal(meter("V1"), "10.00 V");
+assert.equal(text("selected-name"), "Inductor L1");
+assert.equal(reading("tau"), "5.000 ms");
+assert.equal($("warp").value, "0.005");
+// Sixty frames at 0.005× are 5 ms: I = (10/100)(1 − 1/e).
+await steps(60);
+assert.match(text("time"), /^t = 5\.000 ms/);
+assert.equal(meter("A1"), "63.21 mA");
+assert.equal(meter("V1"), "3.679 V");
+
+// The AC view. It opens on its own first preset, paused, with its own
+// palette, RMS meters, an oscilloscope and a phasor diagram.
+$("mode-ac").click();
+await frame();
+assert.equal($("mode-ac").getAttribute("aria-pressed"), "true");
+assert.equal($("mode-dc").getAttribute("aria-pressed"), "false");
+assert.ok(offered().includes("source") && !offered().includes("cell"));
+assert.equal($("phasor-panel").hidden, false);
+assert.equal(text("graph-title"), "Oscilloscope");
+assert.match(text("scene-status"), /^AC circuit · 4 components/);
+assert.match(text("scene-status"), /time step 50\.0 µs \(T\/400\)/);
+assert.equal($("warp").value, "0.02");
+assert.equal(text("selected-name"), "Resistor R1");
+// No RMS reading until a whole cycle has been measured.
+assert.equal(meter("A1"), "– rms");
+// Sixty frames at 0.02× are one 50 Hz cycle. 10 V RMS across 100 Ω.
+await steps(60);
+assert.match(text("time"), /^t = 20\.00 ms/);
+assert.equal(meter("A1"), "100.0 mA rms");
+assert.equal(meter("V1"), "10.00 V rms");
+assert.equal(reading("rms-current"), "100.0 mA");
+assert.equal(reading("mean-power"), "1.000 W");
+assert.equal(reading("phase"), "in phase");
+// The source's two voltage boxes are one quantity: peak = RMS × √2.
+await click(0, 2);
+assert.equal(text("selected-name"), "AC source E1");
+assert.equal($("component-rms").value, "10");
+assert.equal($("component-amplitude").value, "14.1421");
+assert.equal($("component-frequency").value, "50");
+set($("component-rms"), 20, "input");
+await frame();
+assert.equal($("component-amplitude").value, "28.2843");
+await steps(60);
+assert.equal(meter("A1"), "200.0 mA rms");
+// Capacitor: I = V·2πfC = 31.42 mA, a quarter-cycle ahead.
+await preset("ac-capacitor");
+await steps(120);
+assert.equal(meter("A1"), "31.42 mA rms");
+assert.equal(reading("phase"), "current leads by 90.0°");
+assert.equal(reading("reactance"), "318.3 Ω");
+assert.equal(reading("mean-power"), "0 W");
+// Inductor: I = V/2πfL = 63.66 mA, a quarter-cycle behind.
+await preset("ac-inductor");
+await steps(120);
+assert.equal(meter("A1"), "63.66 mA rms");
+assert.equal(reading("phase"), "current lags by 90.0°");
+assert.equal(reading("reactance"), "157.1 Ω");
+// Series RLC, run for half a second at 1× to settle: Z = 189.7 Ω.
+await preset("rlc");
+set($("warp"), 1);
+await steps(30);
+assert.match(text("time"), /^t = 500\.0 ms/);
+assert.equal(meter("A1"), "52.71 mA rms");
+assert.equal(meter("V1"), "5.271 V rms");
+assert.equal(meter("V2"), "8.279 V rms");
+assert.equal(meter("V3"), "16.78 V rms");
+assert.equal(text("selected-name"), "AC source E1");
+assert.equal(reading("impedance"), "189.7 Ω");
+assert.equal(reading("phase"), "current leads by 58.2°");
+assert.equal(reading("power-factor"), "0.527");
+assert.equal(reading("mean-power"), "277.8 mW");
+assert.match(text("phasor-note"), /For the supply: current leads by 58\.2°/);
+assert.match(text("graph-note"), /^The last three cycles \(T = 20\.00 ms\)/);
+// Resonance at 71.18 Hz: Z = R, and V_L = V_C = 22.36 V.
+await preset("resonance");
+set($("warp"), 1);
+await steps(60);
+assert.equal(meter("A1"), "100.0 mA rms");
+assert.equal(meter("V2"), "22.36 V rms");
+assert.equal(meter("V3"), "22.36 V rms");
+assert.equal(reading("phase"), "in phase");
+// Back to DC: its circuit is as it was left.
+$("mode-dc").click();
+await frame();
+assert.equal(text("graph-title"), "Graphs against time");
+assert.equal($("phasor-panel").hidden, true);
+assert.equal(meter("A1"), "63.21 mA");
+assert.match(text("scene-status"), /^DC circuit/);
+await preset("series");
+document.querySelector('[data-add="resistor"]').click();
+await click(10, 2);
 
 // Display toggles and their keys.
 for (const [k, id] of [
