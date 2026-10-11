@@ -45,6 +45,7 @@ const TAB_GROUPS = {
 
 let win = null,
   queued = false,
+  live = false,
   mode = "light",
   tab = "colours",
   query = "",
@@ -307,7 +308,9 @@ function build() {
   // Rebuilt after the event that changed the scheme has finished, never
   // inside it (rebuilding moves focus, which can fire another change).
   window.addEventListener("physium-scheme-edit", () => {
-    if (queued || !win || win.hidden) return;
+    // Not while a slider or colour picker is held (`live`): rebuilding
+    // would replace the control under the pointer and end the drag.
+    if (live || queued || !win || win.hidden) return;
     queued = true;
     setTimeout(() => {
       queued = false;
@@ -380,11 +383,13 @@ function colourRow(t, scheme) {
   let before = null;
   picker.addEventListener("input", () => {
     before ??= currentScheme();
+    live = true;
     const v = picker.value + alphaOf(hex.value);
     hex.value = v;
     attempt(() => commit(v, false));
   });
   picker.addEventListener("change", () => {
+    live = false;
     if (before) {
       const after = currentScheme();
       setScheme(before, { record: false });
@@ -446,23 +451,41 @@ function valueRow(t, scheme) {
     control.type = "range";
     Object.assign(control, { min: t.min, max: t.max, step: t.step });
     control.value = current;
-    const out = document.createElement("output");
-    out.htmlFor = id;
-    const show = () =>
-      (out.textContent = control.value + (t.unit ? " " + t.unit : ""));
-    show();
+    // The slider and a number field for the same value.
+    const out = document.createElement("span"),
+      field = document.createElement("input"),
+      unit = document.createElement("span");
+    out.className = "dev-number";
+    field.type = "number";
+    Object.assign(field, { min: t.min, max: t.max, step: t.step });
+    field.value = current;
+    field.setAttribute("aria-label", t.description);
+    unit.textContent = t.unit ?? "";
+    out.append(field, unit);
     let before = null;
     control.addEventListener("input", () => {
       before ??= currentScheme();
-      show();
+      // Held: the window is not rebuilt until the slider is let go, or the
+      // slider being dragged would be replaced under the pointer.
+      live = true;
+      field.value = control.value;
       set(Number(control.value), false);
     });
     control.addEventListener("change", () => {
+      live = false;
       if (!before) return;
       const after = currentScheme();
       setScheme(before, { record: false });
       setScheme(after);
       before = null;
+    });
+    field.addEventListener("change", () => {
+      const typed = Number(field.value);
+      if (field.value.trim() === "" || !Number.isFinite(typed)) {
+        field.value = control.value;
+        return;
+      }
+      set(Math.min(t.max, Math.max(t.min, typed)), true);
     });
     row.append(label, control, out);
   } else {

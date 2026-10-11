@@ -43,6 +43,7 @@ export function setupPreferences($) {
     $("ui-theme").value = prefs.theme;
     $("ui-size").value = prefs.size;
     $("ui-size-value").textContent = prefs.size + "%";
+    if ($("ui-size-number")) $("ui-size-number").value = prefs.size;
     $("ui-grid").checked = prefs.grid;
     if ($("ui-angle-unit")) $("ui-angle-unit").value = prefs.angleUnit;
     const { theme, size, grid, angleUnit } = prefs;
@@ -59,10 +60,34 @@ export function setupPreferences($) {
     prefs.theme = e.target.value;
     apply();
   };
-  $("ui-size").oninput = (e) => {
-    prefs.size = Number(e.target.value);
+  // The size changes the layout the slider itself sits in, so while the
+  // slider is held with the pointer only its number follows; the page is
+  // resized when it is let go. (Resizing under the pointer would move the
+  // thumb away from it.) Keys and the number field apply at once.
+  let held = false;
+  const size = $("ui-size"),
+    sizeOf = (x) => Math.max(80, Math.min(140, Math.round(Number(x)) || 100));
+  size.addEventListener("pointerdown", () => (held = true));
+  size.oninput = (e) => {
+    const value = sizeOf(e.target.value);
+    if (held) {
+      $("ui-size-value").textContent = value + "%";
+      if ($("ui-size-number")) $("ui-size-number").value = value;
+      return;
+    }
+    prefs.size = value;
     apply();
   };
+  size.onchange = (e) => {
+    held = false;
+    prefs.size = sizeOf(e.target.value);
+    apply();
+  };
+  if ($("ui-size-number"))
+    $("ui-size-number").onchange = (e) => {
+      prefs.size = sizeOf(e.target.value);
+      apply();
+    };
   $("ui-grid").onchange = (e) => {
     prefs.grid = e.target.checked;
     apply();

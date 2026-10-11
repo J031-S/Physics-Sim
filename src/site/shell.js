@@ -69,7 +69,16 @@ export const WEBSITE_SETTINGS = `<summary>Website</summary>
     <label for="ui-size">GUI size</label
     ><input id="ui-size" type="range" min="80" max="140" step="5" value="100"
     /><span class="prop-value"
-      ><output id="ui-size-value" for="ui-size">100%</output></span
+      ><input
+        id="ui-size-number"
+        type="number"
+        min="80"
+        max="140"
+        step="1"
+        value="100"
+        aria-label="GUI size in per cent"
+      /><span class="unit">%</span
+      ><output id="ui-size-value" for="ui-size" hidden>100%</output></span
     >
   </div>
   <label class="setting-toggle"

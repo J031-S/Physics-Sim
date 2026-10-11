@@ -303,7 +303,9 @@ export function surfaceCss(get, { colours, fontRoot }) {
   // Patterns: the page behind everything, and the canvas behind the scene
   // (the scene canvases clear to transparent each frame).
   for (const [where, selector] of [
-    ["page", "body, .doc-page main"],
+    // One element only: a second copy on `main` starts from its own corner
+    // (and is scaled with the page's zoom), so the two would not line up.
+    ["page", "body"],
     ["canvas", PARTS.canvas],
   ]) {
     const kind = get(`${where}-pattern`);

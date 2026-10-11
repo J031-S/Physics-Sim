@@ -906,8 +906,12 @@ header {
    minitools): the simulations fix the body, these do not. */
 body.doc-page {
   overflow: auto;
+  background-color: var(--canvas-bg);
 }
+/* The page's background (and any pattern on it) is the body's, showing
+   through `main`, so that it runs unbroken behind the whole page. */
 .doc-page main {
+  background: transparent;
   height: auto;
   min-height: calc(100dvh - var(--header-h) * var(--ui-scale));
 }
@@ -1218,4 +1222,15 @@ body.doc-page {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+/* Every slider on the site looks and handles the same way. */
+input[type="range"] {
+  accent-color: var(--accent-text);
+  cursor: ew-resize;
+  touch-action: pan-y;
+}
+#ui-size-number {
+  width: 52px;
+  padding: 4px 5px;
 }

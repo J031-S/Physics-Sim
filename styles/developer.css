@@ -217,7 +217,7 @@
   font-weight: 700;
 }
 .dev-value {
-  grid-template-columns: 1fr 120px 64px;
+  grid-template-columns: 1fr 110px 74px;
 }
 .dev-value .dev-token-name {
   font-weight: 500;
@@ -228,10 +228,22 @@
 .dev-value select {
   grid-column: 2 / 4;
 }
-.dev-value output {
+.dev-number {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font:
     10.5px ui-monospace,
     monospace;
+}
+.dev-number input {
+  width: 46px;
+  padding: 2px 3px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--canvas-bg);
+  color: inherit;
+  font: inherit;
   text-align: right;
 }
 #dev-css,
