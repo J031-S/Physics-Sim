@@ -6,6 +6,8 @@
   --negative: #3f76aa;
   --current: #b4530a;
   --electron: #3f76aa;
+  --dot: #ff7a00;
+  --dot-electron: #00a3ff;
   --voltage: #2f7d4f;
   --danger: #a5544a;
 }
@@ -14,6 +16,8 @@
   --negative: #6fa8ec;
   --current: #f2c14e;
   --electron: #6fa8ec;
+  --dot: #ff4d2e;
+  --dot-electron: #1f8bff;
   --voltage: #8fd3a4;
   --danger: #e08a7e;
 }
@@ -70,10 +74,10 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--current);
+  background: var(--dot);
 }
 .electron-flow .cl-dot {
-  background: var(--electron);
+  background: var(--dot-electron);
 }
 .cl-ramp {
   flex: 0 0 44px;

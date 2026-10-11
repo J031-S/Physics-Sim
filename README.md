@@ -332,9 +332,11 @@ The **DC** button at the left of the toolbar is the page's view. There is one so
 - **Place a component**: click it in the toolbar (or press its number key), then click the grid; or drag it straight out of the toolbar onto the grid. Everything snaps to the grid. `R` turns the component before it is placed. The tool then returns to **Grab**.
 - **Wire it up**: drag from any terminal to wherever the wire should end. If the two points are not in line the wire is drawn with one corner, along the direction you set off in; hold Shift for a single straight wire. The **Wire** tool (`W`) starts a wire from any grid point and stays on until Esc or `G`.
 - **Junctions**: ends that share a grid point are joined. A wire that ends part-way along another wire joins it there (the other wire is cut at that point). A filled dot marks three or more ends meeting; a small open ring marks an end joined to nothing.
-- **Put a meter in series**: drop a component onto a wire and the wire is cut and the component inserted.
+- **Put a component in series**: drop it onto a wire. It turns to lie along that wire, whichever way the wire runs, the wire is cut and the component is inserted. This works from the toolbar and when dragging a component that has no wires on it yet; the faint preview shows which way it will face.
 - **Move**: drag a component and the wires on its terminals stretch to follow. Arrow keys move the selected component one square. A selected wire has a handle at each end.
-- **Turn**: `R` (or the button in the panel) turns the selected component a quarter-turn about its centre. The wires stay put, so one quarter-turn takes it off them and a second puts it back the other way round: that is how to reverse a cell or a meter.
+- **Turn**: `R` (or the button in the panel) turns the selected component a quarter-turn about its centre. The wires stay put, so one quarter-turn takes it off them and a second puts it back.
+  - A **cell, capacitor, ammeter or voltmeter** has a + terminal, so it has four orientations, and the second quarter-turn puts it back the other way round: that is how to reverse one. A two-way switch also has four.
+  - A **resistor, variable resistor, lamp or switch** behaves the same either way round, so it has two orientations only, horizontal and vertical. Turning it never draws it upside down or back to front, and two quarter-turns leave it exactly as it was.
 - **Delete**: `Delete`. **Clear scene** removes everything.
 - **View**: drag empty space to pan (or use Pan, `H`), scroll or `+` / `−` to zoom, **Fit scene** (`F`).
 
@@ -374,7 +376,7 @@ Click a component to see and change its values. The number box is in the unit sh
 
 ### Display
 
-- **Current** (`C`): dots along every wire and lead that carries current. Their speed is proportional to the current: at any moment the fastest dots are on the branch with the most current, and as a capacitor charges they slow in step with it. The speed is scaled to the largest current seen since the last reset, so that milliamps and amps are both visible.
+- **Current** (`C`): bright dots, each ringed in the page colour so that it stands out from the wire on both themes, along every wire and lead that carries current. Their speed is proportional to the current: at any moment the fastest dots are on the branch with the most current, and as a capacitor charges they slow in step with it. The speed is scaled to the largest current seen since the last reset, so that milliamps and amps are both visible.
 - **Electron flow** (`E`): the same dots moving the way the electrons do, from the − terminal round to the +. Readings and arrows stay conventional.
 - **Colour by potential** (`P`): each wire and lead is coloured from blue (lowest potential in the circuit) to red (highest). Everything joined by plain wire is one colour; the colour changes only across a component.
 - **Values** (`V`): names and values beside the components, and the meter readings.

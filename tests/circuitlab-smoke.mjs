@@ -335,6 +335,27 @@ assert.equal(meter("A1"), "0 A");
 assert.equal($("warning").hidden, false);
 assert.match(text("warning-text"), /terminals of E1 are joined/);
 
+// A component dropped on a wire turns to lie along it and goes in series.
+// Here a resistor (10 Ω) is put on the upright wire at the right-hand side:
+// I = 12/(4 + 8 + 10).
+await preset("series");
+document.querySelector('[data-add="resistor"]').click();
+await click(10, 2);
+assert.deepEqual(counts(), [7, 13]);
+assert.equal(text("selected-name"), "Resistor R3");
+assert.equal(meter("A1"), "545.5 mA");
+assert.equal(reading("current"), "545.5 mA ↓");
+assert.equal(reading("voltage"), "5.455 V");
+// It has two orientations only. A quarter-turn takes it off the wire; a
+// second puts it back exactly as it was, not upside down.
+key("r");
+await frame();
+assert.equal(meter("A1"), "0 A");
+key("r");
+await frame();
+assert.equal(meter("A1"), "545.5 mA");
+assert.equal(reading("current"), "545.5 mA ↓");
+
 // Display toggles and their keys.
 for (const [k, id] of [
   ["c", "show-current"],
@@ -373,7 +394,7 @@ $("clear").click();
 assert.equal($("clear-confirm").hidden, false);
 $("clear-no").click();
 assert.equal($("clear-confirm").hidden, true);
-assert.deepEqual(counts(), [7, 15]);
+assert.deepEqual(counts(), [7, 13]);
 $("clear").click();
 $("clear-yes").click();
 await frame();

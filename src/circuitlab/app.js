@@ -4,7 +4,13 @@
 import { setupPreferences } from "../preferences.js";
 import { setupNav } from "../nav.js";
 import { setPlaybackIcon } from "../icons.js";
-import { CircuitLab, KINDS, LIMITS, STEPS_PER_TAU } from "./model.js";
+import {
+  CircuitLab,
+  KINDS,
+  LIMITS,
+  STEPS_PER_TAU,
+  turnsOf,
+} from "./model.js";
 import { presets } from "./presets.js";
 
 const $ = (id) => document.getElementById(id),
@@ -533,6 +539,12 @@ function palette() {
     negative: dark ? "#6fa8ec" : "#3f76aa",
     current: dark ? "#f2c14e" : "#b4530a",
     electron: dark ? "#6fa8ec" : "#3f76aa",
+    // The moving dots. Chosen against the wire they sit on as well as the
+    // page: wires are near-black on the light theme and cream on the dark
+    // one, so the dots are a saturated colour with a ring of the page
+    // colour round them.
+    dot: dark ? "#ff4d2e" : "#ff7a00",
+    dotElectron: dark ? "#1f8bff" : "#00a3ff",
     voltage: dark ? "#8fd3a4" : "#2f7d4f",
     glow: dark ? "#ffd866" : "#f5b700",
     danger: dark ? "#ff8f7d" : "#b3261e",
@@ -909,8 +921,10 @@ function drawComponent(g, item, reading, o) {
 // travelled.
 function drawDots(c, s) {
   if (!state.show.current) return;
-  ctx.fillStyle = state.electrons ? c.electron : c.current;
-  const r = clamp(view.scale * 0.06, 1.5, 3);
+  ctx.fillStyle = state.electrons ? c.dotElectron : c.dot;
+  ctx.strokeStyle = c.back;
+  ctx.lineWidth = 1.5;
+  const r = clamp(view.scale * 0.09, 2.4, 4.4);
   for (const item of lab.list()) {
     if (!placed(item)) continue;
     const flow = s.of(item.id)?.flow;
@@ -934,6 +948,7 @@ function drawDots(c, s) {
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
         ctx.fill();
+        ctx.stroke();
       }
       offset = d - length;
     }
@@ -1745,7 +1760,7 @@ function place(kind, x, y) {
   let id = null;
   if (
     !attempt(() => {
-      id = lab.add(kind, { x, y, rot: state.placeRot });
+      id = lab.add(kind, { x, y, rot: facing(kind, state.placeRot, x, y) });
     })
   )
     return;
@@ -1775,6 +1790,25 @@ function nudge(item, dx, dy) {
   });
   if (!lab.get(item.id)) select(null);
   changed();
+}
+// The way a component should face at a grid point: along the wire that
+// runs straight through that point, if there is one, so that it drops into
+// the wire in series. Otherwise as it is. Of the two ways along the wire, a
+// component with a + terminal takes the one a quarter-turn from where it
+// was (left ↔ top, right ↔ bottom).
+function facing(kind, rot, x, y) {
+  let across = false,
+    up = false;
+  for (const w of lab.list()) {
+    if (w.kind !== "wire" || !placed(w)) continue;
+    const between = (a, b, v) => v > Math.min(a, b) && v < Math.max(a, b);
+    if (w.y1 === y && w.y2 === y && between(w.x1, w.x2, x)) across = true;
+    if (w.x1 === x && w.x2 === x && between(w.y1, w.y2, y)) up = true;
+  }
+  rot = turnsOf(kind, rot);
+  if (across === up || kind === "switch2") return rot;
+  if (up === (rot % 2 === 1)) return rot;
+  return turnsOf(kind, up ? [3, 1, 1, 3][rot] : [0, 2, 2, 0][rot]);
 }
 const gridPoint = (sx, sy) => {
   const p = world(sx, sy);
@@ -1860,7 +1894,17 @@ canvas.addEventListener("pointermove", (e) => {
       drag.moved = true;
       if (x !== nowX || y !== nowY)
         try {
-          lab.move(item.id, x, y, drag.carry);
+          // A component with no wires on it yet turns to lie along a wire
+          // it is dragged onto.
+          lab.move(
+            item.id,
+            x,
+            y,
+            drag.carry,
+            item.kind === "wire" || drag.carry.length
+              ? undefined
+              : facing(item.kind, item.rot, x, y),
+          );
         } catch {
           // Off the edge of the grid: it stays where it was.
         }
@@ -1886,7 +1930,12 @@ canvas.addEventListener("pointermove", (e) => {
       if (Math.max(dx, dy) > 0.3) drag.horizontal = dx >= dy;
     }
   } else if (ADD[state.tool] && state.tool !== "wire")
-    ghost = { kind: state.tool, x: at.x, y: at.y, rot: state.placeRot };
+    ghost = {
+      kind: state.tool,
+      x: at.x,
+      y: at.y,
+      rot: facing(state.tool, state.placeRot, at.x, at.y),
+    };
   else {
     hover = state.tool === "pan" ? null : terminalAt(sx, sy);
     const hit = state.tool === "grab" && !hover && hitTest(sx, sy);
@@ -1989,8 +2038,13 @@ window.addEventListener("pointermove", (e) => {
     paletteDrag.active = true;
   if (!paletteDrag.active) return;
   const { sx, sy } = eventPoint(e);
+  const at = gridPoint(sx, sy);
   ghost = overCanvas(e)
-    ? { kind: paletteDrag.kind, ...gridPoint(sx, sy), rot: state.placeRot }
+    ? {
+        kind: paletteDrag.kind,
+        ...at,
+        rot: facing(paletteDrag.kind, state.placeRot, at.x, at.y),
+      }
     : null;
 });
 window.addEventListener("pointerup", (e) => {
@@ -2051,7 +2105,7 @@ document.addEventListener("keydown", (e) => {
     // Turns the component about to be placed, or else the selected one.
     if (ADD[state.tool] && state.tool !== "wire") {
       state.placeRot = (state.placeRot + 1) & 3;
-      if (ghost) ghost.rot = state.placeRot;
+      if (ghost) ghost.rot = turnsOf(ghost.kind, state.placeRot);
     } else rotateSelected();
   } else if (key === "0") reset();
   else if (key === "[") shiftWarp(-1);
