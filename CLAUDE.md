@@ -40,6 +40,7 @@ No bundler, no framework, no runtime dependencies. `index.html` loads `vendor/ma
 | `src/nav.js` | The drop-down of links that switches between the pages. The links themselves are written out in each page's HTML: a new page is added to all of them |
 | `src/fieldlab/model.js` | `FieldLab`: sources, E, V, B, A_z, forces, field-line tracing, contours. No DOM |
 | `src/fieldlab/presets.js` | Field arrangements with the textbook result each one shows |
+| `src/fieldlab/arrows.js` | Where the direction arrows sit on a field line. No DOM |
 | `src/fieldlab/app.js` | The fields page: drawing, input, panels |
 | `src/orbitlab/model.js` | `OrbitLab`: central body, satellites, the leapfrog integrator, orbital elements from the state vector, predicted paths, swept areas, third-law points. No DOM |
 | `src/orbitlab/presets.js` | Ready-made launches with the textbook result each one shows |
@@ -94,7 +95,7 @@ The sources are static and the canvas is redrawn on change. The one thing integr
 - `TestCharges.step(dt)` is velocity Verlet with substeps that shorten near point charges. A test charge is +1 nC and 1 µg (`TEST_CHARGE`), feels the field without adding to it, and stops on a plate, at a negative charge, or out of range. Its path is not a field line (inertia); do not "fix" that. `fillGrid(bounds, spacing)` replaces them all with one per grid point (the Test grid button); trails are then drawn as a single path, so keep them short.
 - Equipotentials come with the sampled potential grid, which `app.js` turns into the red/blue shading (opacity ∝ |V| up to the returned `scale`).
 - Placing anything returns the tool to Grab, as in the sandbox.
-- **Panning must not change the picture.** Line tracing uses `anchoredBounds()` and contour steps use `referenceBounds()` (both tied to the sources, not the view); contour samples sit on a world lattice; background-field lines start at fixed values of its stream function; arrows sit where a line crosses a world lattice. Do not place anything by distance along a polyline or by the view's edges.
+- **Panning must not change the picture.** Line tracing uses `anchoredBounds()` and contour steps use `referenceBounds()` (both tied to the sources, not the view); contour samples sit on a world lattice; background-field lines start at fixed values of its stream function; the arrows on a line are placed by `lineArrows` in `arrows.js` from the line and the sources alone (rings and spokes round the nearest source; a world lattice only when there are no sources), and lines are followed `arrowMargin()` past the screen edge so that merging two close arrows never depends on the view. Do not place anything by distance from the start of a polyline or by the view's edges. Moving the view in a real browser and comparing the canvas pixel for pixel is the check.
 - New behaviour needs a test in `tests/fieldlab.test.mjs` against the formula. `tests/fieldlab-smoke.mjs` drives the page in happy-dom; its `// ---- checks ----` part uses only DOM calls, so it can also be run inside a real browser.
 
 ## Orbits tool (`src/orbitlab/`)

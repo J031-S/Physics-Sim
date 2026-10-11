@@ -193,7 +193,7 @@ Choose a source in the toolbar and click the scene to place it; the tool then re
 
 The **Display** panel chooses what is drawn:
 
-- **Field lines** (`L`), with arrows along the field.
+- **Field lines** (`L`), with arrows along the field. The arrows are arranged round the sources: on rings round a charge or wire where a line runs towards or away from it, and on evenly spaced spokes where a line runs round it (parallel to and square to the face of a plate or magnet). They stay on the same spot of their line when the view is moved.
 - **Field arrows** (`A`) on a grid. Length and opacity grow with the square root of the field strength relative to the strongest tenth on screen: a guide to strength, not a scale.
 - **Equipotentials** (electric scene only), thin green lines at equal steps of a round number of volts shown beside the tick box. The 0 V line is heavier. The scene behind them is shaded by potential: red where V is positive, blue where it is negative, and more opaque the larger |V| is. The opacity is proportional to |V| up to the value shown in the key ("full at ±…"), which is the largest potential outside the 3% of the screen closest to the charges; nearer than that the shading stays at full strength.
 - **Forces** (`F`): the force on each point charge (in newtons), or on each metre of each wire (N/m), from every other source and the background field. Arrow lengths are in proportion to each other.

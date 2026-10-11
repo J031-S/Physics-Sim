@@ -13,6 +13,7 @@ import {
   contourLines,
 } from "../src/fieldlab/model.js";
 import { presets } from "../src/fieldlab/presets.js";
+import { arrowFeatures, lineArrows } from "../src/fieldlab/arrows.js";
 
 const nC = 1e-9;
 const close = (actual, expected, relative, message) =>
@@ -763,4 +764,198 @@ test("the picture does not depend on which region is drawn", () => {
     );
   assert.equal(a.step, b.step);
   assert.equal(a.scale, b.scale);
+});
+
+// ---------------------------------------------------------------------------
+// Direction arrows on field lines (src/fieldlab/arrows.js).
+
+const circle = (cx, cy, r, n = 1440) =>
+  Array.from({ length: n + 1 }, (_, k) => [
+    cx + r * Math.cos((2 * Math.PI * k) / n + 0.3),
+    cy + r * Math.sin((2 * Math.PI * k) / n + 0.3),
+  ]);
+const none = { points: [], segments: [] };
+
+test("arrows on a circle round a wire sit on evenly spaced spokes", () => {
+  const S = 2,
+    wire = { points: [[0.37, -1.13]], segments: [] };
+  // Circumference ÷ spacing, rounded to a power of two: 1, 2, 4, 8 spokes.
+  for (const [r, spokes] of [
+    [0.3, 1],
+    [0.6, 2],
+    [1.3, 4],
+    [2.5, 8],
+  ]) {
+    const arrows = lineArrows(circle(0.37, -1.13, r), wire, S);
+    assert.equal(arrows.length, spokes, `radius ${r}`);
+    const angles = arrows
+      .map((a) => Math.atan2(a.y + 1.13, a.x - 0.37))
+      // Measured from straight up; an angle a hair below a full turn is 0.
+      .map((a) => (a - Math.PI / 2 + 4 * Math.PI + 1e-6) % (2 * Math.PI))
+      .sort((a, b) => a - b);
+    // The first spoke is straight up; the rest follow at equal angles.
+    angles.forEach((a, k) => {
+      const want = (2 * Math.PI * k) / spokes,
+        off = Math.min(Math.abs(a - want), 2 * Math.PI - Math.abs(a - want));
+      near(off, 0, 1e-6, `spoke ${k} of ${spokes}`);
+    });
+    for (const a of arrows) {
+      near(Math.hypot(a.x - 0.37, a.y + 1.13), r, 1e-5 * r, "on the circle");
+      // Pointing along the line: anticlockwise, square to the radius.
+      near(
+        (-(a.y + 1.13) * a.dx + (a.x - 0.37) * a.dy) / r,
+        1,
+        1e-4,
+        "tangent",
+      );
+    }
+  }
+});
+
+test("arrows on a line straight out of a charge sit on rings (k + ½) apart", () => {
+  const S = 1.5,
+    charge = { points: [[-2, 3]], segments: [] },
+    dir = [Math.cos(0.7), Math.sin(0.7)],
+    line = Array.from({ length: 2001 }, (_, k) => [
+      -2 + dir[0] * (0.05 + k * 0.004),
+      3 + dir[1] * (0.05 + k * 0.004),
+    ]),
+    arrows = lineArrows(line, charge, S);
+  assert.equal(arrows.length, 5);
+  arrows.forEach((a, k) => {
+    near(Math.hypot(a.x + 2, a.y - 3), (k + 0.5) * S, 1e-9, `ring ${k}`);
+    near(a.dx, dir[0], 1e-9, "direction x");
+    near(a.dy, dir[1], 1e-9, "direction y");
+  });
+});
+
+test("arrows follow the sources, not the grid", () => {
+  // Moving the sources and the line together by any amount moves every
+  // arrow by exactly that amount. Arrows tied to a grid would not.
+  const lab = new FieldLab();
+  lab.add("charge", { x: -1.1, y: 0.2, charge: 2 * nC });
+  lab.add("charge", { x: 1.4, y: -0.3, charge: -2 * nC });
+  const lines = electricFieldLines(lab, BOUNDS, { step: 0.05 }),
+    features = arrowFeatures(lab.compiled(), "electric"),
+    [ox, oy] = [0.3137, -0.2718],
+    moved = {
+      points: features.points.map((p) => [p[0] + ox, p[1] + oy]),
+      segments: [],
+    };
+  let total = 0;
+  for (const line of lines) {
+    const a = lineArrows(line, features, 1.7),
+      b = lineArrows(
+        line.map((p) => [p[0] + ox, p[1] + oy]),
+        moved,
+        1.7,
+      );
+    assert.equal(a.length, b.length);
+    a.forEach((arrow, k) => {
+      near(b[k].x - arrow.x, ox, 1e-9, "x shift");
+      near(b[k].y - arrow.y, oy, 1e-9, "y shift");
+    });
+    total += a.length;
+  }
+  assert.ok(total > 20, `expected plenty of arrows, got ${total}`);
+});
+
+test("rings round two sources that nearly meet give one arrow midway", () => {
+  // Charges one spacing apart: the ½-spacing rings of both cross the line
+  // joining them at its middle.
+  const S = 2,
+    pair = {
+      points: [
+        [-1.01, 0],
+        [1.01, 0],
+      ],
+      segments: [],
+    },
+    line = Array.from({ length: 801 }, (_, k) => [-0.9 + k * 0.00225, 0]),
+    arrows = lineArrows(line, pair, S);
+  assert.equal(arrows.length, 1);
+  near(arrows[0].x, 0, 1e-9, "midway");
+});
+
+test("a line traced from end to end always carries an arrow", () => {
+  // Between plates closer than the arrow spacing no ring is crossed.
+  const lab = new FieldLab();
+  presets.find((p) => p.id === "parallel-plates").build(lab);
+  const features = arrowFeatures(lab.compiled(), "electric"),
+    lines = electricFieldLines(lab, BOUNDS, { step: 0.05 }),
+    between = lines.filter(
+      (l) =>
+        Math.abs(l[0][0]) < 2 &&
+        Math.abs(l.at(-1)[0]) < 2 &&
+        l.every((p) => Math.abs(p[1]) <= 0.5),
+    );
+  assert.ok(between.length >= 5);
+  for (const line of between) {
+    assert.equal(lineArrows(line, features, 4).length, 0);
+    const arrows = lineArrows(line, features, 4, { whole: true });
+    assert.equal(arrows.length, 1);
+    // Halfway across the 1 m gap, pointing from the + plate to the − plate.
+    near(arrows[0].y, 0, 1e-3, "mid-gap");
+    near(arrows[0].dy, -1, 1e-3, "downwards");
+  }
+});
+
+test("a uniform field alone: arrows on a lattice fixed in the world", () => {
+  // Half-way lines of a lattice of side 2: x = …, −3, −1, 1, 3, …
+  const line = Array.from({ length: 901 }, (_, k) => [-4.5 + k * 0.01, 0.4]),
+    arrows = lineArrows(line, none, 2);
+  assert.deepEqual(
+    arrows.map((a) => Math.round(a.x * 1e9) / 1e9),
+    [-3, -1, 1, 3],
+  );
+});
+
+test("arrows do not move when the drawn region is moved", () => {
+  const S = 2,
+    reference = { minX: -6, maxX: 6, minY: -6, maxY: 6 },
+    key = (a) => `${a.x.toFixed(6)},${a.y.toFixed(6)}`,
+    // Arrows well inside both regions, where neither cuts the lines short.
+    core = (a) => Math.abs(a.x) < 1.6 && Math.abs(a.y) < 1.1;
+  // Magnetic: the contours are cut off at the edge of the region.
+  const wires = new FieldLab();
+  wires.add("wire", { x: -0.75, y: 0, current: 10 });
+  wires.add("wire", { x: 0.75, y: 0.25, current: 10 });
+  const magnetic = (bounds) =>
+    magneticFieldLines(wires, bounds, { cell: 0.05, coreRadius: 0.14, reference })
+      .lines.flatMap((line) =>
+        lineArrows(line, arrowFeatures(wires.compiled(), "magnetic"), S),
+      )
+      .filter(core)
+      .map(key)
+      .sort();
+  const m1 = magnetic({ minX: -5.5, maxX: 5.5, minY: -3.5, maxY: 3.5 }),
+    m2 = magnetic({ minX: -3.85, maxX: 7.15, minY: -4.6, maxY: 2.4 }),
+    m3 = magnetic({ minX: -9.2, maxX: 1.8, minY: -1.3, maxY: 5.7 });
+  assert.ok(m1.length >= 12, `expected plenty of arrows, got ${m1.length}`);
+  assert.deepEqual(m2, m1);
+  assert.deepEqual(m3, m1);
+  // Electric, with a background field whose lines enter at the region's edge.
+  const charge = new FieldLab();
+  charge.add("charge", { x: 0.25, y: -0.5, charge: 2 * nC });
+  charge.setUniform("electric", { x: 6, y: 2 });
+  const electric = (bounds) =>
+    electricFieldLines(charge, bounds, { step: 0.07, startRadius: 0.09 })
+      .flatMap((line) =>
+        lineArrows(line, arrowFeatures(charge.compiled(), "electric"), S),
+      )
+      .filter(core)
+      .map(key)
+      .sort();
+  const e1 = electric({ minX: -6, maxX: 6, minY: -5, maxY: 5 }),
+    e2 = electric({ minX: -11.12, maxX: 6, minY: -5, maxY: 10.24 });
+  assert.ok(e1.length >= 12, `expected plenty of arrows, got ${e1.length}`);
+  assert.equal(e2.length, e1.length);
+  // Lines that come in from the edge are integrated from different starting
+  // points, so they agree to the accuracy of the integration, not exactly.
+  const parse = (k) => k.split(",").map(Number);
+  for (const k of e1) {
+    const [x, y] = parse(k),
+      gap = Math.min(...e2.map(parse).map((p) => Math.hypot(p[0] - x, p[1] - y)));
+    near(gap, 0, 2e-3, "same arrow");
+  }
 });

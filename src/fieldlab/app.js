@@ -12,6 +12,7 @@ import {
   magneticFieldLines,
   TestCharges,
 } from "./model.js";
+import { arrowFeatures, lineArrows } from "./arrows.js";
 import { presets } from "./presets.js";
 import { setupSceneFiles } from "../scene-file.js";
 
@@ -365,9 +366,15 @@ function sourceBox(margin) {
     maxY: Math.max(...list.map((s) => s.y + reach(s))) + margin,
   };
 }
+// Lines are followed this far past the edge of the screen: two arrows that
+// fall close together become one, so a line must be known a little beyond
+// any arrow that can be seen (see arrows.js).
+function arrowMargin() {
+  return 0.5 * arrowSpacing() + 12 / view.scale;
+}
 function snappedView() {
   // The view, widened outwards to a coarse lattice (512 px).
-  const v = viewBounds(12 / view.scale),
+  const v = viewBounds(arrowMargin()),
     lattice = 512 / view.scale;
   return {
     minX: Math.floor(v.minX / lattice) * lattice,
@@ -425,12 +432,27 @@ function recompute() {
         : "";
     }
   } else if (state.show.lines)
-    result.lines = magneticFieldLines(lab, viewBounds(10 * px), {
+    result.lines = magneticFieldLines(lab, viewBounds(arrowMargin()), {
       cell: 5 * px,
       count: Math.round(16 * state.density),
       coreRadius: 14 * px,
       reference: referenceBounds(),
     }).lines;
+  // A line that stops short of the edge of the traced region runs from one
+  // source to another, and always carries an arrow.
+  const features = arrowFeatures(lab.compiled(), state.mode),
+    spacing = arrowSpacing(),
+    traced = state.mode === "electric" ? anchoredBounds() : null,
+    inside = (p) =>
+      p[0] > traced.minX + 8 * px &&
+      p[0] < traced.maxX - 8 * px &&
+      p[1] > traced.minY + 8 * px &&
+      p[1] < traced.maxY - 8 * px;
+  result.arrows = result.lines.map((line) =>
+    lineArrows(line, features, spacing, {
+      whole: !!traced && inside(line[0]) && inside(line[line.length - 1]),
+    }),
+  );
   $("equipotential-step").textContent =
     state.mode === "electric" && state.show.equipotentials && result.step
       ? "every " + tidy(result.step, 6) + " V"
@@ -525,48 +547,21 @@ function arrowHead(x, y, angle, size) {
   ctx.restore();
 }
 
-// A field line with direction arrows every so often along its length.
-// Arrows sit where the line crosses a lattice fixed in the world (vertical
-// lattice lines where the line runs mostly sideways, horizontal ones where
-// it runs mostly up or down), so they stay on the same spot of the line
-// however the view is moved or the line was traced.
-function fieldLine(points, pointSources) {
+// A field line with its direction arrows. Where the arrows sit is worked out
+// in arrows.js from the line and the sources alone, so they stay on the same
+// spot of the line however the view is moved.
+function arrowSpacing() {
+  return GRID * 2 ** Math.round(Math.log2(170 / (GRID * view.scale)));
+}
+function fieldLine(points, arrows, pointSources) {
   if (points.length < 2) return;
-  const path = points.map((p) => screen(p[0], p[1]));
-  strokePath(path);
-  const spacing = GRID * 2 ** Math.round(Math.log2(170 / (GRID * view.scale))),
-    cellOf = (v) => Math.floor(v / spacing - 0.5),
-    arrows = [];
-  for (let i = 1; i < points.length; i++) {
-    const [x0, y0] = points[i - 1],
-      [x1, y1] = points[i],
-      sideways = Math.abs(x1 - x0) >= Math.abs(y1 - y0),
-      a = sideways ? x0 : y0,
-      b = sideways ? x1 : y1;
-    if (cellOf(a) === cellOf(b)) continue;
-    const f = ((Math.max(cellOf(a), cellOf(b)) + 0.5) * spacing - a) / (b - a),
-      [sx0, sy0] = path[i - 1],
-      [sx1, sy1] = path[i];
-    arrows.push([
-      sx0 + f * (sx1 - sx0),
-      sy0 + f * (sy1 - sy0),
-      Math.atan2(sy1 - sy0, sx1 - sx0),
-      sideways,
-    ]);
-  }
-  const tooClose = 0.45 * spacing * view.scale;
-  for (const [x, y, angle, sideways] of arrows) {
+  strokePath(points, true);
+  for (const a of arrows) {
+    const [x, y] = screen(a.x, a.y);
     if (x < -10 || y < -10 || x > view.width + 10 || y > view.height + 10)
       continue;
     if (pointSources.some((s) => Math.hypot(x - s[0], y - s[1]) < 22)) continue;
-    // Where the line turns through 45° the two kinds can fall together;
-    // the sideways one is kept.
-    if (
-      !sideways &&
-      arrows.some((o) => o[3] && Math.hypot(x - o[0], y - o[1]) < tooClose)
-    )
-      continue;
-    arrowHead(x, y, angle, 5.5);
+    arrowHead(x, y, Math.atan2(-a.dy, a.dx), 5.5);
   }
 }
 
@@ -978,7 +973,9 @@ function draw() {
   ctx.strokeStyle = ctx.fillStyle = colour;
   ctx.lineWidth = 1.5;
   ctx.lineJoin = "round";
-  for (const line of computed.lines) fieldLine(line, pointSources);
+  computed.lines.forEach((line, i) =>
+    fieldLine(line, computed.arrows[i], pointSources),
+  );
   if (state.show.arrows)
     drawFieldArrows(
       c,
