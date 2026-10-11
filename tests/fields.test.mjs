@@ -155,3 +155,146 @@ test("circular field resizing can shrink as well as grow without moving its cent
   near(f.y, 10);
   s.dispose();
 });
+
+// ---------------------------------------------------------------------------
+// The edge of a field region. A body is in a region for part of a step when
+// it crosses the edge, so the textbook results below (work = qEL across a
+// gap, a half-turn of diameter 2mv/qB, a parabola across plates) only come
+// out if the field acts for that part of the step alone.
+
+const regionOf = (s, type, patch) => {
+  const id = s.fields.add(type, { x: patch.x, y: patch.y });
+  s.fields.update(id, { shape: "rectangle", ...patch });
+  return id;
+};
+const charge = (s, { x, y, vx = 0, vy = 0, q = 1, m = 1 }) => {
+  const id = s.add("ball", { x, y });
+  s.updateConstants(id, {
+    charge: q,
+    mass: m,
+    linearDamping: 0,
+    angularDamping: 0,
+  });
+  s.setPose(id, { x, y });
+  if (vx || vy) s.setVelocity(id, { vx, vy });
+  return id;
+};
+export const exitSpeed = (E, { q = 1, m = 1, L = 1, start = 0.3 } = {}) => {
+  // From rest, `start` inside the left edge of a region L wide.
+  const s = make(),
+    left = 2;
+  regionOf(s, "electric", {
+    x: left + L / 2,
+    y: 20,
+    width: L,
+    height: 4,
+    strength: E,
+  });
+  const id = charge(s, { x: left + start, y: 20, q, m });
+  for (let i = 0; i < 100000 && s.state(id).x < left + L + 0.5; i++) s.step();
+  const v = s.state(id).vx;
+  s.dispose();
+  return v;
+};
+test("a charge crossing a gap gains qEd of kinetic energy, whatever the field", () => {
+  // ½mv² = qE × (distance travelled in the field)
+  for (const [E, q, m, L, start] of [
+    [8, 1, 1, 1, 0],
+    [7, 1, 1, 1, 0],
+    [3.3, 2, 5, 1, 0.3],
+    [64, 1, 1, 1, 0.21],
+    [90, 3, 0.7, 2.5, 0.4],
+    [0.9, 1, 12, 0.6, 0.05],
+  ]) {
+    const expected = Math.sqrt((2 * q * E * (L - start)) / m),
+      got = exitSpeed(E, { q, m, L, start });
+    assert.ok(
+      Math.abs(got - expected) <= 2e-3 * expected,
+      `E=${E} q=${q} m=${m} L=${L}: speed ${got}, expected ${expected} (${(((got - expected) / expected) * 100).toFixed(2)}%)`,
+    );
+  }
+});
+export const halfTurn = (v, B, { q = 1, m = 1 } = {}) => {
+  // Enters a magnetic region through its left edge, turns through half a
+  // circle and leaves through the same edge, 2r from where it came in.
+  const s = make(),
+    r = (m * v) / (q * B);
+  regionOf(s, "magnetic", {
+    x: 5 + 12,
+    y: 30,
+    width: 24,
+    height: 48,
+    strength: B,
+  });
+  const id = charge(s, { x: 5 - 0.37, y: 30, vx: v, q, m });
+  let before = s.potentialPoint(id),
+    entered = false,
+    out = null;
+  for (let i = 0; i < 200000 && out === null; i++) {
+    s.step();
+    const now = s.potentialPoint(id);
+    if (now.x > 5) entered = true;
+    if (entered && now.x <= 5) {
+      const f = (5 - before.x) / (now.x - before.x);
+      out = before.y + f * (now.y - before.y);
+    }
+    before = now;
+  }
+  s.dispose();
+  return { diameter: Math.abs(out - 30), expected: 2 * r };
+};
+test("a charge entering a magnetic region leaves 2mv/qB from where it came in", () => {
+  for (const [v, B, q, m] of [
+    [4, 2, 1, 1],
+    [3.3, 0.7, 2, 5],
+    [11, 1.3, 1, 1.1],
+    [0.8, 4, 0.5, 3],
+  ]) {
+    const { diameter, expected } = halfTurn(v, B, { q, m });
+    assert.ok(
+      Math.abs(diameter - expected) <= 2e-3 * expected,
+      `v=${v} B=${B} q=${q} m=${m}: ${diameter}, expected ${expected} (${(((diameter - expected) / expected) * 100).toFixed(2)}%)`,
+    );
+  }
+});
+export const deflection = (E, L, u, { q = 1, m = 1 } = {}) => {
+  // Crosses a region L long at speed u, with the field across its path.
+  const s = make();
+  regionOf(s, "electric", {
+    x: 3 + L / 2,
+    y: 30,
+    width: 30,
+    height: L,
+    angle: 90,
+    strength: E,
+  });
+  const id = charge(s, { x: 3 - 0.41, y: 30, vx: u, q, m });
+  let before = s.potentialPoint(id),
+    out = null;
+  for (let i = 0; i < 200000 && out === null; i++) {
+    s.step();
+    const now = s.potentialPoint(id);
+    if (now.x >= 3 + L) {
+      const f = (3 + L - before.x) / (now.x - before.x);
+      out = before.y + f * (now.y - before.y) - 30;
+    }
+    before = now;
+  }
+  s.dispose();
+  return out;
+};
+test("a charge crossing a field region is deflected by qEL²/2mu²", () => {
+  for (const [E, L, u, q, m] of [
+    [2, 4, 4, 1, 1],
+    [5, 3, 7.3, 1, 2],
+    [12, 1.5, 9.1, 2, 3],
+    [0.6, 6, 2.2, 1, 1],
+  ]) {
+    const expected = (q * E * L * L) / (2 * m * u * u),
+      got = deflection(E, L, u, { q, m });
+    assert.ok(
+      Math.abs(got - expected) <= 3e-3 * expected,
+      `E=${E} L=${L} u=${u}: ${got}, expected ${expected} (${(((got - expected) / expected) * 100).toFixed(2)}%)`,
+    );
+  }
+});

@@ -202,14 +202,45 @@ export class Fields {
       }
     return pairs;
   }
+  // Which regions hold the point: the field can only change abruptly when
+  // this changes.
+  inside(p) {
+    let key = "";
+    for (const f of this.regions.values())
+      if (this.contains(f, p)) key += f.id + " ";
+    return key;
+  }
   advance(o, state, dt) {
     if (o.lockPosition || !o.charge) return;
-    const { ex, ey, bz, regionX, regionY } = this.at(state),
-      qm = o.charge / o.mass,
-      ax = qm * ex,
-      ay = qm * ey,
-      w = qm * bz,
-      theta = w * dt,
+    // The stored position runs half a step ahead of the stored velocity
+    // (see Sandbox.potentialPoint), so the place that belongs with this
+    // velocity is half a step back. Following the body from there is what
+    // makes it feel the edge of a region at the right moment.
+    const p = {
+        x: state.x - (state.vx * dt) / 2,
+        y: state.y - (state.vy * dt) / 2,
+        vx: state.vx,
+        vy: state.vy,
+      },
+      qm = o.charge / o.mass;
+    this.follow(o, qm, p, dt, 0);
+    globalThis.Matter.Body.setVelocity(o.body, {
+      x: (p.vx * 100) / 60,
+      y: (-p.vy * 100) / 60,
+    });
+  }
+  // Carry `p` (position and velocity) through the time h. A region has a
+  // sharp edge, and a body that crosses one is in the field for only part of
+  // the step: the step is halved, again and again, round the moment of
+  // crossing, so that the field acts for the right time. Without this a
+  // charge crossing a gap gains up to a whole step's worth too much or too
+  // little, and the textbook results (½mv² = qEd, r = mv/qB) are missed by
+  // a few per cent.
+  follow(o, qm, p, h, depth) {
+    const field = this.at(p),
+      ax = qm * field.ex,
+      ay = qm * field.ey,
+      theta = qm * field.bz * h,
       c = Math.cos(theta),
       s = Math.sin(theta);
     // Exact constant-field velocity solution. Positive Bz is out of the screen:
@@ -218,18 +249,31 @@ export class Fields {
     const sinc = Math.abs(theta) < 1e-5 ? 1 - (theta * theta) / 6 : s / theta;
     const cosc =
       Math.abs(theta) < 1e-5 ? theta / 2 - theta ** 3 / 24 : (1 - c) / theta;
-    const vx = c * state.vx + s * state.vy + dt * (sinc * ax + cosc * ay);
-    const vy = -s * state.vx + c * state.vy + dt * (sinc * ay - cosc * ax);
+    const vx = c * p.vx + s * p.vy + h * (sinc * ax + cosc * ay),
+      vy = -s * p.vx + c * p.vy + h * (sinc * ay - cosc * ax),
+      x = p.x + ((p.vx + vx) * h) / 2,
+      y = p.y + ((p.vy + vy) * h) / 2;
+    if (this.regions.size && depth < 14) {
+      const here = this.inside(p);
+      if (
+        this.inside({ x, y }) !== here ||
+        this.inside({ x: (p.x + x) / 2, y: (p.y + y) / 2 }) !== here
+      ) {
+        this.follow(o, qm, p, h / 2, depth + 1);
+        this.follow(o, qm, p, h / 2, depth + 1);
+        return;
+      }
+    }
     // Work = force · displacement, using the mean velocity over the step
     // (exact for a pure electric field).
     this.work +=
       (o.charge *
-        dt *
-        (regionX * (state.vx + vx) + regionY * (state.vy + vy))) /
+        h *
+        (field.regionX * (p.vx + vx) + field.regionY * (p.vy + vy))) /
       2;
-    globalThis.Matter.Body.setVelocity(o.body, {
-      x: (vx * 100) / 60,
-      y: (-vy * 100) / 60,
-    });
+    p.x = x;
+    p.y = y;
+    p.vx = vx;
+    p.vy = vy;
   }
 }
