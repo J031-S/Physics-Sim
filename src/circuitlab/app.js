@@ -34,6 +34,7 @@ const BASE_SCALE = 44, // pixels per grid square at 100% zoom
   ],
   TERMINAL = 9, // pixels within which a terminal is picked up
   DOT_SPACING = 0.8, // grid squares between current dots
+  DOT_FADE = 0.35, // grid squares over which dots fade at a junction
   DOT_SPEED = 3.2, // grid squares per second at the largest current seen
   SAMPLES = 1600; // graph samples kept for each component
 const view = { scale: BASE_SCALE, x: 0, y: 0, width: 0, height: 0 };
@@ -62,7 +63,7 @@ let last = 0,
   mark = 0, // time of the last change to the circuit, for the τ marker
   peak = 0; // largest current seen, which sets the speed of the dots
 const traces = new Map(), // id → { t, v, i } arrays for the graphs
-  phase = new Map(), // id → how far along its path the first dot is
+  phase = new Map(), // run → how far its dots have travelled along it
   units = new Map(); // "id:key" → unit factor chosen in the form
 
 const ADD = {
@@ -917,60 +918,138 @@ function drawComponent(g, item, reading, o) {
   g.fillText(text, x, y + size + 2);
 }
 
-// Dots along every branch that carries current. Their speed is in
-// proportion to the current; `phase` holds how far each branch's dots have
-// travelled.
+// The current dots.
+//
+// Dots are laid out along *runs*, not along single wires. A run is a chain
+// of wires and components in series: it starts and ends where the current
+// divides or joins (or it is a closed loop), so the current is the same all
+// the way along it. Each run has one set of evenly spaced dots that all
+// move together, at a speed in proportion to that current. Laying dots out
+// wire by wire instead makes them bunch and gap wherever two wires meet,
+// and blink on any wire shorter than the spacing.
+//
+// The spacing is DOT_SPACING adjusted, by under a third at worst, so that
+// a whole number of gaps fits the run: a dot then leaves one end exactly
+// as another enters the other, and the number on the run never changes.
+function dotRuns(s) {
+  const branches = [],
+    leaving = new Map(), // node → current-carrying branches that start there
+    ends = new Map(); // node → how many such branch ends meet there
+  for (const item of lab.list()) {
+    if (!placed(item)) continue;
+    const flow = s.of(item.id)?.flow;
+    if (!flow) continue;
+    // Followed the way the conventional current goes.
+    const points = pathOf(item),
+      to = item.kind === "switch2" && item.position === "b" ? 2 : 1,
+      nodes = [item.nodes[0], item.nodes[to]];
+    if (flow < 0) {
+      points.reverse();
+      nodes.reverse();
+    }
+    const branch = { item, points, from: nodes[0], to: nodes[1] };
+    branch.current = Math.abs(flow);
+    branches.push(branch);
+    if (!leaving.has(branch.from)) leaving.set(branch.from, []);
+    leaving.get(branch.from).push(branch);
+    for (const node of nodes) ends.set(node, (ends.get(node) || 0) + 1);
+  }
+  // A node where exactly two ends meet, one arriving and one leaving, is
+  // the middle of a run.
+  const through = (node) =>
+      ends.get(node) === 2 && leaving.get(node)?.length === 1,
+    used = new Set(),
+    runs = [],
+    follow = (first) => {
+      const chain = [];
+      for (let b = first; b && !used.has(b); ) {
+        used.add(b);
+        chain.push(b);
+        b = through(b.to) ? leaving.get(b.to)[0] : null;
+      }
+      const run = { points: [], gaps: [], length: 0, ids: [] };
+      run.current = first.current;
+      run.closed = chain[chain.length - 1].to === first.from;
+      for (const b of chain) {
+        const began = run.length;
+        b.points.forEach((point, k) => {
+          const last = run.points[run.points.length - 1];
+          if (k && last)
+            run.length += Math.hypot(point[0] - last[0], point[1] - last[1]);
+          if (!last || last[0] !== point[0] || last[1] !== point[1])
+            run.points.push(point);
+        });
+        run.ids.push(b.item.id);
+        // Dots pass out of sight behind a component's symbol.
+        if (b.item.kind !== "wire" && b.item.kind !== "switch2") {
+          const middle = (began + run.length) / 2;
+          run.gaps.push([middle - 0.5, middle + 0.5]);
+        }
+      }
+      run.key = [...run.ids].sort((a, b) => a - b).join("-");
+      runs.push(run);
+    };
+  for (const b of branches) if (!through(b.from)) follow(b);
+  // What is left is closed loops with no junction on them.
+  for (const b of branches) if (!used.has(b)) follow(b);
+  return runs;
+}
+
 function drawDots(c, s) {
   if (!state.show.current) return;
   ctx.fillStyle = state.electrons ? c.dotElectron : c.dot;
   ctx.strokeStyle = c.back;
   ctx.lineWidth = 1.5;
   const r = clamp(view.scale * 0.09, 2.4, 4.4);
-  for (const item of lab.list()) {
-    if (!placed(item)) continue;
-    const flow = s.of(item.id)?.flow;
-    if (!flow) continue;
-    const path = pathOf(item),
-      // Dots run along the leads and stop at the symbol itself.
-      body = item.kind === "wire" || item.kind === "switch2" ? 0 : 0.5;
-    let offset = (phase.get(item.id) || 0) % DOT_SPACING;
-    if (offset < 0) offset += DOT_SPACING;
-    for (let k = 1; k < path.length; k++) {
-      const [x1, y1] = path[k - 1],
-        [x2, y2] = path[k],
+  for (const run of dotRuns(s)) {
+    if (!(run.length > 0)) continue;
+    const spacing =
+      run.length / Math.max(1, Math.round(run.length / DOT_SPACING));
+    let d = (phase.get(run.key) || 0) % spacing;
+    if (d < 0) d += spacing;
+    // Walk the run once, dropping a dot each time `d` is passed.
+    let walked = 0;
+    for (let k = 1; k < run.points.length; k++) {
+      const [x1, y1] = run.points[k - 1],
+        [x2, y2] = run.points[k],
         length = Math.hypot(x2 - x1, y2 - y1);
-      let d = offset;
-      for (; d < length; d += DOT_SPACING) {
-        if (Math.abs(d - length / 2) < body) continue;
-        const [x, y] = screen(
-          x1 + ((x2 - x1) * d) / length,
-          y1 + ((y2 - y1) * d) / length,
-        );
+      for (; d < walked + length - 1e-9; d += spacing) {
+        if (run.gaps.some(([lo, hi]) => d > lo && d < hi)) continue;
+        const t = (d - walked) / length,
+          [x, y] = screen(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t);
+        // Where a run meets a junction its dots fade in and out over a
+        // third of a square, so none pops into view and the dots of the
+        // runs that meet there do not crowd the junction.
+        ctx.globalAlpha = run.closed
+          ? 1
+          : clamp(Math.min(d, run.length - d) / DOT_FADE, 0, 1);
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
         ctx.fill();
         ctx.stroke();
       }
-      offset = d - length;
+      walked += length;
     }
   }
+  ctx.globalAlpha = 1;
 }
+// Moves every run's dots on by a distance in proportion to its current.
+// `peak`, the largest current seen since the last reset, sets the scale.
 function moveDots(s, seconds) {
-  for (const item of lab.list()) {
-    const flow = s.of(item.id)?.flow;
-    if (flow) peak = Math.max(peak, Math.abs(flow));
-  }
+  const runs = dotRuns(s);
+  for (const run of runs) peak = Math.max(peak, run.current);
   if (!(peak > 0)) return;
-  const sense = state.electrons ? -1 : 1;
-  for (const item of lab.list()) {
-    const flow = s.of(item.id)?.flow;
-    if (flow)
-      phase.set(
-        item.id,
-        (phase.get(item.id) || 0) +
-          (sense * DOT_SPEED * seconds * flow) / peak,
-      );
+  const sense = state.electrons ? -1 : 1,
+    live = new Set();
+  for (const run of runs) {
+    live.add(run.key);
+    phase.set(
+      run.key,
+      (phase.get(run.key) || 0) +
+        (sense * DOT_SPEED * seconds * run.current) / peak,
+    );
   }
+  for (const key of phase.keys()) if (!live.has(key)) phase.delete(key);
 }
 
 function drawGrid(c) {
