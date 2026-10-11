@@ -231,6 +231,8 @@ The screen is a flat slice through a three-dimensional arrangement.
 - **Equipotentials** stop short of the few percent of the screen closest to the charges, where they would merge.
 - **The sources are static.** They stay where they are put: forces on them are shown but do not move them, there is no induction, and the two scenes do not affect each other. No force is calculated on plates or magnets. Only test charges move, and only in the electric scene: in the magnetic scene the field lies in the screen, so the force on a charge moving in the screen would point out of it.
 
+**Saving and loading.** **Save scene** downloads the electric and magnetic scenes together, with their background fields, as `physics-sim-fields.json`; **Load scene** opens such a file on the scene that was showing when it was saved. Test charges are not saved.
+
 ## Orbits & gravitation tool
 
 A separate page for Newton's law of gravitation, `F = GMm/r²`. A central body (the Earth to begin with) sits at the centre. You choose where a satellite starts, how fast and in which direction it is launched, and watch the path it takes. Raising the launch speed takes it from falling to the ground, through an ellipse, a circle and a larger ellipse, to escape. Open it from the drop-down at the left of the top bar.
@@ -320,6 +322,8 @@ The motion itself is integrated numerically, in SI units, with `G = 6.674 × 10�
 - **Constants are rounded.** With `G = 6.674 × 10⁻¹¹` and `M = 5.972 × 10²⁴ kg`, the geostationary radius comes to 42 163 km; the usual 42 164 km uses the more precisely known product GM.
 - **"Circular" is a label** for eccentricity below 0.001, and "parabolic" for total energy that is zero to rounding. Typing the escape speed to four figures gives a very long ellipse or a hyperbola, correctly; **Use** gives the parabola.
 - **An escaping satellite is followed out to 200 launch radii** and then left. The graphs keep the most recent few orbits.
+
+**Saving and loading.** **Save scene** downloads `physics-sim-orbits.json`: the central body, the launch that is set up, and how and when each satellite was launched. **Load scene** flies those launches again up to the moment of saving, so every satellite is back where it was with its trail and Kepler's-law records, then waits for Run. A flight too long to fly again in about a second loads with the satellites on their right orbits but starting from their launches, and says so.
 
 ## Electric circuits tool
 
@@ -415,6 +419,10 @@ The first instant matters as much as the curve: at t = 0, and immediately after 
 - **DC only, and linear only**, for now: no AC sources, inductors, diodes or other non-ohmic components.
 - **The dots are a picture of the current, not of the charge carriers.** Real electrons drift at a fraction of a millimetre per second, and their speed depends on the wire's thickness as well as on the current.
 - A circuit can hold 400 parts at most. Large circuits with very short time constants run slower than the time scale asks, and say so.
+
+**Saving and loading.** **Save scene** downloads the circuit as `physics-sim-circuit.json`, with every part's place, values and name, the time scale and the component being graphed. **Load scene** opens it at t = 0: a file saved part-way through a run starts again, with each capacitor at its starting p.d.
+
+Each tool reads only its own files. A file saved from another tool is refused with a message naming the tool to open it in, and a damaged file leaves the open scene as it was.
 
 ## Right-click menu
 

@@ -12,6 +12,8 @@
 // Every source is mirror-symmetric about the screen, so E and B at points on
 // the screen lie in the screen and can be drawn there.
 
+import { checkFormat, listOf } from "../scene-format.js";
+
 export const K_E = 8.9875517923e9; // N·m²/C²
 export const EPS0 = 8.8541878128e-12; // F/m
 export const MU0 = 1.25663706212e-6; // T·m/A
@@ -197,6 +199,49 @@ export class FieldLab {
     }
     this.uniform[mode] = { x, y };
     this.cache = null;
+  }
+
+  // A plain JSON description of both scenes (electric and magnetic) and
+  // their background fields, in SI. Test charges are not part of it.
+  exportScene() {
+    return {
+      format: "physics-sim-fields",
+      version: 1,
+      uniform: {
+        electric: { ...this.uniform.electric },
+        magnetic: { ...this.uniform.magnetic },
+      },
+      sources: this.sources.map(({ id, ...source }) => ({ ...source })),
+    };
+  }
+  static fromScene(data) {
+    const lab = new FieldLab();
+    lab.#apply(data);
+    return lab;
+  }
+  // Replaces everything with the saved scene. The file is built in a spare
+  // lab first, so a bad one throws a readable Error and changes nothing here.
+  loadScene(data) {
+    FieldLab.fromScene(data);
+    this.#apply(data);
+  }
+  // Every value goes through the same checks as an edit made by hand.
+  #apply(data) {
+    checkFormat(data, "physics-sim-fields");
+    const sources = listOf(data.sources),
+      uniform = data.uniform ?? {};
+    if (typeof uniform !== "object")
+      throw new Error("This scene file is damaged.");
+    this.sources = [];
+    this.uniform = { electric: { x: 0, y: 0 }, magnetic: { x: 0, y: 0 } };
+    this.cache = null;
+    for (const { kind, ...props } of sources) this.add(kind, props);
+    for (const mode of ["electric", "magnetic"])
+      if (uniform[mode] !== undefined) {
+        if (!uniform[mode] || typeof uniform[mode] !== "object")
+          throw new Error("This scene file is damaged.");
+        this.setUniform(mode, uniform[mode]);
+      }
   }
 
   // Sources flattened into the primitives the kernels work on.

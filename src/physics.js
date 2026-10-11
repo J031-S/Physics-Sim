@@ -2,6 +2,7 @@ import { Fields } from "./fields.js";
 import { GroupMove } from "./group-move.js";
 import { Mechanisms } from "./mechanisms.js";
 import { solveRestingContacts } from "./contacts.js";
+import { checkFormat } from "./scene-format.js";
 // The sandbox exposes SI units; Matter uses px, ms and 60 Hz-normalised velocity.
 const { Engine, Bodies, Body, Composite, Query } =
   globalThis.Matter;
@@ -1390,8 +1391,7 @@ export class Sandbox {
   // validation as edits made by hand. On failure the sandbox is left partly
   // built, so prefer Sandbox.fromScene(), which discards it.
   loadScene(data) {
-    if (data?.format !== "physics-sim-scene" || data.version !== 1)
-      throw new Error("This file is not a Physics Sim scene.");
+    checkFormat(data, "physics-sim-scene");
     if (this.objects.size || this.links.size || this.fields.regions.size)
       throw new Error("Load a scene into an empty sandbox.");
     const list = (value) => {

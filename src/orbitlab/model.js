@@ -6,6 +6,8 @@
 // The central body does not move. That is exact in the limit m ≪ M, which is
 // the case this tool is for; it is not exact for the Moon (see the README).
 
+import { checkFormat, listOf } from "../scene-format.js";
+
 export const G = 6.674e-11; // N·m²/kg²
 export const SIDEREAL_DAY = 86164.0905; // s, one turn of the Earth
 
@@ -423,6 +425,100 @@ export class OrbitLab {
     s.history.push(0, r0, s.launch.speed);
     this.satellites.push(s);
     return s.id;
+  }
+
+  // A plain JSON description of the experiment, in SI: the central body,
+  // the clock, and how and when each satellite still in the scene was
+  // launched. Positions are not stored: they follow from the launches.
+  exportScene() {
+    return {
+      format: "physics-sim-orbits",
+      version: 1,
+      body: { ...this.body },
+      satelliteMass: this.satelliteMass,
+      time: this.time,
+      satellites: this.satellites.map((s) => ({
+        radius: s.launch.radius,
+        speed: s.launch.speed,
+        angle: s.launch.angle,
+        launchedAt: s.launchedAt,
+      })),
+    };
+  }
+  static fromScene(data, options = {}) {
+    const lab = new OrbitLab(options);
+    lab.loadScene(data, options);
+    return lab;
+  }
+  // Replaces everything with the saved experiment and flies it again up to
+  // the saved moment, so each satellite is back where it was, with its trail
+  // and Kepler's-law records. The file is checked in a spare lab first, so a
+  // bad one throws a readable Error and changes nothing here.
+  //
+  // Returns { complete }. Flying again costs integration steps; past
+  // `budget` of them the rest of the flight is skipped and `complete` is
+  // false: every satellite is then on its right orbit, but not at the place
+  // it had reached.
+  loadScene(data, { budget = 3e6 } = {}) {
+    new OrbitLab().#apply(data, 0);
+    return this.#apply(data, budget);
+  }
+  #apply(data, budget) {
+    checkFormat(data, "physics-sim-orbits");
+    const body = data.body;
+    if (!body || typeof body !== "object")
+      throw new Error("This scene file is damaged.");
+    const known = Object.hasOwn(BODIES, body.key),
+      launches = listOf(data.satellites).map((s) => ({
+        radius: s.radius,
+        speed: s.speed,
+        angle: s.angle,
+        launchedAt: s.launchedAt ?? 0,
+      })),
+      end = data.time ?? 0;
+    if (launches.length > LIMITS.satellites)
+      throw new Error(
+        `A scene can hold ${LIMITS.satellites} satellites at most.`,
+      );
+    for (const t of [end, ...launches.map((l) => l.launchedAt)])
+      if (typeof t !== "number" || !Number.isFinite(t) || t < 0)
+        throw new Error("This scene file is damaged.");
+    this.setBody({
+      key: known ? body.key : "custom",
+      name: known
+        ? BODIES[body.key].name
+        : typeof body.name === "string" && body.name.trim()
+          ? body.name.trim().slice(0, 40)
+          : "Custom body",
+      mass: body.mass,
+      radius: body.radius,
+    });
+    this.thirdLaw = [];
+    this.nextId = 1; // the scene starts again: satellite 1, first colour
+    if (data.satelliteMass !== undefined)
+      this.setSatelliteMass(data.satelliteMass);
+    for (const launch of launches) this.launchState(launch);
+    if (!budget) return { complete: false };
+    launches.sort((a, b) => a.launchedAt - b.launchedAt);
+    let calls = Math.ceil(budget / this.maxSteps);
+    const flyTo = (time) => {
+      while (this.time < time && calls > 0) {
+        const done = this.advance(time - this.time);
+        calls--;
+        // Rounding in the sum of slices can leave a sliver; it is no time.
+        if (!(done > 0) || time - this.time < 1e-9 * time) break;
+      }
+      return calls > 0;
+    };
+    let complete = true;
+    for (const launch of launches) {
+      complete = complete && flyTo(launch.launchedAt);
+      this.launch(launch);
+      if (complete) this.satellites.at(-1).launchedAt = launch.launchedAt;
+    }
+    complete = complete && flyTo(end);
+    if (complete) this.time = Math.max(this.time, end);
+    return { complete };
   }
 
   get(id) {

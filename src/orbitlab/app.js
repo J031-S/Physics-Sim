@@ -13,6 +13,7 @@ import {
   escapeSpeed,
 } from "./model.js";
 import { presets } from "./presets.js";
+import { setupSceneFiles } from "../scene-file.js";
 
 const $ = (id) => document.getElementById(id),
   canvas = $("canvas"),
@@ -1950,6 +1951,54 @@ $("presets-toggle").addEventListener("click", () => {
 $("close-presets").addEventListener("click", () => closePanels());
 
 // Sets up a preset's launch and leaves it paused, ready for Run.
+// A saved file holds the central body, the launch that was set up, and how
+// and when each satellite was launched; loading flies them again to the
+// moment of saving, then waits for Run.
+setupSceneFiles({
+  filename: "physics-sim-orbits.json",
+  toast,
+  save: () => ({
+    ...lab.exportScene(),
+    aim: { ...aim },
+    warp: state.warp,
+  }),
+  load(data) {
+    const report = lab.loadScene(data);
+    ghost = null;
+    paths.clear();
+    for (const s of lab.list())
+      paths.set(s.id, orbitPath(s.elements, { maxRadius: s.range }));
+    state.selected = lab.list().at(-1)?.id ?? null;
+    state.achieved = 0;
+    setRunning(false);
+    // The saved launch set-up, or failing that one that suits the new body.
+    try {
+      setAim({
+        radius: data.aim.radius,
+        speed: data.aim.speed,
+        angle: data.aim.angle,
+      });
+    } catch {
+      const radius = Math.max(aim.radius, lab.body.radius);
+      Object.assign(aim, {
+        radius,
+        speed: Math.min(circularSpeed(lab.mu, radius), LIMITS.speed),
+        angle: 0,
+      });
+    }
+    if (WARPS.includes(data.warp)) setWarp(data.warp);
+    fitted = false;
+    setAutoFit(true);
+    syncForms();
+    buildList();
+    toast(
+      report.complete
+        ? "Scene loaded · press Run to continue"
+        : "Scene loaded. The flight was too long to replay, so the satellites start again from their launches.",
+    );
+  },
+});
+
 function loadPreset(preset) {
   attempt(() => {
     changeBody({ key: preset.body, ...BODIES[preset.body] }, false, true);

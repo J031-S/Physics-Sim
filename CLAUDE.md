@@ -35,6 +35,8 @@ No bundler, no framework, no runtime dependencies. `index.html` loads `vendor/ma
 | `src/field-view.js` | Field rendering and field drag/rotate/resize gestures |
 | `src/app.js` | Canvas drawing, pointer/keyboard input, menus, settings panel, the `requestAnimationFrame` loop |
 | `src/preferences.js`, `src/icons.js` | Persistent website preferences (localStorage key `physics-sim-ui`), icon sets. Shared by every page, so every control they touch is optional |
+| `src/scene-format.js` | The file format name of each tool and `checkFormat`, which every loader calls first (a file from another tool is refused by name). No DOM |
+| `src/scene-file.js` | The Save scene / Load scene buttons shared by the fields, orbits and circuits pages (`#save-scene`, `#load-scene`, `#scene-file`) |
 | `src/nav.js` | The drop-down of links that switches between the pages. The links themselves are written out in each page's HTML: a new page is added to all of them |
 | `src/fieldlab/model.js` | `FieldLab`: sources, E, V, B, A_z, forces, field-line tracing, contours. No DOM |
 | `src/fieldlab/presets.js` | Field arrangements with the textbook result each one shows |
@@ -163,5 +165,6 @@ Measured against analytic results (October 2026). Do not assume these behave cor
 ## Working agreements
 
 - Do not commit or push unless asked.
-- Scenes are transient by design (no save/load); only website preferences persist.
+- Nothing is stored between visits except website preferences. Every tool saves and loads scenes as JSON files instead: each model has `exportScene()`, `static fromScene(data)` and `loadScene(data)`. `loadScene` builds the file in a spare instance first, so a bad file throws a readable `Error` and leaves the open scene untouched; keep that property, and route every value through the model's own validating setters. A new tool needs the same three methods, a format name in `src/scene-format.js`, the three header elements, a `setupSceneFiles` call, and round-trip tests in `tests/scene-files.test.mjs`.
+- What a file holds: fields, both scenes and their background fields (not test charges); orbits, the central body and each satellite's launch and launch time, replayed on loading up to the saved moment within a step budget (`{ complete }` says whether it got there); circuits, the circuit at t = 0 with part names (a capacitor returns to its starting p.d.). Pages add their own view settings (mode, time scale, watched part, launch set-up) beside the model's data.
 - Prefer small, verifiable changes. For anything that alters simulated behaviour, report the before/after numbers from a test, not just "tests pass".

@@ -12,6 +12,7 @@ import {
   turnsOf,
 } from "./model.js";
 import { presets } from "./presets.js";
+import { setupSceneFiles } from "../scene-file.js";
 
 const $ = (id) => document.getElementById(id),
   canvas = $("canvas"),
@@ -2189,6 +2190,28 @@ $("clear-yes").addEventListener("click", () => {
   state.selected = state.watched = null;
   buildForm();
   restart();
+});
+
+// A saved file is the circuit at its start, with the time scale and the
+// component whose graph was showing.
+setupSceneFiles({
+  filename: "physics-sim-circuit.json",
+  toast,
+  save: () => ({
+    ...lab.exportScene(),
+    scale: state.warp,
+    watch: lab.get(state.watched)?.name ?? null,
+  }),
+  load(data) {
+    lab.loadScene(data);
+    units.clear();
+    setRunning(false);
+    if (WARPS.includes(data.scale)) setWarp(data.scale);
+    restart();
+    select(lab.list().find((i) => i.name === data.watch)?.id ?? null);
+    fit();
+    toast("Circuit loaded · press Run to start");
+  },
 });
 
 function loadPreset(preset) {

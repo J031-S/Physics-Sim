@@ -19,6 +19,8 @@
 // Elements are linear; a non-linear one would repeat the solve of `#solveAt`
 // with its stamp re-linearised (Newton's method) until it stops changing.
 
+import { checkFormat, listOf } from "../scene-format.js";
+
 export const STEPS_PER_TAU = 100; // time steps in the shortest time constant
 
 export const KINDS = {
@@ -558,6 +560,71 @@ export class CircuitLab {
     this.#touch();
     if (!explicit) this.settle(kind === "wire" ? undefined : item.id);
     return this.get(item.id) ? item.id : null;
+  }
+
+  // A plain JSON description of the circuit as built, in SI: every part
+  // with its place, its values and its name. It is the circuit at t = 0: a
+  // capacitor is saved with its starting p.d., not the p.d. it has reached.
+  exportScene() {
+    return {
+      format: "physics-sim-circuit",
+      version: 1,
+      items: this.#items.map((item) => {
+        const out = { kind: item.kind };
+        if (item.kind !== "wire") out.name = item.name;
+        if (item.explicit) out.nodes = [...item.nodes];
+        else
+          for (const key of item.kind === "wire"
+            ? ["x1", "y1", "x2", "y2"]
+            : ["x", "y", "rot"])
+            out[key] = item[key];
+        for (const key of KINDS[item.kind].keys) out[key] = item[key];
+        return out;
+      }),
+    };
+  }
+  static fromScene(data) {
+    const lab = new CircuitLab();
+    lab.#apply(data);
+    return lab;
+  }
+  // Replaces the circuit with the saved one, at t = 0. The file is built in
+  // a spare lab first, so a bad one throws a readable Error and changes
+  // nothing here.
+  loadScene(data) {
+    CircuitLab.fromScene(data);
+    this.#apply(data);
+  }
+  // Every part goes through `add`, so it is checked like one placed by hand.
+  #apply(data) {
+    checkFormat(data, "physics-sim-circuit");
+    const items = listOf(data.items);
+    this.clear();
+    const used = new Set();
+    for (const { kind, name, ...props } of items) {
+      const id = this.add(kind, props),
+        prefix = KINDS[kind].prefix;
+      // Keep the saved name where it is a name this tool could have given.
+      if (
+        id &&
+        prefix &&
+        typeof name === "string" &&
+        new RegExp(`^${prefix}[1-9]\\d{0,3}$`).test(name) &&
+        !used.has(name)
+      )
+        this.get(id).name = name;
+      for (const item of this.#items) used.add(item.name);
+    }
+    // New parts continue the numbering after the highest name in use.
+    for (const item of this.#items) {
+      const prefix = KINDS[item.kind].prefix;
+      if (prefix)
+        this.#counters[prefix] = Math.max(
+          this.#counters[prefix] || 0,
+          Number(item.name.slice(prefix.length)) || 0,
+        );
+    }
+    this.#touch();
   }
 
   // Wires along a path of grid points: wire([0, 0], [4, 0], [4, 2]).

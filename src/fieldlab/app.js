@@ -13,6 +13,7 @@ import {
   TestCharges,
 } from "./model.js";
 import { presets } from "./presets.js";
+import { setupSceneFiles } from "../scene-file.js";
 
 const $ = (id) => document.getElementById(id),
   canvas = $("canvas"),
@@ -1247,6 +1248,29 @@ function loadPreset(preset) {
   syncUniform();
   fit();
 }
+
+// A saved file holds both scenes; it opens on the one that was showing.
+setupSceneFiles({
+  filename: "physics-sim-fields.json",
+  toast,
+  save: () => ({ ...lab.exportScene(), view: { mode: state.mode } }),
+  load(data) {
+    lab.loadScene(data);
+    tests.clear();
+    state.selected.electric = state.selected.magnetic = null;
+    const saved = data.view?.mode;
+    setMode(
+      saved === "electric" || saved === "magnetic"
+        ? saved
+        : lab.list("electric").length || !lab.list("magnetic").length
+          ? "electric"
+          : "magnetic",
+    );
+    syncUniform();
+    fit();
+    toast("Scene loaded");
+  },
+});
 
 const PANELS = {
   "settings-panel": "settings-toggle",
