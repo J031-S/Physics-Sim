@@ -8,9 +8,14 @@ export function circle(ctx, o) {
     cx = w * 0.36,
     cy = h / 2,
     R = Math.min(h * 0.38, w * 0.28),
-    a = -50 * deg,
+    a = -15 * deg,
     bx = cx + R * Math.cos(a),
-    by = cy + R * Math.sin(a);
+    by = cy + R * Math.sin(a),
+    // The radius is marked to another point of the circle, clear of the
+    // inward arrow.
+    ra = 140 * deg,
+    rx = cx + R * Math.cos(ra),
+    ry = cy + R * Math.sin(ra);
   P.line(
     Array.from({ length: 121 }, (_, i) => [
       cx + R * Math.cos((i / 120) * TAU),
@@ -21,11 +26,11 @@ export function circle(ctx, o) {
     [4, 4],
   );
   P.ball(cx, cy, 3, "ink");
-  P.dim(cx, cy, bx, by);
-  P.tag("r", (cx + bx) / 2 + 10, (cy + by) / 2 + 12, "left");
+  P.dim(cx, cy, rx, ry);
+  P.tag("r", (cx + rx) / 2 - 8, (cy + ry) / 2 - 12, "right");
   P.ball(bx, by, 11);
   // Moving anticlockwise: velocity along the tangent.
-  const L = Math.abs(P.length("v", 30, 80)) || 50,
+  const L = Math.min(by - 34, Math.abs(P.length("v", 28, 70)) || 45),
     tx = Math.sin(a),
     ty = -Math.cos(a);
   P.arrow(bx, by, bx + tx * L, by + ty * L, "vector-velocity");
@@ -34,7 +39,7 @@ export function circle(ctx, o) {
   if (inward) {
     const k = Math.min(R - 16, Math.abs(P.length(inward, 30, 80)));
     P.arrow(bx, by, bx - Math.cos(a) * k, by - Math.sin(a) * k);
-    P.tag(inward, bx + 18, by + 18, "left");
+    P.tag(inward, bx + 16, by + 24, "left");
   }
   const right = w - 24;
   let y = 30;
@@ -195,7 +200,7 @@ export function gfield(ctx, o) {
   g.strokeStyle = P.col("ink-soft");
   g.setLineDash([3, 5]);
   g.beginPath();
-  g.arc(cx, cy, px - cx, -0.5, 0.5);
+  g.arc(cx, cy, px - cx, -0.3, 0.3);
   g.stroke();
   g.setLineDash([]);
   P.ball(cx, cy, R, "orbit-body");
@@ -214,7 +219,7 @@ export function gfield(ctx, o) {
     P.tag("g", px - L / 2, cy + 22);
     P.text("force on each kg here", px, cy + 46);
   }
-  P.tag("G", w - 20, h - 18, "right");
+  P.tag("G", w - 20, 18, "right");
 }
 
 // A satellite in a circular orbit.

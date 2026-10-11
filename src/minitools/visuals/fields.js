@@ -197,42 +197,43 @@ export function electronGun(ctx, o) {
   P.tag("m", w - 20, top + 32, "right");
 }
 
-// A charge deflected between horizontal plates.
+// A charge deflected between horizontal plates. The path is the real
+// parabola to scale between the plates: if the sideways displacement would be
+// more than half the gap, the charge meets a plate part of the way along, and
+// the picture stops it there.
 export function deflection(ctx, o) {
   const P = picture(ctx, o),
     { w, h } = P,
-    x0 = w * 0.2,
-    x1 = w * 0.7,
+    x0 = w * 0.24,
+    x1 = w * 0.72,
     top = 34,
     bottom = h - 52,
     mid = (top + bottom) / 2,
+    half = (bottom - top) / 2,
     q = P.value("q", 1),
     yv = P.value("y", 0),
     d = P.value("d", 1),
-    dy = Math.min(0.95, Math.abs(yv / (d / 2)) || 0) * ((bottom - top) / 2 - 8);
+    // The displacement at the far end, as a fraction of half the gap.
+    ratio = Math.abs(yv / (d / 2)) || 0,
+    hits = ratio > 1,
+    // Where along the plates the path ends (1 is the far end).
+    reach = hits ? Math.sqrt(1 / ratio) : 1,
+    // Positive charges move towards the negative (lower) plate; the sign of
+    // y says which way it is measured.
+    down = (q >= 0 ? 1 : -1) * (yv < 0 ? -1 : 1),
+    pts = [];
   P.plate(x0, top, x1, top, 1);
   P.plate(x0, bottom, x1, bottom, -1);
   for (let x = x0 + 20; x < x1; x += 40)
     P.arrow(x, top + 8, x, bottom - 8, "field-electric", 1);
-  // Positive charges move towards the negative (lower) plate.
-  const down = q >= 0 ? 1 : -1,
-    pts = [];
   for (let i = 0; i <= 40; i++) {
-    const t = i / 40;
-    pts.push([x0 + (x1 - x0) * t, mid + down * dy * t * t]);
+    const t = (reach * i) / 40;
+    pts.push([
+      x0 + (x1 - x0) * t,
+      mid + down * Math.min(half - 3, ratio * half * t * t),
+    ]);
   }
-  P.line(
-    [
-      [30, mid],
-      [x0, mid],
-    ],
-    "vector-velocity",
-    1.5,
-  );
-  P.line(pts, "vector-velocity", 1.5);
-  P.charge(40, mid, q, 8);
-  P.arrow(50, mid, 90, mid, "vector-velocity");
-  P.tag("u", 70, mid - 20);
+  const [ex, ey] = pts[pts.length - 1];
   P.line(
     [
       [x0, mid],
@@ -242,12 +243,38 @@ export function deflection(ctx, o) {
     1,
     [3, 4],
   );
-  P.dim(x1 + 14, mid, x1 + 14, mid + down * dy);
-  P.tag("y", x1 + 22, mid + (down * dy) / 2, "left");
+  P.line(
+    [
+      [26, mid],
+      [x0, mid],
+    ],
+    "vector-velocity",
+    1.5,
+  );
+  P.line(pts, "vector-velocity", 1.5);
+  P.charge(34, mid, q, 8);
+  P.arrow(44, mid, Math.min(x0 - 6, 92), mid, "vector-velocity");
+  P.tag("u", 26, mid - 22, "left");
+  if (hits) {
+    P.ball(ex, ey, 3.5, "vector-velocity");
+    P.text("hits the plate here", ex + 10, ey - down * 16, "left", "ink");
+    P.tag("y", x1 + 22, mid + down * 16, "left");
+    P.text("if the plate were not there", x1 + 22, mid + down * 38, "left");
+  } else {
+    P.arrow(
+      ex - 1,
+      ey - 0.05 * down * ratio * half,
+      ex,
+      ey,
+      "vector-velocity",
+    );
+    P.dim(x1 + 14, mid, x1 + 14, ey);
+    P.tag("y", x1 + 22, (mid + ey) / 2, "left");
+  }
   P.dim(x0, bottom + 18, x1, bottom + 18);
   P.tag("L", (x0 + x1) / 2, bottom + 18);
   P.dim(x0 - 14, top, x0 - 14, bottom);
-  P.tag("d", x0 - 20, top + 24, "right");
+  P.tag("d", x0 - 22, bottom - 18, "right");
   P.tag("V", x1 + 22, top + 4, "left");
   P.tag("q", w - 20, h - 18, "right");
   P.tag("m", w - 20, h - 42, "right");
@@ -318,7 +345,13 @@ export function movingCharge(ctx, o) {
   P.charge(x, y, P.value("q", 1), 10);
   P.tag("q", x - 16, y + 22, "right");
   const L = Math.abs(P.length("v", 40, 100));
-  P.arrow(x, y, x + L * Math.cos(th), y - L * Math.sin(th), "vector-velocity");
+  P.arrow(
+    x + 11 * Math.cos(th),
+    y - 11 * Math.sin(th),
+    x + L * Math.cos(th),
+    y - L * Math.sin(th),
+    "vector-velocity",
+  );
   P.tag("v", x + L * Math.cos(th) + 6, y - L * Math.sin(th) - 8, "left");
   P.angle(x, y, 28, -th, 0);
   P.tag("theta", x + 36, y + 14, "left");
@@ -349,18 +382,22 @@ export function wireForce(ctx, o) {
     "structure",
     5,
   );
+  // The current, as an arrow beside the wire.
+  const sx = -Math.sin(th),
+    sy = -Math.cos(th);
   P.arrow(
-    x + (L / 2 - 14) * Math.cos(th),
-    y - (L / 2 - 14) * Math.sin(th),
-    x + (L / 2 + 14) * Math.cos(th),
-    y - (L / 2 + 14) * Math.sin(th),
+    x + (L / 2 - 24) * Math.cos(th) + 13 * sx,
+    y - (L / 2 - 24) * Math.sin(th) + 13 * sy,
+    x + (L / 2 + 24) * Math.cos(th) + 13 * sx,
+    y - (L / 2 + 24) * Math.sin(th) + 13 * sy,
     "circuit-current",
+    2.5,
   );
   P.tag(
     "I",
-    x + (L / 2) * Math.cos(th) - 16,
-    y - (L / 2) * Math.sin(th),
-    "right",
+    x + (L / 2) * Math.cos(th) + 30 * sx,
+    y - (L / 2) * Math.sin(th) + 30 * sy,
+    sx < -0.5 ? "right" : "center",
   );
   P.tag("l", ex + 10, ey, "left");
   P.line(
@@ -439,9 +476,16 @@ export function flux(ctx, o) {
   P.arrow(cx, cy, cx + nx * 70, cy + ny * 70, "accent-text");
   P.text("normal", cx + nx * 80 + 4, cy + ny * 80 - 12, "left");
   P.angle(cx, cy, 30, Math.min(0, -th), Math.max(0, -th));
-  P.tag("theta", cx + 40, cy + 16, "left");
-  P.tag("A", cx - ny * half - 10, cy + nx * half + 14, "right");
-  P.tag("Phi", w * 0.2, 22);
+  if (Math.abs(th) < 45 * deg) P.tag("theta", cx + 40, cy + 16, "left");
+  else
+    P.tag(
+      "theta",
+      cx + 56 * Math.cos(th / 2),
+      cy - 56 * Math.sin(th / 2),
+      "left",
+    );
+  P.tag("A", cx + ny * half - 12, cy - nx * half - 6, "right");
+  P.tag("Phi", w - 24, h - 14, "right");
   P.text("loop seen edge on", w * 0.2, h - 14);
 }
 
@@ -451,7 +495,7 @@ export function faraday(ctx, o) {
     { w, h, ctx: g } = P,
     cx = w * 0.52,
     cy = h * 0.5,
-    turns = Math.max(2, Math.min(10, Math.round(Math.sqrt(P.value("N", 4)))));
+    turns = Math.max(2, Math.min(10, Math.round(Math.sqrt(Math.abs(P.value("N", 4))))));
   g.strokeStyle = P.col("circuit-current");
   g.lineWidth = 2;
   for (let i = 0; i < turns; i++) {
@@ -545,7 +589,7 @@ export function motional(ctx, o) {
     (top + bottom) / 2,
     "vector-velocity",
   );
-  P.tag("v", x + 40, (top + bottom) / 2 - 18);
+  P.tag("v", x + 14, (top + bottom) / 2 - 20, "left");
   P.dim(x - 18, top, x - 18, bottom);
   P.tag("l", x - 24, (top + bottom) / 2, "right");
   P.tag("emf", 62, (top + bottom) / 2, "left");
@@ -562,8 +606,15 @@ export function transformer(ctx, o) {
   g.strokeStyle = P.col("structure");
   g.lineWidth = 16;
   g.strokeRect(cx - cw / 2, cy - ch / 2, cw, ch);
+  // The coil with more turns is drawn with 12 loops and the other in
+  // proportion (never fewer than 2), so the turns ratio can be seen.
+  const most = Math.max(
+    Math.abs(P.value("Np", 100)),
+    Math.abs(P.value("Ns", 100)),
+    1,
+  );
   const coil = (x, n, side) => {
-    const shown = Math.max(2, Math.min(12, Math.round(Math.log2(n + 1) * 2))),
+    const shown = Math.max(2, Math.round((12 * Math.abs(n)) / most) || 2),
       span = ch * 0.6;
     g.strokeStyle = P.col("circuit-current");
     g.lineWidth = 2;
@@ -641,8 +692,8 @@ export function generator(ctx, o) {
     1,
   );
   P.line(pts, "circuit-current", 1.8);
-  P.tag("emf", gx + gw / 8, cy - amp - 14);
-  P.text("peak", gx + gw / 8 + 34, cy - amp + 4, "left");
+  P.tag("emf", gx + 4, cy - amp - 14, "left");
+  P.text("peak", gx + gw / 8 + 34, cy - amp + 6, "left");
   P.tag("N", gx, h - 14, "left");
   P.tag("A", gx + gw, h - 14, "right");
 }
@@ -653,7 +704,7 @@ export function cyclotron(ctx, o) {
     { w, h, ctx: g } = P,
     cx = w * 0.38,
     cy = h / 2,
-    R = h * 0.36,
+    R = Math.abs(P.length("r", h * 0.16, h * 0.38)) || h * 0.3,
     q = P.value("q", 1);
   P.bRegion(20, 10, w - 20, h - 10, false);
   P.tag("B", w - 24, 22, "right");
@@ -673,9 +724,9 @@ export function cyclotron(ctx, o) {
   const dir = q >= 0 ? 1 : -1;
   P.arrow(cx + dir * 11, by, cx + dir * 70, by, "vector-velocity");
   P.tag("v", cx + dir * 80, by, dir > 0 ? "left" : "right");
-  P.arrow(cx, by + 11, cx, by + 50);
-  P.text("F", cx + 8, by + 46, "left");
-  P.tag("q", cx - 16, by - 18, "right");
+  P.arrow(cx, by + 11, cx, by + Math.min(50, R - 8));
+  P.text("F", cx + 8, by + Math.min(46, R - 12), "left");
+  P.tag("q", cx - dir * 16, by - 18, dir > 0 ? "right" : "left");
   P.tag("m", w - 24, h - 20, "right");
 }
 

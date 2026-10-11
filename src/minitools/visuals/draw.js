@@ -97,6 +97,12 @@ export function picture(ctx, o) {
   const has = (key) => byKey.has(key);
   const value = (key, fallback = 0) => val(v, key, fallback);
 
+  // A counted quantity (turns, harmonic number) is written as a whole
+  // number when it is one.
+  const shown = (x, q) =>
+    q.step === 1 && Number.isInteger(x) && Math.abs(x) < 1e6
+      ? String(x).replace("-", "−")
+      : numberText(x);
   // "sym = value unit" for a quantity of the tool.
   function runsOf(key, { name } = {}) {
     const q = byKey.get(key);
@@ -106,7 +112,7 @@ export function picture(ctx, o) {
     return [
       ...symbolRuns(q.latex),
       {
-        text: ` = ${Number.isFinite(x) ? numberText(x) + unit : "—"}`,
+        text: ` = ${Number.isFinite(x) ? shown(x, q) + unit : "—"}`,
         sub: false,
       },
     ];
@@ -117,8 +123,13 @@ export function picture(ctx, o) {
     ctx.globalAlpha = 0;
     const width = drawRuns(ctx, runs, x, y, align, 12.5, weight);
     ctx.restore();
-    const left =
+    // A label never runs off the picture: it is moved back inside instead.
+    let left =
       align === "left" ? x : align === "right" ? x - width : x - width / 2;
+    left = Math.max(6, Math.min(w - width - 6, left));
+    y = Math.max(12, Math.min(h - 12, y));
+    x = left;
+    align = "left";
     ctx.fillStyle = col("canvas-bg");
     ctx.globalAlpha = 0.82;
     ctx.beginPath();

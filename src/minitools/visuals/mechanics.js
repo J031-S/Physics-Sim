@@ -6,8 +6,10 @@ export function motion(ctx, o) {
   const P = picture(ctx, o),
     { w, h } = P,
     y = h * 0.58,
-    x0 = 70,
-    x1 = w - 110;
+    // The end is drawn on the side the displacement points to.
+    back = P.has("s") && P.value("s") < 0,
+    x0 = back ? w - 120 : 120,
+    x1 = back ? 120 : w - 120;
   P.ground(30, w - 30, y + 14);
   P.ball(x0, y, 13, "body-ball", P.has("u") ? 1 : 0.45);
   P.ball(x1, y, 13);
@@ -17,12 +19,12 @@ export function motion(ctx, o) {
   if (P.has("u")) {
     const L = P.length("u", 16, 80);
     P.arrow(x0, y, x0 + L, y, "vector-velocity");
-    P.tag("u", x0 + Math.max(L, 0) / 2 + 6, y - 26);
+    P.tag("u", x0 + L / 2, y - 26);
   }
   if (P.has("v")) {
     const L = P.length("v", 16, 80);
     P.arrow(x1, y, x1 + L, y, "vector-velocity");
-    P.tag("v", x1 + Math.max(L, 0) / 2 + 6, y - 26);
+    P.tag("v", x1 + L / 2, y - 26);
   }
   const mid = (x0 + x1) / 2;
   if (P.has("a")) {
@@ -141,8 +143,13 @@ export function torque(ctx, o) {
   );
   P.arrow(ex, py, fx, fy);
   P.angle(ex, py, 22, -th, 0);
-  P.tag("theta", ex + 34, py - 12, "left");
-  P.tag("F", fx + 8, fy - 6, "left");
+  P.tag("theta", ex + 30, py + 20, "left");
+  P.tag(
+    "F",
+    fx + 12 * Math.cos(th),
+    fy - 14 * Math.sin(th) - 4,
+    Math.cos(th) >= -0.2 ? "left" : "right",
+  );
   // The turning effect about the pivot.
   P.ctx.strokeStyle = P.col("accent-text");
   P.ctx.lineWidth = 1.8;
@@ -587,7 +594,12 @@ export function projectile(ctx, o) {
     y0 - 56 * Math.sin(th),
     "vector-velocity",
   );
-  P.tag("u", x0 + 60 * Math.cos(th) + 8, y0 - 60 * Math.sin(th) - 8, "left");
+  P.tag(
+    "u",
+    x0 + 60 * Math.cos(th) + 8,
+    Math.min(y0 - 60 * Math.sin(th) - 8, y0 - 36),
+    "left",
+  );
   P.angle(x0, y0, 26, -th, 0);
   P.tag("theta", x0 + 34, y0 - 10, "left");
   P.dim(x0, y0 + 18, x0 + R * k, y0 + 18);

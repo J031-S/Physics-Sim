@@ -124,6 +124,7 @@ export function lampPower(ctx, o) {
   ]);
   C.meter(C.mx, C.t - 44, "V");
   C.meter(C.r, C.my, "A");
+  C.current(C.r - 30, C.b, C.r - 70, C.b);
   P.tag("P", C.mx, C.t + 30);
   P.tag("V", C.mx, C.t - 68);
   P.tag("I", C.r + 20, C.my, "left");
@@ -235,6 +236,7 @@ export function parallel(ctx, o) {
     S.resistor((a + b) / 2, y);
     P.tag(`R${i + 1}`, (a + b) / 2, y - 18);
   });
+  S.current(l + (a - l) * 0.25, t, l + (a - l) * 0.8, t);
   P.text("the same p.d. across each", (a + b) / 2, bottom + 14);
   P.tag("R", b + 18, (t + bottom) / 2, "left");
   P.text("in total", b + 18, (t + bottom) / 2 + 22, "left");

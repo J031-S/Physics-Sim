@@ -75,7 +75,7 @@ export function period(ctx, o) {
     "ink-soft",
     1,
   );
-  P.text("time", x1, y + 16, "right");
+  P.text("time", x1, y - 14, "right");
   sine(P, x0, x1, y, h * 0.28, cycles, "vector-velocity");
   const c1 = x0 + T * 0.25,
     c2 = c1 + T;
@@ -158,6 +158,8 @@ export function snell(ctx, o) {
       "accent-text",
     );
     P.text("total internal reflection", cx + 20, cy - 24, "left");
+    P.text("no refracted ray", cx + 10, cy + 26, "left");
+    P.tag("theta2", cx + 10, cy + 50, "left");
   }
   P.tag("n1", w - 20, 20, "right");
   P.tag("n2", w - 20, h - 20, "right");
@@ -280,8 +282,32 @@ export function photoelectric(ctx, o) {
   }
   P.line(pts, "accent-text", 1.6);
   P.tag("f", 70, 16, "left");
-  P.charge(hx + 30, sy - 40, -1, 8);
-  P.arrow(hx + 40, sy - 50, hx + 90, sy - 100, "vector-velocity");
+  // An electron leaves only if the photon brings more than the work
+  // function.
+  const out = P.value(stopping ? "Vs" : "Ek", 1) > 0;
+  if (out) {
+    P.charge(hx + 30, sy - 40, -1, 8);
+    P.arrow(hx + 40, sy - 50, hx + 90, sy - 100, "vector-velocity");
+  } else {
+    const edge = (stopping ? w * 0.58 : w * 0.68) - 16;
+    P.charge(Math.min(hx + 90, edge), sy + 16, -1, 8);
+    if (stopping)
+      P.text(
+        "no electron leaves: hf < W",
+        w * 0.62 + 10,
+        h * 0.4 + 48,
+        "left",
+        "ink",
+      );
+    else
+      P.text(
+        "no electron leaves: hf is less than W",
+        hx + 10,
+        sy - 22,
+        "left",
+        "ink",
+      );
+  }
   P.tag("Ek", hx + 96, sy - 104, "left");
   if (stopping) {
     P.plate(w * 0.62, 16, w * 0.62, sy - 10, -1);
@@ -346,7 +372,7 @@ export function timeDilation(ctx, o) {
     { w, h, value } = P,
     beta = Math.min(0.99, Math.abs(value("v", 0) / value("c", 3e8))),
     top = 26,
-    bottom = h - 46,
+    bottom = h - 58,
     ax = w * 0.14;
   const mirrors = (x0, x1) => {
     P.line(
@@ -377,7 +403,7 @@ export function timeDilation(ctx, o) {
     1.6,
   );
   P.text("at rest", ax, bottom + 16);
-  P.tag("t0", ax, bottom + 36);
+  P.tag("t0", ax, bottom + 40);
   // The moving clock: the light goes on a slant, so a tick takes longer.
   const H = bottom - top,
     run = Math.min(
@@ -403,7 +429,7 @@ export function timeDilation(ctx, o) {
     "vector-velocity",
   );
   P.tag("v", bx + run + 36, bottom + 16, "left");
-  P.tag("t", bx + run, bottom + 36);
+  P.tag("t", bx + run, bottom + 40);
   P.text("one tick seen from outside", bx + run, top - 14);
 }
 
@@ -422,6 +448,8 @@ export function lengthContraction(ctx, o) {
   P.block(x0 + L / 2, h * 0.68, Math.max(2, L), 18);
   P.dim(x0, h * 0.68 + 22, x0 + L, h * 0.68 + 22);
   P.tag("L", x0 + L / 2, h * 0.68 + 22);
-  P.arrow(x0 + L + 10, h * 0.68, x0 + L + 70, h * 0.68, "vector-velocity");
-  P.tag("v", x0 + L + 78, h * 0.68, "left");
+  const vy = h * 0.68 - 26,
+    vx = x0 + Math.max(L, 60) / 2;
+  P.arrow(vx - 30, vy, vx + 30, vy, "vector-velocity");
+  P.tag("v", vx + 38, vy, "left");
 }
