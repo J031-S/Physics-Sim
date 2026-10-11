@@ -1632,7 +1632,7 @@ $("scene-file").onchange = async () => {
   try {
     data = JSON.parse(await file.text());
   } catch {
-    toast("This file is not a Physics Sim scene.");
+    toast("This file is not a Physium scene.");
     return;
   }
   let next;

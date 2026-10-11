@@ -1,0 +1,5 @@
+KaTeX 0.16.22 — https://katex.org — MIT licence (LICENSE in this folder).
+
+The Physium logo (assets/logo.svg) is the outline of \varphi (U+03C6) taken
+from KaTeX's KaTeX_Math-Italic font, which is distributed under the same MIT
+licence.

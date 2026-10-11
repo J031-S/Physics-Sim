@@ -57,9 +57,14 @@ header {
   font-size: 16px;
   white-space: nowrap;
 }
-.brand > span {
-  font: italic 30px Georgia;
-  color: #6d8871;
+/* The logo (assets/logo.svg) is used as a mask, so it takes this colour. */
+.brand-mark {
+  display: block;
+  width: 26px;
+  height: 30px;
+  background: #6d8871;
+  -webkit-mask: url(assets/logo.svg) center / contain no-repeat;
+  mask: url(assets/logo.svg) center / contain no-repeat;
 }
 .subtitle {
   font-size: 11px;
@@ -1274,8 +1279,9 @@ header {
   gap: 8px;
   font-size: 14px;
 }
-.brand > span {
-  font-size: 24px;
+.brand-mark {
+  width: 21px;
+  height: 24px;
 }
 .playback {
   gap: 5px;

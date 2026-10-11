@@ -1,4 +1,4 @@
-# Physics Sim
+# Physium
 
 Interactive 2D mechanics and electromagnetism sandbox for teaching high-school / introductory physics (kinematics, forces, springs, pulleys, electric and magnetic fields). Students use it to check their intuition against "what really happens", so **physical correctness matters more than visual polish**: a result that looks plausible but disagrees with the textbook formula is a bug.
 
@@ -48,6 +48,7 @@ No bundler, no framework, no runtime dependencies. `index.html` loads `vendor/ma
 | `src/circuitlab/model.js` | `CircuitLab`: components on a grid, modified nodal analysis, the linear solver, capacitor time stepping, fault detection. No DOM |
 | `src/circuitlab/presets.js` | Ready-made circuits with the readings each one should show |
 | `src/circuitlab/app.js` | The circuits page: drawing, input, panels, graphs, the frame loop |
+| `assets/logo.svg` | The Physium mark: the `\varphi` outline from KaTeX's Math Italic font, filled with `currentColor`. Used for the header mark (as a CSS mask), the favicon and the homepage hero |
 | `server.mjs` | Tiny static server for local use only |
 | `vendor/` | Third-party code and licences. Do not edit `vendor/matter.js` |
 

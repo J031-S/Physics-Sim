@@ -1,4 +1,4 @@
-# Physics Sim — minimal sandbox
+# Physium — physics simulations for students
 
 This version intentionally replaces the expanded workbench with a small, running 2D mechanics and prescribed-field sandbox. The previous versions remain in Git history.
 

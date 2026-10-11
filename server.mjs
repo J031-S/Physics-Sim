@@ -2,7 +2,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 const root = resolve(import.meta.dirname);
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 http.createServer(async (req, res) => {
   try {
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
@@ -12,4 +12,4 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': types[extname(path)] || 'text/plain', 'Cache-Control': 'no-cache' });
     res.end(data);
   } catch { res.writeHead(404); res.end('Not found'); }
-}).listen(Number(process.env.PORT || 3000), '0.0.0.0', () => console.log('Physics Sim: http://localhost:' + (process.env.PORT || 3000)));
+}).listen(Number(process.env.PORT || 3000), '0.0.0.0', () => console.log('Physium: http://localhost:' + (process.env.PORT || 3000)));

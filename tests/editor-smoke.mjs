@@ -874,9 +874,9 @@ for (const open of [
   key(" ");
   const before = $("time").textContent;
   await load("not json");
-  assert.equal($("toast").textContent, "This file is not a Physics Sim scene.");
+  assert.equal($("toast").textContent, "This file is not a Physium scene.");
   await load(JSON.stringify({ format: "something-else" }));
-  assert.equal($("toast").textContent, "This file is not a Physics Sim scene.");
+  assert.equal($("toast").textContent, "This file is not a Physium scene.");
   frames(1);
   assert.equal($("time").textContent, before, "bad file left scene untouched");
   await load(sceneText);

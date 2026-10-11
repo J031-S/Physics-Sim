@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="30 -462 608 700" role="img" aria-label="Physium">
+  <!-- \varphi from KaTeX_Math-Italic (KaTeX 0.16.22, MIT; see vendor/katex/).
+       The path uses currentColor; the style below only colours it when the
+       file is shown on its own (the favicon). -->
+  <style>
+    svg { color: #435d49; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #a9c49d; }
+    }
+  </style>
+  <path fill="currentColor" transform="scale(1,-1)" d="M502 442Q558 442 588.0 403.0Q618 364 618 302Q618 283 616 267Q599 166 523 88Q449 16 360 -4Q331 -10 299 -10Q273 -10 273 -12L241 -179Q238 -196 224.0 -207.0Q210 -218 190 -218Q176 -216 167.5 -207.5Q159 -199 159 -185Q159 -172 214 -2Q215 -1 212 0Q209 1 205 2Q138 22 94.0 70.0Q50 118 50 190Q50 210 55 238Q84 366 149 431H162Q183 431 183 423Q183 419 175 409Q127 353 102 260Q93 232 92 210Q92 185 97 170Q114 115 181 87Q217 70 235 70L237 71Q243 90 250 112Q277 198 300 253Q347 360 401 404Q447 442 502 442ZM574 278Q574 321 550.0 345.0Q526 369 486 369Q437 369 394.0 329.0Q351 289 323 218Q309 184 295 109L286 64Q300 62 306 62Q429 62 513 146Q560 193 572 250Q574 257 574 278Z"/>
+</svg>
