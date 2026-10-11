@@ -89,6 +89,57 @@ test("every visual, related page and linked tool exists", () => {
   }
 });
 
+// A canvas context that accepts every call and keeps the text drawn.
+function recordingContext() {
+  const texts = [];
+  const ctx = new Proxy(
+    {},
+    {
+      get(target, key) {
+        if (key === "fillText") return (text) => texts.push(String(text));
+        if (key === "measureText")
+          return (text) => ({ width: 7 * text.length });
+        if (key in target) return target[key];
+        return () => {};
+      },
+      set(target, key, value) {
+        target[key] = value;
+        return true;
+      },
+    },
+  );
+  return { ctx, texts };
+}
+
+test("every tool's picture draws and labels its unknown", () => {
+  for (const t of tools)
+    for (const unknown of t.solveFor) {
+      const values = defaults(t);
+      for (const c of t.constants) values[c.key] = c.value;
+      values[unknown] = t.solve[unknown](values);
+      const { ctx, texts } = recordingContext(),
+        q = t.variables.find((v) => v.key === unknown);
+      visuals[t.visual](ctx, {
+        width: 700,
+        height: 250,
+        values,
+        unknown,
+        tool: t,
+        xKey: t.variables[0].key,
+        dark: false,
+      });
+      const all = texts.join(" ");
+      assert.doesNotMatch(all, /NaN|undefined|Infinity/, `${t.id} ${unknown}`);
+      // The unknown's value is shown, with its unit.
+      assert.ok(
+        texts.some(
+          (s) => s.startsWith(" = ") && (!q.unit || s.endsWith(q.unit)),
+        ),
+        `${t.id}: no value shown for ${unknown}`,
+      );
+    }
+});
+
 test("every tool has a simulation or names the one it wants", () => {
   for (const t of tools)
     assert.ok(

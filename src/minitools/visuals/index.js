@@ -1,33 +1,24 @@
-// Pictures for the minitools, one module each. Each draws on a canvas
-// context from the tool's current values: simple and clear, to be refined
-// later. They show the situation only; the numbers come from the formula and
-// the simulation.
+// Pictures for the minitools. Each draws on a canvas context from the
+// tool's current values and labels the quantities it shows with the tool's
+// own symbols, values and units (see draw.js); the numbers come from the
+// formula, the picture shows the situation they describe.
 //
 //   draw(ctx, { width, height, values, unknown, tool, xKey, dark })
 //
-// Every tool gets `graph`; `visual` in its catalogue entry names another.
+// Every tool gets `graph`; `visual` in its catalogue entry names its own
+// picture.
 import graph from "./graph.js";
-import circle from "./circle.js";
-import projectile from "./projectile.js";
-import orbit from "./orbit.js";
-import particle from "./particle.js";
-import ramp from "./ramp.js";
-import spring from "./spring.js";
-import wave from "./wave.js";
-import circuit from "./circuit.js";
-import field from "./field.js";
-import pendulum from "./pendulum.js";
+import * as mechanics from "./mechanics.js";
+import * as circular from "./circular.js";
+import * as fields from "./fields.js";
+import * as circuits from "./circuits.js";
+import * as waves from "./waves.js";
 
 export const visuals = {
   graph,
-  circle,
-  projectile,
-  orbit,
-  particle,
-  ramp,
-  spring,
-  wave,
-  circuit,
-  field,
-  pendulum,
+  ...mechanics,
+  ...circular,
+  ...fields,
+  ...circuits,
+  ...waves,
 };

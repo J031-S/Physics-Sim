@@ -213,6 +213,7 @@ const motionSim = (watch, duration) => ({
 export const tools = [
   tool({
     id: "suvat-v-u-at",
+    visual: "motion",
     title: "Velocity after a time",
     topic: "Motion",
     purpose: "How a constant acceleration changes the velocity",
@@ -231,7 +232,6 @@ export const tools = [
       a: "\\frac{@v - @u}{@t}",
       t: "\\frac{@v - @u}{@a}",
     },
-    visual: "graph",
     sim: motionSim(
       {
         v: (m) => ballState(m).vx,
@@ -243,6 +243,7 @@ export const tools = [
   }),
   tool({
     id: "suvat-s-ut-at2",
+    visual: "motion",
     title: "Displacement after a time",
     topic: "Motion",
     purpose: "How far something goes when it speeds up steadily",
@@ -259,12 +260,12 @@ export const tools = [
       u: "\\frac{@s - \\tfrac{1}{2}·@a·@t^{2}}{@t}",
       a: "\\frac{2(@s - @u·@t)}{@t^{2}}",
     },
-    visual: "graph",
     sim: motionSim({ s: (m) => ballState(m).x - m.tags.x0 }, (v) => v.t),
     related: "mechanics",
   }),
   tool({
     id: "suvat-v2-u2-2as",
+    visual: "motion",
     title: "Velocity after a distance",
     topic: "Motion",
     purpose: "The speed reached over a distance, without knowing the time",
@@ -286,7 +287,6 @@ export const tools = [
       a: "\\frac{@v^{2} - @u^{2}}{2·@s}",
       s: "\\frac{@v^{2} - @u^{2}}{2·@a}",
     },
-    visual: "graph",
     sim: motionSim(
       {
         v: (m, _, v) =>
@@ -300,6 +300,7 @@ export const tools = [
   }),
   tool({
     id: "suvat-average-velocity",
+    visual: "motion",
     title: "Displacement from the average velocity",
     topic: "Motion",
     purpose:
@@ -317,7 +318,6 @@ export const tools = [
       v: "\\frac{2·@s}{@t} - @u",
       t: "\\frac{2·@s}{@u + @v}",
     },
-    visual: "graph",
     sim: {
       engine: "sandbox",
       caption:
@@ -330,6 +330,7 @@ export const tools = [
   }),
   tool({
     id: "average-velocity",
+    visual: "motion",
     title: "Average velocity",
     topic: "Motion",
     purpose: "Displacement divided by the time taken",
@@ -346,7 +347,6 @@ export const tools = [
       t: ({ s, vav }) => s / vav,
     },
     forms: { vav: "\\frac{@s}{@t}", s: "@vav·@t", t: "\\frac{@s}{@vav}" },
-    visual: "graph",
     sim: {
       engine: "sandbox",
       caption: "A ball gliding at a steady velocity with nothing acting on it.",
@@ -363,6 +363,7 @@ export const tools = [
   // ---------------------------------------------------------------- forces
   tool({
     id: "newtons-second-law",
+    visual: "push",
     title: "Newton's second law",
     topic: "Forces",
     purpose: "A net force gives a mass an acceleration",
@@ -379,7 +380,6 @@ export const tools = [
       m: ({ F, a }) => F / a,
     },
     forms: { a: "\\frac{@F}{@m}", F: "@m·@a", m: "\\frac{@F}{@a}" },
-    visual: "graph",
     sim: {
       engine: "sandbox",
       caption:
@@ -396,6 +396,7 @@ export const tools = [
   }),
   tool({
     id: "weight",
+    visual: "weight",
     title: "Weight",
     topic: "Forces",
     purpose: "The gravitational force on a mass",
@@ -412,7 +413,6 @@ export const tools = [
       g: ({ W, m }) => W / m,
     },
     forms: { W: "@m·@g", m: "\\frac{@W}{@g}", g: "\\frac{@W}{@m}" },
-    visual: "graph",
     sim: {
       engine: "sandbox",
       caption:
@@ -440,6 +440,7 @@ export const tools = [
   }),
   tool({
     id: "friction",
+    visual: "friction",
     title: "Friction",
     topic: "Forces",
     purpose: "Sliding friction is proportional to the normal force",
@@ -456,7 +457,6 @@ export const tools = [
       N: ({ Ff, mu }) => Ff / mu,
     },
     forms: { Ff: "@mu·@N", mu: "\\frac{@Ff}{@N}", N: "\\frac{@Ff}{@mu}" },
-    visual: "ramp",
     sim: {
       engine: "sandbox",
       caption:
@@ -489,6 +489,7 @@ export const tools = [
   }),
   tool({
     id: "hookes-law",
+    visual: "hooke",
     title: "Hooke's law",
     topic: "Forces",
     purpose: "A spring's force is proportional to its extension",
@@ -505,7 +506,6 @@ export const tools = [
       k: ({ F, x }) => F / x,
     },
     forms: { x: "\\frac{@F}{@k}", F: "@k·@x", k: "\\frac{@F}{@x}" },
-    visual: "spring",
     sim: {
       engine: "sandbox",
       caption:
@@ -541,6 +541,7 @@ export const tools = [
   }),
   tool({
     id: "torque",
+    visual: "torque",
     title: "Torque",
     topic: "Forces",
     purpose: "The turning effect of a force about a pivot",
@@ -562,7 +563,6 @@ export const tools = [
       F: "\\frac{@tau}{@r\\sin @theta}",
       r: "\\frac{@tau}{@F\\sin @theta}",
     },
-    visual: "graph",
     wants: "statics",
     related: "mechanics",
   }),
@@ -570,6 +570,7 @@ export const tools = [
   // ---------------------------------------------------------------- momentum
   tool({
     id: "momentum",
+    visual: "moving",
     title: "Momentum",
     topic: "Momentum",
     purpose: "Mass times velocity",
@@ -586,7 +587,6 @@ export const tools = [
       v: ({ p, m }) => p / m,
     },
     forms: { p: "@m·@v", m: "\\frac{@p}{@v}", v: "\\frac{@p}{@m}" },
-    visual: "graph",
     sim: {
       engine: "sandbox",
       caption:
@@ -604,6 +604,7 @@ export const tools = [
   }),
   tool({
     id: "impulse",
+    visual: "impulse",
     title: "Impulse",
     topic: "Momentum",
     purpose: "A force acting for a time changes the momentum",
@@ -627,7 +628,6 @@ export const tools = [
       dt: "\\frac{@m·@dv}{@F}",
       m: "\\frac{@F·@dt}{@dv}",
     },
-    visual: "graph",
     sim: {
       engine: "sandbox",
       caption:
@@ -642,6 +642,7 @@ export const tools = [
   // ---------------------------------------------------------------- energy
   tool({
     id: "work-done",
+    visual: "work",
     title: "Work done by a force",
     topic: "Energy",
     purpose: "Only the part of a force along the motion does work",
@@ -663,7 +664,6 @@ export const tools = [
       F: "\\frac{@W}{@s\\cos @theta}",
       s: "\\frac{@W}{@F\\cos @theta}",
     },
-    visual: "graph",
     sim: {
       engine: "sandbox",
       caption:
@@ -690,6 +690,7 @@ export const tools = [
   }),
   tool({
     id: "kinetic-energy",
+    visual: "moving",
     title: "Kinetic energy",
     topic: "Energy",
     purpose: "Doubling the speed quadruples the kinetic energy",
@@ -710,7 +711,6 @@ export const tools = [
       m: "\\frac{2·@Ek}{@v^{2}}",
       v: "\\sqrt{\\frac{2·@Ek}{@m}}",
     },
-    visual: "graph",
     sim: {
       engine: "sandbox",
       caption:
@@ -726,6 +726,7 @@ export const tools = [
   }),
   tool({
     id: "gravitational-potential-energy",
+    visual: "drop",
     title: "Gravitational potential energy",
     topic: "Energy",
     purpose: "Energy stored by lifting a mass near the ground",
@@ -747,7 +748,6 @@ export const tools = [
       m: "\\frac{@Ep}{@g·@h}",
       h: "\\frac{@Ep}{@m·@g}",
     },
-    visual: "graph",
     sim: {
       engine: "sandbox",
       caption:
@@ -774,6 +774,7 @@ export const tools = [
   }),
   tool({
     id: "elastic-potential-energy",
+    visual: "hooke",
     title: "Elastic potential energy",
     topic: "Energy",
     purpose: "Energy stored in a stretched spring",
@@ -794,7 +795,6 @@ export const tools = [
       k: "\\frac{2·@Es}{@x^{2}}",
       x: "\\sqrt{\\frac{2·@Es}{@k}}",
     },
-    visual: "spring",
     sim: {
       engine: "sandbox",
       caption:
@@ -821,6 +821,7 @@ export const tools = [
   }),
   tool({
     id: "power-work-time",
+    visual: "power",
     title: "Power",
     topic: "Energy",
     purpose: "How quickly work is done",
@@ -837,7 +838,6 @@ export const tools = [
       t: ({ W, P }) => W / P,
     },
     forms: { P: "\\frac{@W}{@t}", W: "@P·@t", t: "\\frac{@W}{@P}" },
-    visual: "graph",
     sim: {
       engine: "sandbox",
       caption:
@@ -852,6 +852,7 @@ export const tools = [
   }),
   tool({
     id: "power-force-velocity",
+    visual: "drive",
     title: "Power from force and velocity",
     topic: "Energy",
     purpose: "A force on something moving does work at the rate Fv",
@@ -868,7 +869,6 @@ export const tools = [
       v: ({ P, F }) => P / F,
     },
     forms: { P: "@F·@v", F: "\\frac{@P}{@v}", v: "\\frac{@P}{@F}" },
-    visual: "graph",
     sim: {
       engine: "sandbox",
       caption:
@@ -892,6 +892,7 @@ export const tools = [
   // ---------------------------------------------------------------- circular motion
   tool({
     id: "circular-speed",
+    visual: "circle",
     title: "Speed in a circle",
     topic: "Circular motion",
     purpose: "One lap is a circumference in one period",
@@ -912,7 +913,6 @@ export const tools = [
       r: "\\frac{@v·@T}{2\\pi}",
       T: "\\frac{2\\pi·@r}{@v}",
     },
-    visual: "circle",
     sim: whirl({
       T: (m) => period(m, "T", ballState(m).y, m.tags.centre.y, m.time),
       v: (m) => m.measure(m.tags.ball).speed,
@@ -921,6 +921,7 @@ export const tools = [
   }),
   tool({
     id: "centripetal-acceleration",
+    visual: "circle",
     title: "Centripetal acceleration",
     topic: "Circular motion",
     purpose: "Moving in a circle means accelerating towards its centre",
@@ -941,7 +942,6 @@ export const tools = [
       v: "\\sqrt{@a·@r}",
       r: "\\frac{@v^{2}}{@a}",
     },
-    visual: "circle",
     sim: whirl({
       a: (m) => {
         const f = m.netForce(m.tags.ball);
@@ -952,6 +952,7 @@ export const tools = [
   }),
   tool({
     id: "centripetal-force",
+    visual: "circle",
     title: "Centripetal force",
     topic: "Circular motion",
     purpose: "The net force needed to keep a mass on a circle",
@@ -975,7 +976,6 @@ export const tools = [
       v: "\\sqrt{\\frac{@F·@r}{@m}}",
       r: "\\frac{@m·@v^{2}}{@F}",
     },
-    visual: "circle",
     sim: whirl({
       F: (m) => {
         const f = m.netForce(m.tags.ball);
@@ -988,6 +988,7 @@ export const tools = [
   // ---------------------------------------------------------------- gravitation
   tool({
     id: "newtons-gravitation",
+    visual: "masses",
     title: "Newton's law of gravitation",
     topic: "Gravitation",
     purpose: "Gravity weakens with the square of the distance",
@@ -1021,12 +1022,12 @@ export const tools = [
       m: "\\frac{@F·@r^{2}}{@G·@M}",
       r: "\\sqrt{\\frac{@G·@M·@m}{@F}}",
     },
-    visual: "orbit",
     sim: circularOrbit({ F: (lab) => lab.measure(lab.tags.satellite).force }),
     related: "orbits",
   }),
   tool({
     id: "gravitational-field-strength",
+    visual: "gfield",
     title: "Gravitational field strength",
     topic: "Gravitation",
     purpose: "The force on each kilogram, at a distance from a mass",
@@ -1066,7 +1067,6 @@ export const tools = [
       M: "\\frac{@g·@r^{2}}{@G}",
       r: "\\sqrt{\\frac{@G·@M}{@g}}",
     },
-    visual: "orbit",
     sim: circularOrbit({
       g: (lab) => lab.measure(lab.tags.satellite).force / lab.satelliteMass,
     }),
@@ -1074,6 +1074,7 @@ export const tools = [
   }),
   tool({
     id: "gravitational-potential",
+    visual: "gfield",
     title: "Gravitational potential energy (far from the surface)",
     topic: "Gravitation",
     purpose: "Zero at infinity and negative everywhere closer",
@@ -1103,7 +1104,6 @@ export const tools = [
       Ep: "-\\frac{@G·@M·@m}{@r}",
       r: "-\\frac{@G·@M·@m}{@Ep}",
     },
-    visual: "orbit",
     sim: circularOrbit({
       Ep: (lab) => lab.measure(lab.tags.satellite).potential,
     }),
@@ -1113,6 +1113,7 @@ export const tools = [
   // ---------------------------------------------------------------- electric fields
   tool({
     id: "coulombs-law",
+    visual: "coulomb",
     title: "Coulomb's law",
     topic: "Electric fields",
     purpose: "The force between two charges",
@@ -1135,7 +1136,6 @@ export const tools = [
       q2: "\\frac{@F·@r^{2}}{@k·@q1}",
       r: "\\sqrt{\\frac{@k·@q1·@q2}{@F}}",
     },
-    visual: "field",
     sim: {
       engine: "fieldlab",
       caption:
@@ -1157,6 +1157,7 @@ export const tools = [
   }),
   tool({
     id: "electric-field-force",
+    visual: "fieldForce",
     title: "Electric field strength",
     topic: "Electric fields",
     purpose: "The force on each coulomb of charge",
@@ -1173,7 +1174,6 @@ export const tools = [
       q: ({ F, E }) => F / E,
     },
     forms: { F: "@E·@q", E: "\\frac{@F}{@q}", q: "\\frac{@F}{@E}" },
-    visual: "field",
     sim: {
       engine: "fieldlab",
       caption:
@@ -1199,6 +1199,7 @@ export const tools = [
   }),
   tool({
     id: "point-charge-field",
+    visual: "pointField",
     title: "Field of a point charge",
     topic: "Electric fields",
     purpose: "Double the distance, a quarter of the field",
@@ -1220,7 +1221,6 @@ export const tools = [
       q: "\\frac{@E·@r^{2}}{@k}",
       r: "\\sqrt{\\frac{@k·@q}{@E}}",
     },
-    visual: "field",
     sim: {
       engine: "fieldlab",
       caption:
@@ -1242,6 +1242,7 @@ export const tools = [
   }),
   tool({
     id: "uniform-field-plates",
+    visual: "platesField",
     title: "Field between parallel plates",
     topic: "Electric fields",
     purpose: "A uniform field from a potential difference across a gap",
@@ -1258,7 +1259,6 @@ export const tools = [
       d: ({ V, E }) => V / E,
     },
     forms: { E: "\\frac{@V}{@d}", V: "@E·@d", d: "\\frac{@V}{@E}" },
-    visual: "particle",
     sim: platesSim({
       E: (lab) => {
         const [x, y] = lab.electricField(0, 0);
@@ -1270,6 +1270,7 @@ export const tools = [
   }),
   tool({
     id: "electric-work",
+    visual: "electricWork",
     title: "Work done moving a charge",
     topic: "Electric fields",
     purpose: "Energy gained by a charge falling through a potential difference",
@@ -1286,7 +1287,6 @@ export const tools = [
       V: ({ W, q }) => W / q,
     },
     forms: { W: "@q·@V", q: "\\frac{@W}{@V}", V: "\\frac{@W}{@q}" },
-    visual: "particle",
     sim: platesSim({ W: (lab, _, v) => v.q * plateDifference(lab) }, 0.2),
     related: "fields",
   }),
@@ -1294,6 +1294,7 @@ export const tools = [
   // ---------------------------------------------------------------- circuits
   tool({
     id: "current-charge",
+    visual: "chargeFlow",
     title: "Current",
     topic: "Circuits",
     purpose: "Charge passing a point each second",
@@ -1310,7 +1311,6 @@ export const tools = [
       t: ({ q, I }) => q / I,
     },
     forms: { I: "\\frac{@q}{@t}", q: "@I·@t", t: "\\frac{@q}{@I}" },
-    visual: "circuit",
     sim: {
       engine: "circuitlab",
       caption:
@@ -1325,6 +1325,7 @@ export const tools = [
   }),
   tool({
     id: "ohms-law",
+    visual: "ohm",
     title: "Ohm's law",
     topic: "Circuits",
     purpose: "Current through a resistor is proportional to the p.d. across it",
@@ -1341,7 +1342,6 @@ export const tools = [
       R: ({ V, I }) => V / I,
     },
     forms: { I: "\\frac{@V}{@R}", V: "@I·@R", R: "\\frac{@V}{@I}" },
-    visual: "circuit",
     sim: {
       engine: "circuitlab",
       caption:
@@ -1359,6 +1359,7 @@ export const tools = [
   }),
   tool({
     id: "electrical-power",
+    visual: "lampPower",
     title: "Electrical power",
     topic: "Circuits",
     purpose: "Energy transferred each second by a current through a p.d.",
@@ -1375,7 +1376,6 @@ export const tools = [
       I: ({ P, V }) => P / V,
     },
     forms: { P: "@V·@I", V: "\\frac{@P}{@I}", I: "\\frac{@P}{@V}" },
-    visual: "circuit",
     sim: {
       engine: "circuitlab",
       caption:
@@ -1387,6 +1387,7 @@ export const tools = [
   }),
   tool({
     id: "power-current-resistance",
+    visual: "heating",
     title: "Power in a resistor",
     topic: "Circuits",
     purpose: "Heating grows with the square of the current",
@@ -1407,7 +1408,6 @@ export const tools = [
       I: "\\sqrt{\\frac{@P}{@R}}",
       R: "\\frac{@P}{@I^{2}}",
     },
-    visual: "circuit",
     sim: {
       engine: "circuitlab",
       caption:
@@ -1419,6 +1419,7 @@ export const tools = [
   }),
   tool({
     id: "series-resistors",
+    visual: "series",
     title: "Resistors in series",
     topic: "Circuits",
     purpose: "One path: the resistances add",
@@ -1435,7 +1436,6 @@ export const tools = [
       R3: ({ R, R1, R2 }) => R - R1 - R2,
     },
     forms: { R: "@R1 + @R2 + @R3", R3: "@R - @R1 - @R2" },
-    visual: "circuit",
     sim: {
       engine: "circuitlab",
       caption:
@@ -1452,6 +1452,7 @@ export const tools = [
   }),
   tool({
     id: "parallel-resistors",
+    visual: "parallel",
     title: "Resistors in parallel",
     topic: "Circuits",
     purpose: "More paths: the total resistance falls",
@@ -1467,7 +1468,6 @@ export const tools = [
     forms: {
       R: "\\left(\\frac{1}{@R1} + \\frac{1}{@R2} + \\frac{1}{@R3}\\right)^{-1}",
     },
-    visual: "circuit",
     sim: {
       engine: "circuitlab",
       caption:
@@ -1481,6 +1481,7 @@ export const tools = [
   // ---------------------------------------------------------------- magnetism
   tool({
     id: "force-on-moving-charge",
+    visual: "movingCharge",
     title: "Force on a moving charge",
     topic: "Magnetism",
     purpose: "A magnetic field pushes sideways on a moving charge",
@@ -1503,7 +1504,6 @@ export const tools = [
       B: "\\frac{@F}{@q·@v\\sin @theta}",
       v: "\\frac{@F}{@q·@B\\sin @theta}",
     },
-    visual: "particle",
     sim: {
       engine: "sandbox",
       caption:
@@ -1534,6 +1534,7 @@ export const tools = [
   }),
   tool({
     id: "force-on-wire",
+    visual: "wireForce",
     title: "Force on a current-carrying wire",
     topic: "Magnetism",
     purpose: "The motor effect",
@@ -1556,7 +1557,6 @@ export const tools = [
       B: "\\frac{@F}{@I·@l\\sin @theta}",
       I: "\\frac{@F}{@B·@l\\sin @theta}",
     },
-    visual: "field",
     sim: {
       engine: "fieldlab",
       caption:
@@ -1578,6 +1578,7 @@ export const tools = [
   }),
   tool({
     id: "field-of-wire",
+    visual: "wireField",
     title: "Field of a long straight wire",
     topic: "Magnetism",
     purpose: "Circles round the wire, weaker further away",
@@ -1599,7 +1600,6 @@ export const tools = [
       I: "\\frac{2\\pi·@r·@B}{@mu0}",
       r: "\\frac{@mu0·@I}{2\\pi·@B}",
     },
-    visual: "field",
     sim: {
       engine: "fieldlab",
       caption:
@@ -1621,6 +1621,7 @@ export const tools = [
   }),
   tool({
     id: "magnetic-flux",
+    visual: "flux",
     title: "Magnetic flux",
     topic: "Magnetism",
     purpose: "How much field passes through a loop",
@@ -1642,11 +1643,11 @@ export const tools = [
       B: "\\frac{@Phi}{@A\\cos @theta}",
       A: "\\frac{@Phi}{@B\\cos @theta}",
     },
-    visual: "graph",
     wants: "induction",
   }),
   tool({
     id: "faradays-law",
+    visual: "faraday",
     title: "Faraday's law",
     topic: "Magnetism",
     purpose: "A changing flux induces an emf",
@@ -1668,11 +1669,11 @@ export const tools = [
       N: "-\\frac{@emf·@dt}{@dPhi}",
       dt: "-\\frac{@N·@dPhi}{@emf}",
     },
-    visual: "graph",
     wants: "induction",
   }),
   tool({
     id: "motional-emf",
+    visual: "motional",
     title: "EMF of a moving rod",
     topic: "Magnetism",
     purpose: "A conductor cutting field lines",
@@ -1694,11 +1695,11 @@ export const tools = [
       B: "\\frac{@emf}{@l·@v}",
       v: "\\frac{@emf}{@B·@l}",
     },
-    visual: "graph",
     wants: "induction",
   }),
   tool({
     id: "transformer",
+    visual: "transformer",
     title: "Transformer",
     topic: "Magnetism",
     purpose: "The voltage ratio equals the turns ratio",
@@ -1722,13 +1723,13 @@ export const tools = [
       Ns: "\\frac{@Vs·@Np}{@Vp}",
       Np: "\\frac{@Vp·@Ns}{@Vs}",
     },
-    visual: "graph",
     wants: "induction",
   }),
 
   // ---------------------------------------------------------------- waves
   tool({
     id: "wave-equation",
+    visual: "wave",
     title: "The wave equation",
     topic: "Waves",
     purpose: "Speed is frequency times wavelength",
@@ -1749,11 +1750,11 @@ export const tools = [
       v: "@f·@lambda",
       f: "\\frac{@v}{@lambda}",
     },
-    visual: "wave",
     wants: "waves",
   }),
   tool({
     id: "period-frequency",
+    visual: "period",
     title: "Period and frequency",
     topic: "Waves",
     purpose: "The time for one cycle",
@@ -1765,11 +1766,11 @@ export const tools = [
     solveFor: ["T", "f"],
     solve: { T: ({ f }) => 1 / f, f: ({ T }) => 1 / T },
     forms: { T: "\\frac{1}{@f}", f: "\\frac{1}{@T}" },
-    visual: "wave",
     wants: "waves",
   }),
   tool({
     id: "snells-law",
+    visual: "snell",
     title: "Snell's law",
     topic: "Waves",
     purpose: "Light bends as it changes speed at a boundary",
@@ -1794,11 +1795,11 @@ export const tools = [
       n2: "\\frac{@n1\\sin @theta1}{\\sin @theta2}",
       theta1: "\\sin^{-1}\\left(\\frac{@n2\\sin @theta2}{@n1}\\right)",
     },
-    visual: "graph",
     wants: "waves",
   }),
   tool({
     id: "standing-waves",
+    visual: "standing",
     title: "Standing waves on a string",
     topic: "Waves",
     purpose: "Only whole numbers of half-wavelengths fit",
@@ -1820,11 +1821,11 @@ export const tools = [
       v: "\\frac{2·@L·@f}{@n}",
       L: "\\frac{@n·@v}{2·@f}",
     },
-    visual: "wave",
     wants: "waves",
   }),
   tool({
     id: "inverse-square-intensity",
+    visual: "intensity",
     title: "Intensity and distance",
     topic: "Waves",
     purpose: "Spreading over a sphere: twice as far, a quarter as bright",
@@ -1845,13 +1846,13 @@ export const tools = [
       P: "4\\pi·@r^{2}·@I",
       r: "\\sqrt{\\frac{@P}{4\\pi·@I}}",
     },
-    visual: "graph",
     wants: "waves",
   }),
 
   // ---------------------------------------------------------------- modern physics
   tool({
     id: "photon-energy",
+    visual: "photon",
     title: "Photon energy",
     topic: "Modern physics",
     purpose: "Light comes in packets whose energy depends on frequency",
@@ -1864,11 +1865,11 @@ export const tools = [
     solveFor: ["E", "f"],
     solve: { E: ({ h, f }) => h * f, f: ({ h, E }) => E / h },
     forms: { E: "@h·@f", f: "\\frac{@E}{@h}" },
-    visual: "wave",
     wants: "modern",
   }),
   tool({
     id: "photoelectric-effect",
+    visual: "photoelectric",
     title: "Photoelectric effect",
     topic: "Modern physics",
     purpose: "A photon's energy pays the work function, the rest is kinetic",
@@ -1890,11 +1891,11 @@ export const tools = [
       f: "\\frac{@Ek + @W}{@h}",
       W: "@h·@f - @Ek",
     },
-    visual: "wave",
     wants: "modern",
   }),
   tool({
     id: "de-broglie",
+    visual: "deBroglie",
     title: "De Broglie wavelength",
     topic: "Modern physics",
     purpose: "Moving particles behave as waves",
@@ -1907,11 +1908,11 @@ export const tools = [
     solveFor: ["lambda", "p"],
     solve: { lambda: ({ h, p }) => h / p, p: ({ h, lambda }) => h / lambda },
     forms: { lambda: "\\frac{@h}{@p}", p: "\\frac{@h}{@lambda}" },
-    visual: "wave",
     wants: "modern",
   }),
   tool({
     id: "mass-energy",
+    visual: "massEnergy",
     title: "Mass–energy equivalence",
     topic: "Modern physics",
     purpose: "A little mass is a great deal of energy",
@@ -1924,11 +1925,11 @@ export const tools = [
     solveFor: ["E", "m"],
     solve: { E: ({ m, c }) => m * c * c, m: ({ E, c }) => E / (c * c) },
     forms: { E: "@m·@c^{2}", m: "\\frac{@E}{@c^{2}}" },
-    visual: "graph",
     wants: "modern",
   }),
   tool({
     id: "time-dilation",
+    visual: "timeDilation",
     title: "Time dilation",
     topic: "Modern physics",
     purpose: "A moving clock runs slow",
@@ -1948,11 +1949,11 @@ export const tools = [
       t: "\\frac{@t0}{\\sqrt{1 - @v^{2}/@c^{2}}}",
       t0: "@t·\\sqrt{1 - @v^{2}/@c^{2}}",
     },
-    visual: "graph",
     wants: "modern",
   }),
   tool({
     id: "length-contraction",
+    visual: "lengthContraction",
     title: "Length contraction",
     topic: "Modern physics",
     purpose: "A moving object is shorter along its motion",
@@ -1972,13 +1973,13 @@ export const tools = [
       L: "@L0·\\sqrt{1 - @v^{2}/@c^{2}}",
       L0: "\\frac{@L}{\\sqrt{1 - @v^{2}/@c^{2}}}",
     },
-    visual: "graph",
     wants: "modern",
   }),
 
   // ---------------------------------------------------------------- combinations
   tool({
     id: "kepler-third-law",
+    visual: "orbit",
     title: "Kepler's third law",
     topic: "Gravitation",
     kind: "combined",
@@ -2027,7 +2028,6 @@ export const tools = [
       },
     ],
     uses: ["newtons-gravitation", "centripetal-force", "circular-speed"],
-    visual: "orbit",
     sim: circularOrbit({
       T: (lab) => lab.get(lab.tags.satellite)?.measuredPeriod ?? null,
     }),
@@ -2035,6 +2035,7 @@ export const tools = [
   }),
   tool({
     id: "orbital-speed",
+    visual: "orbit",
     title: "Orbital speed",
     topic: "Gravitation",
     kind: "combined",
@@ -2075,7 +2076,6 @@ export const tools = [
       { say: "Take the square root", latex: "v = \\sqrt{\\frac{GM}{r}}" },
     ],
     uses: ["newtons-gravitation", "centripetal-force"],
-    visual: "orbit",
     sim: {
       ...circularOrbit({ v: (lab) => lab.measure(lab.tags.satellite).speed }),
       caption:
@@ -2087,6 +2087,7 @@ export const tools = [
   }),
   tool({
     id: "geostationary-orbit",
+    visual: "orbit",
     title: "Geostationary orbit",
     topic: "Gravitation",
     kind: "combined",
@@ -2122,7 +2123,6 @@ export const tools = [
       },
     ],
     uses: ["kepler-third-law"],
-    visual: "orbit",
     sim: {
       ...circularOrbit({
         T: (lab) => lab.get(lab.tags.satellite)?.measuredPeriod ?? null,
@@ -2150,6 +2150,7 @@ export const tools = [
   }),
   tool({
     id: "escape-speed",
+    visual: "escape",
     title: "Escape speed",
     topic: "Gravitation",
     kind: "combined",
@@ -2199,7 +2200,6 @@ export const tools = [
       { say: "Take the square root", latex: "v = \\sqrt{\\frac{2GM}{r}}" },
     ],
     uses: ["kinetic-energy", "gravitational-potential"],
-    visual: "orbit",
     sim: {
       engine: "orbitlab",
       caption:
@@ -2218,6 +2218,7 @@ export const tools = [
   }),
   tool({
     id: "cyclotron-motion",
+    visual: "cyclotron",
     title: "Charged particle in a magnetic field",
     topic: "Magnetism",
     kind: "combined",
@@ -2257,7 +2258,6 @@ export const tools = [
       },
     ],
     uses: ["force-on-moving-charge", "centripetal-force"],
-    visual: "particle",
     sim: {
       engine: "sandbox",
       caption:
@@ -2296,6 +2296,7 @@ export const tools = [
   }),
   tool({
     id: "velocity-selector",
+    visual: "selector",
     title: "Velocity selector",
     topic: "Magnetism",
     kind: "combined",
@@ -2325,7 +2326,6 @@ export const tools = [
       },
     ],
     uses: ["electric-field-force", "force-on-moving-charge"],
-    visual: "particle",
     sim: {
       engine: "sandbox",
       caption:
@@ -2370,6 +2370,7 @@ export const tools = [
   }),
   tool({
     id: "mass-spectrometer",
+    visual: "spectrometer",
     title: "Mass spectrometer",
     topic: "Magnetism",
     kind: "combined",
@@ -2410,7 +2411,6 @@ export const tools = [
       },
     ],
     uses: ["electron-gun", "cyclotron-motion"],
-    visual: "particle",
     sim: {
       engine: "sandbox",
       caption:
@@ -2457,6 +2457,7 @@ export const tools = [
   }),
   tool({
     id: "electron-gun",
+    visual: "electronGun",
     title: "Accelerating a charge",
     topic: "Electric fields",
     kind: "combined",
@@ -2483,7 +2484,6 @@ export const tools = [
       { say: "Solve for the speed", latex: "v = \\sqrt{\\frac{2qV}{m}}" },
     ],
     uses: ["electric-work", "kinetic-energy"],
-    visual: "particle",
     sim: {
       engine: "sandbox",
       caption:
@@ -2522,6 +2522,7 @@ export const tools = [
   }),
   tool({
     id: "deflection-between-plates",
+    visual: "deflection",
     title: "Deflection between plates",
     topic: "Electric fields",
     kind: "combined",
@@ -2563,7 +2564,6 @@ export const tools = [
       },
     ],
     uses: ["uniform-field-plates", "newtons-second-law", "suvat-s-ut-at2"],
-    visual: "particle",
     sim: {
       engine: "sandbox",
       caption:
@@ -2600,6 +2600,7 @@ export const tools = [
   }),
   tool({
     id: "millikan",
+    visual: "millikan",
     title: "Millikan's balance",
     topic: "Electric fields",
     kind: "combined",
@@ -2632,7 +2633,6 @@ export const tools = [
       { say: "Solve for the charge", latex: "q = \\frac{mgd}{V}" },
     ],
     uses: ["uniform-field-plates", "electric-field-force", "weight"],
-    visual: "particle",
     sim: {
       engine: "sandbox",
       caption:
@@ -2664,6 +2664,7 @@ export const tools = [
   }),
   tool({
     id: "projectile-range",
+    visual: "projectile",
     title: "Projectile range",
     topic: "Motion",
     kind: "combined",
@@ -2708,7 +2709,6 @@ export const tools = [
       },
     ],
     uses: ["suvat-s-ut-at2", "suvat-v-u-at"],
-    visual: "projectile",
     sim: {
       engine: "sandbox",
       caption:
@@ -2742,6 +2742,7 @@ export const tools = [
   }),
   tool({
     id: "falling-without-friction",
+    visual: "drop",
     title: "Falling without friction",
     topic: "Energy",
     kind: "combined",
@@ -2763,7 +2764,6 @@ export const tools = [
       { say: "The mass cancels", latex: "v = \\sqrt{2gh}" },
     ],
     uses: ["gravitational-potential-energy", "kinetic-energy"],
-    visual: "graph",
     sim: {
       engine: "sandbox",
       caption:
@@ -2791,6 +2791,7 @@ export const tools = [
   }),
   tool({
     id: "block-on-ramp",
+    visual: "ramp",
     title: "Block on a ramp",
     topic: "Forces",
     kind: "combined",
@@ -2837,7 +2838,6 @@ export const tools = [
       },
     ],
     uses: ["weight", "friction", "newtons-second-law"],
-    visual: "ramp",
     sim: {
       engine: "sandbox",
       caption:
@@ -2887,6 +2887,7 @@ export const tools = [
   }),
   tool({
     id: "banked-curve",
+    visual: "banked",
     title: "Banked curve",
     topic: "Circular motion",
     kind: "combined",
@@ -2921,11 +2922,11 @@ export const tools = [
       { say: "Divide the two", latex: "\\tan\\theta = \\frac{v^2}{rg}" },
     ],
     uses: ["centripetal-force", "weight"],
-    visual: "circle",
     wants: "mechanics-3d",
   }),
   tool({
     id: "conical-pendulum",
+    visual: "conical",
     title: "Conical pendulum",
     topic: "Circular motion",
     kind: "combined",
@@ -2964,11 +2965,11 @@ export const tools = [
       },
     ],
     uses: ["centripetal-force", "weight"],
-    visual: "pendulum",
     wants: "mechanics-3d",
   }),
   tool({
     id: "vertical-circle",
+    visual: "vertical",
     title: "Vertical circle",
     topic: "Circular motion",
     kind: "combined",
@@ -3000,11 +3001,11 @@ export const tools = [
       },
     ],
     uses: ["centripetal-force", "weight"],
-    visual: "circle",
     wants: "mechanics-ropes",
   }),
   tool({
     id: "mass-on-spring",
+    visual: "springMass",
     title: "Mass on a spring",
     topic: "Oscillations",
     kind: "combined",
@@ -3045,7 +3046,6 @@ export const tools = [
       },
     ],
     uses: ["hookes-law", "newtons-second-law"],
-    visual: "spring",
     sim: {
       engine: "sandbox",
       caption:
@@ -3077,6 +3077,7 @@ export const tools = [
   }),
   tool({
     id: "simple-pendulum",
+    visual: "pendulum",
     title: "Simple pendulum",
     topic: "Oscillations",
     kind: "combined",
@@ -3111,7 +3112,6 @@ export const tools = [
       { say: "The period", latex: "T = 2\\pi\\sqrt{\\frac{L}{g}}" },
     ],
     uses: ["weight", "newtons-second-law"],
-    visual: "pendulum",
     sim: {
       engine: "sandbox",
       caption:
@@ -3142,6 +3142,7 @@ export const tools = [
   }),
   tool({
     id: "collisions-1d",
+    visual: "collision",
     title: "Collisions in one dimension",
     topic: "Momentum",
     kind: "combined",
@@ -3182,7 +3183,6 @@ export const tools = [
       },
     ],
     uses: ["momentum", "kinetic-energy"],
-    visual: "graph",
     sim: {
       engine: "sandbox",
       caption:
@@ -3225,6 +3225,7 @@ export const tools = [
   }),
   tool({
     id: "power-lines",
+    visual: "powerLines",
     title: "Power lines",
     topic: "Circuits",
     kind: "combined",
@@ -3267,7 +3268,6 @@ export const tools = [
       },
     ],
     uses: ["electrical-power", "power-current-resistance", "transformer"],
-    visual: "circuit",
     sim: {
       engine: "circuitlab",
       caption:
@@ -3283,6 +3283,7 @@ export const tools = [
   }),
   tool({
     id: "ac-generator",
+    visual: "generator",
     title: "AC generator",
     topic: "Magnetism",
     kind: "combined",
@@ -3317,11 +3318,11 @@ export const tools = [
       { say: "The peak", latex: "\\varepsilon_0 = NBA\\omega" },
     ],
     uses: ["magnetic-flux", "faradays-law"],
-    visual: "graph",
     wants: "induction",
   }),
   tool({
     id: "photoelectric-stopping-voltage",
+    visual: "photoelectric",
     title: "Stopping voltage",
     topic: "Modern physics",
     kind: "combined",
@@ -3351,7 +3352,6 @@ export const tools = [
       { say: "So", latex: "V_s = \\frac{hf - W}{e}" },
     ],
     uses: ["photoelectric-effect", "electric-work"],
-    visual: "wave",
     wants: "modern",
   }),
 ];

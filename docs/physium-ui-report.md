@@ -76,7 +76,7 @@ Formulas or ranges I was unsure of (the review should look at these first):
 - Electron gun allows masses down to 10⁻³¹ kg on the slider, but the sandbox only takes 0.05–100 kg, so real electrons show the "cannot show" message.
 - Ranges in general are first guesses and will need editing to the course formula sheet.
 
-Visuals: the generic graph for every tool, and ten cheap pictures (circle, projectile, orbit, charged particle, ramp, spring, wave, circuit, point charge, pendulum), one module each in `src/minitools/visuals/`. Tools with no fitting picture show the graph only.
+Visuals: the generic graph for every tool, and (after review) a picture of its own for every tool: 61 diagrams in five topic modules in `src/minitools/visuals/`, each drawn from the current values and labelled with the tool's quantities (symbol, value, unit; the unknown highlighted). Lengths are only roughly proportional to the values. Force directions in the magnetic pictures follow F = qv × B and F = Il × B for the field directions drawn. The collisions picture shows v₂ worked out from conservation of momentum, labelled as such.
 
 ## 7. Homepage
 
