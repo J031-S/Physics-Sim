@@ -59,6 +59,10 @@ let last = 0,
   paletteDrag = null,
   suppressClick = false,
   warps = { dc: 1, ac: 0.02 }, // the time scale last used in each view
+  // The time scale at which each view's circuit was set up (its preset's,
+  // or its file's). The dots move at their standard speed at this scale,
+  // and faster or slower in step with the time scale from there.
+  bases = { dc: 1, ac: 0.02 },
   toastTimer,
   fitted = false,
   previewTheme = null,
@@ -517,7 +521,7 @@ function advance(seconds) {
 // One frame's worth of simulated time at the current time scale.
 function stepOnce() {
   if (state.running) setRunning(false);
-  advance(state.warp * FRAME);
+  moveDots(lab.solve(), advance(state.warp * FRAME));
 }
 const warpText = (w) => (w >= 1 ? tidy(w) : tidy(w, 3)) + "×";
 function setWarp(warp) {
@@ -1175,12 +1179,25 @@ function drawDots(c, s) {
   }
   ctx.globalAlpha = 1;
 }
-// Moves every run's dots on by a distance in proportion to its current.
-// `peak`, the largest current seen since the last reset, sets the scale.
-function moveDots(s, seconds) {
+// Moves every run's dots on by a distance in proportion to its current and
+// to the simulated time that has just passed, so the time scale speeds
+// them up and slows them down with everything else. `peak`, the largest
+// current seen since the last reset, sets the scale: at the scale the
+// circuit was set up with, the largest current moves DOT_SPEED squares a
+// second.
+function moveDots(s, simulated) {
   const runs = dotRuns(s);
   for (const run of runs) peak = Math.max(peak, Math.abs(run.current));
   if (!(peak > 0)) return;
+  let seconds = simulated / bases[state.mode];
+  // A dot that moved most of a gap in one frame would seem to stand still
+  // or run backwards. At very high time scales the frame's movement is
+  // held to under half a gap for the fastest run; every run is held back
+  // by the same factor, so their speeds stay in proportion to each other.
+  const fastest = Math.max(...runs.map((run) => Math.abs(run.current)), 0),
+    most = (DOT_SPEED * Math.abs(seconds) * fastest) / peak,
+    limit = 0.45 * DOT_SPACING;
+  if (most > limit) seconds *= limit / most;
   const sense = state.electrons ? -1 : 1,
     live = new Set();
   for (const run of runs) {
@@ -2177,7 +2194,7 @@ function frame(now) {
         100000,
       );
     state.achieved += (done / elapsed - state.achieved) * 0.1;
-    moveDots(lab.solve(), elapsed);
+    moveDots(lab.solve(), done);
   }
   const { c, s } = draw();
   updatePanels(c, s);
@@ -2649,6 +2666,8 @@ $("clear-yes").addEventListener("click", () => {
   units.clear();
   closePanels();
   setRunning(false);
+  // An empty grid starts from the view's usual scale.
+  bases[state.mode] = isAC() ? 0.02 : 1;
   state.selected = state.watched = null;
   buildForm();
   restart();
@@ -2676,6 +2695,7 @@ setupSceneFiles({
     units.clear();
     setRunning(false);
     if (WARPS.includes(data.scale)) setWarp(data.scale);
+    bases[state.mode] = state.warp;
     restart();
     select(lab.list().find((i) => i.name === data.watch)?.id ?? null);
     fit();
@@ -2691,6 +2711,7 @@ function loadPreset(preset) {
   // A preset sets the circuit up and waits for Run.
   setRunning(false);
   setWarp(preset.scale);
+  bases[state.mode] = preset.scale;
   restart();
   select(lab.list().find((i) => i.name === preset.watch)?.id ?? null);
   fit();
