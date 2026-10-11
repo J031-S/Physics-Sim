@@ -1138,3 +1138,18 @@ body.doc-page {
 .dev-review {
   display: none;
 }
+/* Navigation: a rule between home, the simulations and the minitools. */
+.nav-menu a[data-group="home"] + a[data-group="simulation"],
+.nav-menu a[data-group="simulation"] + a[data-group="minitools"] {
+  position: relative;
+  margin-top: 9px;
+}
+.nav-menu a[data-group="home"] + a[data-group="simulation"]::before,
+.nav-menu a[data-group="simulation"] + a[data-group="minitools"]::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 6px;
+  right: 6px;
+  border-top: 1px solid var(--line);
+}

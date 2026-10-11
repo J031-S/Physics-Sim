@@ -30,25 +30,26 @@ function buildBrand() {
 }
 
 // Pages listed in the navigation drop-down, in order.
-export const navPages = () => pages.filter((p) => p.group === "simulation");
+export const navPages = () =>
+  pages.filter((p) => ["home", "simulation", "minitools"].includes(p.group));
 
 function buildNav(current) {
   const nav = document.querySelector("nav.site-nav");
   if (!nav) return;
   const here = pageById(current);
-  nav.setAttribute("aria-label", "Simulations");
+  nav.setAttribute("aria-label", "Site pages");
   nav.innerHTML = `<button
     id="nav-toggle"
     class="nav-toggle"
     aria-haspopup="true"
     aria-expanded="false"
     aria-controls="nav-menu"
-    title="Switch simulation"
-  >${escape(here?.group === "simulation" ? here.title : "Simulations")}</button>
+    title="Go to another page"
+  >${escape(navPages().includes(here) ? here.title : "Pages")}</button>
   <div id="nav-menu" class="nav-menu" hidden>${navPages()
     .map(
       (p) =>
-        `<a href="${pageUrl(p)}"${p.id === current ? ' aria-current="page"' : ""}><strong>${escape(p.title)}</strong><small>${escape(p.description)}</small></a>`,
+        `<a href="${pageUrl(p)}" data-group="${p.group}"${p.id === current ? ' aria-current="page"' : ""}><strong>${escape(p.title)}</strong><small>${escape(p.description)}</small></a>`,
     )
     .join("")}</div>`;
 }

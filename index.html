@@ -4,14 +4,127 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Physium</title>
+    <meta
+      name="description"
+      content="Physics simulations and minitools for testing your intuition against what the equations predict."
+    />
     <link rel="icon" type="image/svg+xml" href="assets/logo.svg" />
-    <!-- Temporary: the homepage replaces this redirect (task 7). -->
-    <meta http-equiv="refresh" content="0; url=sims/Mechanics" />
-    <script>
-      location.replace("sims/Mechanics" + location.search + location.hash);
-    </script>
+    <link rel="stylesheet" href="styles/tokens.css" />
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/minitools.css" />
+    <link rel="stylesheet" href="styles/home.css" />
   </head>
-  <body>
-    <p><a href="sims/Mechanics">Physium: open the mechanics sandbox</a></p>
+  <body class="doc-page" data-page="home">
+    <!-- ================================================================
+         PLACEHOLDER COPY. Every piece of text on the homepage is in this
+         block: rewrite it here. src/site/home.js puts it on the page.
+         ================================================================ -->
+    <script type="application/json" id="home-copy">
+      {
+        "goal": "A place for physics students to test their intuition against what the equations really predict: change something, watch what happens, and compare it with the formula.",
+        "mainButton": "Open the simulations",
+        "githubButton": "Source on GitHub",
+        "simulationsTitle": "Simulations",
+        "simulationsIntro": "Four simulations, each built on its own physics engine and checked against textbook results.",
+        "simulations": {
+          "mechanics": "Throw, drop, push and connect balls, blocks and ramps with springs, rods, belts and pulleys, with gravity, friction and fields.",
+          "fields": "Place charges, plates, wires and magnets and see their field lines, equipotentials and the forces between them.",
+          "orbits": "Launch satellites round the Earth or another body and watch Kepler's laws come out of Newton's gravity.",
+          "circuits": "Wire up cells, resistors, lamps, capacitors and inductors, read the meters, and switch to AC."
+        },
+        "minitoolsTitle": "Minitools",
+        "minitoolsIntro": "Small pages for one equation at a time: pick the unknown, move the sliders, and see the working, a graph and, where a simulation can show it, the measured value beside the formula's.",
+        "minitoolsLink": "All the minitools",
+        "featured": [
+          "kepler-third-law",
+          "projectile-range",
+          "ohms-law",
+          "cyclotron-motion"
+        ],
+        "howTitle": "Using it in class or at home",
+        "how": [
+          "Predict first: say what you expect, then run it.",
+          "Change one thing at a time and watch which readings move.",
+          "Use the minitools to check a calculation, then open the full simulation to see it happen.",
+          "A link to a minitool keeps its values, so a teacher can share an exact set-up."
+        ],
+        "limits": "What the simulations leave out",
+        "credits": "Built with Matter.js (collision detection in the mechanics sandbox) and KaTeX (equations). Icons from Material Symbols, Lucide, Tabler, Phosphor, Heroicons, Feather, Bootstrap Icons and Remix Icon; fonts under the SIL Open Font License. See the vendor folder for every licence."
+      }
+    </script>
+    <header>
+      <a class="brand"></a>
+      <nav class="site-nav"></nav>
+      <div class="playback">
+        <button
+          id="settings-toggle"
+          title="Settings"
+          aria-expanded="false"
+          aria-controls="settings-panel"
+        >
+          Settings
+        </button>
+      </div>
+    </header>
+    <main class="home">
+      <section class="home-hero" aria-labelledby="home-title">
+        <span class="home-mark" aria-hidden="true"></span>
+        <h1 id="home-title">Physium</h1>
+        <p class="home-goal" data-copy="goal"></p>
+        <div class="home-actions">
+          <a
+            class="home-button primary"
+            href="#simulations"
+            data-copy="mainButton"
+          ></a>
+          <a
+            class="home-button github"
+            href="https://github.com/J031-S/Physics-Sim"
+            ><span data-github></span><span data-copy="githubButton"></span
+          ></a>
+        </div>
+      </section>
+      <section
+        id="simulations"
+        class="home-section"
+        aria-labelledby="sims-title"
+      >
+        <h2 id="sims-title" data-copy="simulationsTitle"></h2>
+        <p data-copy="simulationsIntro"></p>
+        <div class="home-sims"></div>
+      </section>
+      <section class="home-section" aria-labelledby="minitools-title">
+        <h2 id="minitools-title" data-copy="minitoolsTitle"></h2>
+        <p data-copy="minitoolsIntro"></p>
+        <div class="mt-grid home-featured"></div>
+        <p><a class="home-more" data-copy="minitoolsLink"></a></p>
+      </section>
+      <section class="home-section" aria-labelledby="how-title">
+        <h2 id="how-title" data-copy="howTitle"></h2>
+        <ul class="home-how"></ul>
+      </section>
+    </main>
+    <footer class="home-footer">
+      <p>
+        <a
+          href="https://github.com/J031-S/Physics-Sim#readme"
+          data-copy="limits"
+        ></a>
+        ·
+        <a href="https://github.com/J031-S/Physics-Sim" class="home-github"
+          ><span data-github></span>J031-S/Physics-Sim</a
+        >
+      </p>
+      <p class="home-credits" data-copy="credits"></p>
+    </footer>
+    <section id="settings-panel" hidden aria-labelledby="settings-title">
+      <div class="menu-header">
+        <strong id="settings-title">Settings</strong
+        ><button id="close-settings" aria-label="Close settings">×</button>
+      </div>
+      <details id="website-settings" class="settings-section" open></details>
+    </section>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="src/site/home.js"></script>
   </body>
 </html>

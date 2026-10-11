@@ -60,7 +60,7 @@ const describe = (doc) => {
 };
 
 const shellPages = [
-  ...pages.filter((p) => p.group !== "home"),
+  ...pages,
   { id: "not-found", file: "404.html", address: "no-such-page" },
 ];
 let reference = null,
@@ -84,10 +84,10 @@ for (const page of shellPages) {
   const nav = links.map((a) => [a.getAttribute("href"), a.textContent]);
   referenceNav ??= nav;
   assert.deepEqual(nav, referenceNav, page.id + ": same navigation");
-  assert.ok(nav.length >= 4, "navigation lists the simulations");
+  assert.equal(nav.length, 6, "home, the four simulations, the minitools");
   for (const [href] of nav) assert.ok(!href.endsWith(".html"), href);
   const current = links.filter((a) => a.getAttribute("aria-current"));
-  if (page.group === "simulation") {
+  if (["home", "simulation", "minitools"].includes(page.group)) {
     assert.equal(current.length, 1, page.id + ": one current entry");
     assert.equal(
       current[0].getAttribute("href"),
@@ -95,6 +95,24 @@ for (const page of shellPages) {
     );
   } else assert.equal(current.length, 0);
 
+  if (page.id === "home") {
+    // The GitHub link near the top and in the footer.
+    const github = [...doc.querySelectorAll("a")].filter(
+      (a) => a.getAttribute("href") === "https://github.com/J031-S/Physics-Sim",
+    );
+    assert.equal(github.length, 2, "GitHub link at the top and in the footer");
+    for (const a of github) assert.ok(a.querySelector("svg"), "GitHub mark");
+    // Every simulation and the minitool catalogue one click away.
+    const hrefs = [...doc.querySelectorAll("main a")].map((a) =>
+      a.getAttribute("href"),
+    );
+    for (const p of pages.filter((p) =>
+      ["simulation", "minitools"].includes(p.group),
+    ))
+      assert.ok(hrefs.includes(new URL(p.address, root).href), p.id);
+    assert.ok(doc.querySelectorAll(".mt-card").length >= 3, "featured tools");
+    assert.ok(doc.querySelector(".home-goal").textContent.length > 20);
+  }
   if (page.id === "not-found") {
     assert.equal(
       doc.getElementById("missing-path").textContent,

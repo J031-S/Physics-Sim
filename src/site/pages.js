@@ -11,7 +11,7 @@ export const pages = [
     address: "",
     file: "index.html",
     title: "Home",
-    description: "Physium: test your physics intuition",
+    description: "What Physium is, and where to start",
     group: "home",
   },
   {

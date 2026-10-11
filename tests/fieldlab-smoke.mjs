@@ -91,11 +91,16 @@ assert.equal(nav.getAttribute("aria-expanded"), "true");
 const links = [...$("nav-menu").querySelectorAll("a")];
 assert.deepEqual(
   links.map((a) => a.getAttribute("href")),
-  ["Mechanics", "EMFields", "Orbits", "Circuits"].map(
-    (name) => new URL("../sims/" + name, import.meta.url).href,
-  ),
+  [
+    "",
+    "sims/Mechanics",
+    "sims/EMFields",
+    "sims/Orbits",
+    "sims/Circuits",
+    "minitools/",
+  ].map((path) => new URL("../" + path, import.meta.url).href),
 );
-assert.equal(links[1].getAttribute("aria-current"), "page");
+assert.equal(links[2].getAttribute("aria-current"), "page");
 nav.click();
 assert.equal($("nav-menu").hidden, true);
 

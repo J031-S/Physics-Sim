@@ -1,0 +1,153 @@
+/* The homepage. */
+.home,
+.home-footer {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 24px;
+  zoom: var(--ui-scale);
+}
+.home {
+  min-height: 0;
+  height: auto;
+}
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 56px 0 36px;
+  text-align: center;
+}
+.home-mark {
+  display: block;
+  width: 72px;
+  height: 84px;
+  background: var(--brand-mark-background);
+  -webkit-mask: url(../assets/logo.svg) center / contain no-repeat;
+  mask: url(../assets/logo.svg) center / contain no-repeat;
+}
+.home-hero h1 {
+  margin: 0;
+  font-size: 40px;
+  letter-spacing: -0.01em;
+}
+.home-goal {
+  max-width: 58ch;
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.55;
+}
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.home-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+.home-button.primary {
+  background: var(--run-button);
+  border-color: var(--run-button);
+  color: var(--on-colour);
+}
+.home-button:hover {
+  border-color: var(--accent-text);
+}
+.home-button:focus-visible,
+.home-sim:focus-visible,
+.home-footer a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+.home-github-mark {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+.home-section {
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+}
+.home-section h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+.home-section > p {
+  max-width: 70ch;
+  line-height: 1.5;
+}
+.home-sims {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.home-sim {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.home-sim:hover {
+  border-color: var(--accent-text);
+}
+.home-sim strong {
+  font-size: 16px;
+}
+.home-sim-short {
+  font-size: 12px;
+  opacity: 0.75;
+}
+.home-sim-text {
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.home-more,
+.home-footer a {
+  color: var(--accent-text);
+}
+.home-how {
+  max-width: 70ch;
+  padding-left: 20px;
+  line-height: 1.6;
+}
+.home-footer {
+  padding-top: 18px;
+  padding-bottom: 36px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.home-github {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.home-credits {
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.75;
+}
+@media (max-width: 600px) {
+  .home-hero {
+    padding-top: 32px;
+  }
+  .home-hero h1 {
+    font-size: 32px;
+  }
+}
