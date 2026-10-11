@@ -28,16 +28,16 @@ button {
   cursor: pointer;
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: var(--button-background);
+  background: var(--panel);
   padding: 8px 12px;
 }
 button:hover {
-  background: var(--button-hover-background);
+  background: var(--accent-soft);
 }
 button:focus-visible,
 input:focus-visible,
 canvas:focus-visible {
-  outline: 2px solid var(--focus-ring);
+  outline: 2px solid var(--accent-text);
   outline-offset: 3px;
 }
 header {
@@ -47,7 +47,7 @@ header {
   padding: 0 24px;
   gap: 20px;
   border-bottom: 1px solid var(--line);
-  background: var(--header-background);
+  background: var(--panel);
 }
 .brand {
   display: flex;
@@ -64,13 +64,13 @@ header {
   display: block;
   width: 26px;
   height: 30px;
-  background: var(--brand-mark-background);
+  background: var(--accent-text);
   -webkit-mask: url(../assets/logo.svg) center / contain no-repeat;
   mask: url(../assets/logo.svg) center / contain no-repeat;
 }
 .subtitle {
   font-size: 11px;
-  color: var(--subtitle-color);
+  color: var(--ink-soft);
 }
 .playback {
   margin-left: auto;
@@ -82,9 +82,9 @@ header {
 }
 #pause {
   min-width: 80px;
-  background: var(--run-button);
+  background: var(--accent);
   color: var(--on-colour);
-  border-color: var(--run-button);
+  border-color: var(--accent);
 }
 main {
   height: calc(100dvh - 62px);
@@ -97,16 +97,16 @@ canvas {
   touch-action: none;
 }
 .tools .active {
-  background: var(--tools-active-background);
-  border-color: var(--tools-active-border-color);
-  color: var(--active-ink);
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--ink);
 }
 .tools .active b {
-  color: var(--tools-active-b-color);
+  color: var(--accent-text);
 }
 .divider {
   height: 25px;
-  border-left: 1px solid var(--divider-border-left);
+  border-left: 1px solid var(--line);
   margin: 0 3px;
 }
 .vectors {
@@ -117,7 +117,7 @@ canvas {
   padding: 0 8px;
 }
 input[type="checkbox"] {
-  accent-color: var(--control-accent);
+  accent-color: var(--accent-text);
   width: 14px;
   height: 14px;
 }
@@ -131,11 +131,11 @@ input[type="checkbox"] {
   font:
     10px ui-monospace,
     monospace;
-  color: var(--status-color);
+  color: var(--ink-soft);
   pointer-events: none;
 }
 .status .snapping {
-  color: var(--status-snapping-color);
+  color: var(--accent-text);
   font-weight: 700;
 }
 #toast {
@@ -143,7 +143,7 @@ input[type="checkbox"] {
   bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--toast);
+  background: var(--accent);
   color: var(--on-colour);
   padding: 10px 15px;
   border-radius: 7px;
@@ -199,10 +199,10 @@ input[type="checkbox"] {
   max-height: calc(100dvh - 100px);
   overflow: auto;
   padding: 18px;
-  background: var(--button-background);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 10px 40px var(--panel-shadow);
+  box-shadow: 0 10px 40px var(--shadow);
 }
 #keys-panel dl {
   display: grid;
@@ -219,7 +219,7 @@ input[type="checkbox"] {
 #keys-panel p {
   font-size: 11px;
   line-height: 1.6;
-  color: var(--keys-panel-p-color);
+  color: var(--ink-soft);
 }
 #settings-panel {
   position: fixed;
@@ -230,16 +230,16 @@ input[type="checkbox"] {
   max-height: calc(100dvh - 92px);
   overflow: auto;
   padding: 18px;
-  background: var(--button-background);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 10px 40px var(--panel-shadow);
+  box-shadow: 0 10px 40px var(--shadow);
 }
 #settings-panel p,
 #settings-panel small {
   font-size: 11px;
   line-height: 1.6;
-  color: var(--settings-panel-p-color);
+  color: var(--ink-soft);
 }
 #settings-panel small {
   display: block;
@@ -252,7 +252,7 @@ input[type="checkbox"] {
 }
 #settings-panel label span {
   float: right;
-  color: var(--settings-panel-label-span-color);
+  color: var(--ink-soft);
 }
 #settings-panel input {
   display: block;
@@ -263,12 +263,12 @@ input[type="checkbox"] {
   padding: 8px;
   border: 1px solid var(--line);
   border-radius: 5px;
-  background: var(--constants-input-background);
+  background: var(--canvas-bg);
 }
 #constants input[type="range"],
 #settings-panel input[type="range"] {
   padding: 0;
-  accent-color: var(--control-accent);
+  accent-color: var(--accent-text);
   cursor: ew-resize;
   height: 20px;
   background: transparent;
@@ -304,7 +304,7 @@ select {
   color: var(--ink);
 }
 button:hover {
-  background: color-mix(in srgb, var(--panel), var(--hover-tint) 18%);
+  background: color-mix(in srgb, var(--panel), var(--accent-text) 18%);
 }
 select {
   font: inherit;
@@ -370,16 +370,16 @@ select {
   cursor: pointer;
 }
 .icon-toggle:hover {
-  background: color-mix(in srgb, var(--panel), var(--hover-tint) 18%);
+  background: color-mix(in srgb, var(--panel), var(--accent-text) 18%);
 }
 .icon-toggle:has(input:checked) {
   opacity: 1;
-  background: var(--tools-active-background);
-  border-color: var(--tools-active-border-color);
-  color: var(--icon-toggle-has-input-checked-color);
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--ink);
 }
 .icon-toggle:has(input:focus-visible) {
-  outline: 2px solid var(--focus-ring);
+  outline: 2px solid var(--accent-text);
   outline-offset: 1px;
 }
 .icon-toggle .ui-icon {
@@ -476,7 +476,7 @@ button[data-icon] {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 11px;
-  box-shadow: 0 8px 30px var(--toolbar-shadow);
+  box-shadow: 0 8px 30px var(--shadow);
   zoom: var(--ui-scale);
 }
 .edit-tools button {
@@ -485,12 +485,12 @@ button[data-icon] {
   background: transparent;
 }
 .edit-tools button:hover {
-  background: color-mix(in srgb, var(--panel), var(--hover-tint) 18%);
+  background: color-mix(in srgb, var(--panel), var(--accent-text) 18%);
 }
 .edit-tools .active {
-  background: var(--tools-active-background);
-  border-color: var(--tools-active-border-color);
-  color: var(--active-ink);
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--ink);
 }
 /* Compact property row shared by the constants menu and settings panel. */
 .prop-row {
@@ -512,7 +512,7 @@ button[data-icon] {
 }
 .prop-row .unit {
   min-width: 2.6em;
-  color: var(--prop-row-unit-color);
+  color: var(--ink-soft);
   font-size: 10px;
 }
 /* Settings panel: collapsible sections of compact rows. */
@@ -618,10 +618,10 @@ button[data-icon] {
   flex-basis: 18px;
 }
 .selection-header #delete {
-  color: var(--selection-header-delete-color);
+  color: var(--danger-text);
 }
 .selection-header button:hover {
-  background: color-mix(in srgb, var(--panel), var(--hover-tint) 18%);
+  background: color-mix(in srgb, var(--panel), var(--accent-text) 18%);
 }
 .header-divider {
   align-self: stretch;
@@ -643,7 +643,7 @@ button:disabled {
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 10px 40px var(--panel-shadow);
+  box-shadow: 0 10px 40px var(--shadow);
 }
 #presets-panel > p {
   margin: 6px 0 4px;
@@ -707,7 +707,7 @@ button:disabled {
   padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 10px 40px var(--panel-shadow);
+  box-shadow: 0 10px 40px var(--shadow);
   font-size: 12px;
 }
 #clear-confirm p {
@@ -726,12 +726,12 @@ button:disabled {
   font-size: 11px;
 }
 #clear-confirm .danger {
-  background: var(--danger-button);
-  border-color: var(--danger-button);
+  background: var(--danger);
+  border-color: var(--danger);
   color: var(--on-colour);
 }
 #clear-confirm .danger:hover {
-  background: var(--danger-button-hover);
+  background: var(--danger-hover);
 }
 .swatch {
   position: relative;
@@ -824,12 +824,12 @@ header {
 }
 /* Clear scene is destructive: red, like its confirmation button. */
 #clear {
-  background: var(--clear-button);
-  border-color: var(--clear-button);
+  background: var(--danger);
+  border-color: var(--danger);
   color: var(--on-colour);
 }
 #clear:hover {
-  background: var(--clear-button-hover);
+  background: var(--danger-hover);
 }
 /* Site navigation: the drop-down beside the brand that switches between the
    simulations. Its entries are ordinary links. */
@@ -868,7 +868,7 @@ header {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 11px;
-  box-shadow: 0 10px 30px var(--panel-shadow);
+  box-shadow: 0 10px 30px var(--shadow);
 }
 .nav-menu a {
   display: flex;
@@ -882,15 +882,15 @@ header {
   font-size: 12px;
 }
 .nav-menu a:hover {
-  background: color-mix(in srgb, var(--panel), var(--hover-tint) 18%);
+  background: color-mix(in srgb, var(--panel), var(--accent-text) 18%);
 }
 .nav-menu a:focus-visible {
-  outline: 2px solid var(--focus-ring);
+  outline: 2px solid var(--accent-text);
   outline-offset: 1px;
 }
 .nav-menu a[aria-current="page"] {
-  background: var(--tools-active-background);
-  border-color: var(--tools-active-border-color);
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
 }
 .nav-menu small {
   font-size: 10.5px;
@@ -966,7 +966,7 @@ body.doc-page {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 13px;
-  box-shadow: 0 8px 30px var(--fl-toolbar-box-shadow);
+  box-shadow: 0 8px 30px var(--shadow);
 }
 .fl-toolbar button {
   display: flex;
@@ -982,13 +982,13 @@ body.doc-page {
   background: color-mix(
     in srgb,
     var(--panel),
-    var(--fl-toolbar-button-hover-background) 18%
+    var(--accent-text) 18%
   );
 }
 .fl-toolbar button[aria-pressed="true"] {
-  background: var(--fl-toolbar-button-aria-pressed-true-background);
-  border-color: var(--fl-toolbar-button-aria-pressed-true-border-color);
-  color: var(--active-ink);
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--ink);
 }
 .fl-modes {
   display: flex;
@@ -1002,8 +1002,8 @@ body.doc-page {
   font-weight: 600;
 }
 .fl-modes button[aria-pressed="true"] {
-  background: var(--fl-modes-button-aria-pressed-true-background);
-  border-color: var(--fl-modes-button-aria-pressed-true-border-color);
+  background: var(--panel);
+  border-color: var(--line);
 }
 .fl-toolbar .ui-icon {
   width: 20px;
@@ -1053,7 +1053,7 @@ body.doc-page {
   width: 100%;
   min-width: 0;
   margin: 0;
-  accent-color: var(--fl-display-input-type-range-accent-color);
+  accent-color: var(--accent-text);
 }
 .fl-form {
   display: flex;
@@ -1113,7 +1113,7 @@ body.doc-page {
 /* Typeset equations (src/site/math.js): colour from the equation token,
    size from the surrounding text. */
 .math .katex {
-  color: var(--equation);
+  color: var(--ink);
 }
 .math-pending {
   font-family: ui-monospace, monospace;
@@ -1122,8 +1122,8 @@ body.doc-page {
 .math-error {
   font-family: ui-monospace, monospace;
   font-size: 0.9em;
-  color: var(--math-error);
-  border: 1px dashed var(--math-error);
+  color: var(--danger-text);
+  border: 1px dashed var(--danger-text);
   border-radius: 4px;
   padding: 0 4px;
   white-space: pre-wrap;

@@ -9,13 +9,13 @@ export default function spring(ctx, { width: w, height: h, values: v, dark }) {
     stretch = Math.min(h * 0.4, natural * Math.min(2, Math.abs(x))),
     end = top + natural + stretch,
     cx = w / 2;
-  ctx.strokeStyle = c("canvas-wall", dark);
+  ctx.strokeStyle = c("structure", dark);
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(cx - 40, top);
   ctx.lineTo(cx + 40, top);
   ctx.stroke();
-  ctx.strokeStyle = c("link", dark);
+  ctx.strokeStyle = c("structure", dark);
   ctx.lineWidth = 1.8;
   ctx.beginPath();
   ctx.moveTo(cx, top);
@@ -28,7 +28,7 @@ export default function spring(ctx, { width: w, height: h, values: v, dark }) {
   ctx.arc(cx, end + 14, 14, 0, TAU);
   ctx.fill();
   ctx.setLineDash([3, 4]);
-  ctx.strokeStyle = c("canvas-soft", dark);
+  ctx.strokeStyle = c("ink-soft", dark);
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(cx + 30, top + natural);

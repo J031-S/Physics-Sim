@@ -27,8 +27,8 @@ export const PARTS = {
 
 const SHADOWS = {
   none: "none",
-  hard: "4px 4px 0 var(--panel-shadow)",
-  raised: "0 1px 2px var(--panel-shadow), 0 18px 50px var(--panel-shadow)",
+  hard: "4px 4px 0 var(--shadow)",
+  raised: "0 1px 2px var(--shadow), 0 18px 50px var(--shadow)",
 };
 
 // Background patterns as CSS images, in colour `c` (a CSS colour) with
@@ -195,7 +195,7 @@ export function surfaceCss(get, { colours, fontRoot }) {
     rule(
       `${box}:checked`,
       imp([
-        "background-color: var(--control-accent)",
+        "background-color: var(--accent-text)",
         "background-position: right center",
       ]),
     );
@@ -238,7 +238,7 @@ export function surfaceCss(get, { colours, fontRoot }) {
       `width: ${thin ? 12 : 16}px`,
       `height: ${thin ? 12 : 16}px`,
       `border-radius: ${square ? 3 : 999}px`,
-      "background: var(--control-accent)",
+      "background: var(--accent-text)",
       "border: 2px solid var(--panel)",
     ]);
     rule(`${slider}::-webkit-slider-thumb`, thumb);
@@ -248,20 +248,20 @@ export function surfaceCss(get, { colours, fontRoot }) {
   if (get("focus-ring") === "thick")
     rule(
       focus,
-      imp(["outline: 3px solid var(--focus-ring)", "outline-offset: 2px"]),
+      imp(["outline: 3px solid var(--accent-text)", "outline-offset: 2px"]),
     );
   if (get("focus-ring") === "glow")
     rule(
       focus,
       imp([
         "outline: none",
-        "box-shadow: 0 0 0 4px color-mix(in srgb, var(--focus-ring) 45%, transparent)",
+        "box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-text) 45%, transparent)",
       ]),
     );
   if (get("focus-ring") === "underline")
     rule(
       focus,
-      imp(["outline: none", "box-shadow: inset 0 -3px 0 var(--focus-ring)"]),
+      imp(["outline: none", "box-shadow: inset 0 -3px 0 var(--accent-text)"]),
     );
   if (get("header-style") === "flat")
     rule("header", imp(["border-bottom-color: transparent"]));
@@ -269,7 +269,7 @@ export function surfaceCss(get, { colours, fontRoot }) {
     rule(
       "header",
       imp([
-        "background: color-mix(in srgb, var(--panel), var(--control-accent) 14%)",
+        "background: color-mix(in srgb, var(--panel), var(--accent-text) 14%)",
       ]),
     );
   if (get("header-style") === "floating") {
@@ -281,7 +281,7 @@ export function surfaceCss(get, { colours, fontRoot }) {
         "margin: 6px 8px 0",
         "border: 1px solid var(--line)",
         "border-radius: 12px",
-        "box-shadow: 0 6px 24px var(--panel-shadow)",
+        "box-shadow: 0 6px 24px var(--shadow)",
       ]),
     );
     rule(
@@ -300,7 +300,7 @@ export function surfaceCss(get, { colours, fontRoot }) {
     if (kind === "none") continue;
     const strength = get(`${where}-pattern-strength`),
       size = get(`${where}-pattern-size`),
-      token = `pattern-${where}`,
+      token = "ink-soft",
       c = `color-mix(in srgb, var(--${token}) ${strength}%, transparent)`;
     for (const mode of ["light", "dark"]) {
       const p = pattern(

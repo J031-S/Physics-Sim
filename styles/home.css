@@ -22,7 +22,7 @@
   display: block;
   width: 72px;
   height: 84px;
-  background: var(--brand-mark-background);
+  background: var(--accent-text);
   -webkit-mask: url(../assets/logo.svg) center / contain no-repeat;
   mask: url(../assets/logo.svg) center / contain no-repeat;
 }
@@ -57,8 +57,8 @@
   text-decoration: none;
 }
 .home-button.primary {
-  background: var(--run-button);
-  border-color: var(--run-button);
+  background: var(--accent);
+  border-color: var(--accent);
   color: var(--on-colour);
 }
 .home-button:hover {
@@ -67,7 +67,7 @@
 .home-button:focus-visible,
 .home-sim:focus-visible,
 .home-footer a:focus-visible {
-  outline: 2px solid var(--focus-ring);
+  outline: 2px solid var(--accent-text);
   outline-offset: 3px;
 }
 .home-button .ui-icon,

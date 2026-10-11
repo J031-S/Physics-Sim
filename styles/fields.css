@@ -20,7 +20,7 @@
 }
 .glyph-mark {
   fill: none;
-  stroke: var(--charge-glyph);
+  stroke: var(--on-colour);
   stroke-width: 2.2;
   stroke-linecap: round;
 }

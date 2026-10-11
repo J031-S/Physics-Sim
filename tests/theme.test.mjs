@@ -14,7 +14,7 @@ import {
 
 const root = new URL("../", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
-const LITERAL = /#[0-9a-fA-F]{3,8}\b|rgba?\(/;
+const LITERAL = /#[0-9a-fA-F]{3,8}\b|rgba?\(|:\s*(white|black)\b/;
 
 test("styles/tokens.css is generated from theme.js (npm run tokens)", async () => {
   assert.equal(await read("styles/tokens.css"), tokensCss());
@@ -100,5 +100,15 @@ test("no colour literals in the page scripts outside theme.js", async () => {
       .forEach((line, i) =>
         assert.ok(!literal.test(line), `${file}:${i + 1}: ${line.trim()}`),
       );
+  }
+});
+
+test("no stylesheet redefines a colour token", async () => {
+  const { colourNames } = await import("../src/site/theme.js");
+  const names = new Set(colourNames());
+  for (const file of await readdir(new URL("styles/", root))) {
+    if (file === "tokens.css") continue;
+    for (const m of (await read("styles/" + file)).matchAll(/--([\w-]+)\s*:/g))
+      assert.ok(!names.has(m[1]), `styles/${file} redefines --${m[1]}`);
   }
 });

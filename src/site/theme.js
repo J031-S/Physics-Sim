@@ -12,712 +12,227 @@
 
 export const GROUPS = [
   "Page",
-  "Panels",
-  "Text",
-  "Controls",
+  "Accent",
+  "Status",
   "Canvas",
   "Vectors",
   "Energy",
   "Fields",
-  "Orbits",
   "Circuits",
-  "Graphs",
-  "Status",
-  "Patterns",
   "Developer",
 ];
 
-// Every colour: name (the CSS custom property is --name), group, the value in
-// the light and the dark theme, and where it is used.
+// The colours a scheme sets: name (the CSS custom property is --name), group,
+// the value in the light and the dark theme, and what it colours. Shades
+// such as hover and active backgrounds are not set separately: they are
+// DERIVED from these.
 export const COLOURS = [
   {
-    name: "line",
+    name: "canvas-bg",
     group: "Page",
-    light: "#ccd3c7",
-    dark: "#4a453b",
-    description: "Borders and dividers of panels and controls",
-  },
-  {
-    name: "ink",
-    group: "Page",
-    light: "#354438",
-    dark: "#ebe5d6",
-    description: "Main text, icons and drawn ink",
+    light: "#f2f0e9",
+    dark: "#1c1a16",
+    description: "Page and simulation background",
   },
   {
     name: "panel",
     group: "Page",
     light: "#fffefa",
     dark: "#2a2722",
-    description: "Panels, menus, buttons and the header",
+    description: "Panels, menus, cards, buttons and the top bar",
   },
   {
-    name: "canvas-bg",
+    name: "line",
     group: "Page",
-    light: "#f2f0e9",
-    dark: "#1c1a16",
-    description: "The page and simulation background",
-  },
-  {
-    name: "header-background",
-    group: "Panels",
-    light: "#fbfaf5",
-    dark: "#fbfaf5",
-    description: "CSS: header background",
-  },
-  {
-    name: "brand-mark-background",
-    group: "Panels",
-    light: "#6d8871",
-    dark: "#6d8871",
-    description: "CSS: .brand-mark background",
-  },
-  {
-    name: "tools-background",
-    group: "Panels",
-    light: "#fffef9f2",
-    dark: "#fffef9f2",
-    description: "CSS: .tools background",
-  },
-  {
-    name: "tools-border",
-    group: "Panels",
-    light: "#d2d6ca",
+    light: "#ccd3c7",
     dark: "#4a453b",
-    description: "CSS: .tools border",
+    description: "Borders and dividers",
   },
   {
-    name: "toolbar-shadow",
-    group: "Panels",
-    light: "#3b4b3610",
-    dark: "#3b4b3610",
-    description: "CSS: .edit-tools box-shadow, .tools box-shadow",
+    name: "ink",
+    group: "Page",
+    light: "#354438",
+    dark: "#ebe5d6",
+    description: "Text, icons and drawn outlines",
   },
   {
-    name: "divider-border-left",
-    group: "Panels",
-    light: "#dde2d6",
-    dark: "#dde2d6",
-    description: "CSS: .divider border-left",
-  },
-  {
-    name: "material-menu-border",
-    group: "Panels",
-    light: "#c9d2c1",
-    dark: "#c9d2c1",
-    description: "CSS: #material-menu border",
-  },
-  {
-    name: "panel-shadow",
-    group: "Panels",
-    light: "#34473125",
-    dark: "#34473125",
+    name: "ink-soft",
+    group: "Page",
+    light: "#6f7f63",
+    dark: "#bdb4a2",
     description:
-      "CSS: #clear-confirm box-shadow, #keys-panel box-shadow, #material-menu box-shadow, #presets-panel box-shadow, #settings-panel box-shadow, .category-menu box-shadow, .nav-menu box-shadow",
+      "Secondary text, units, notes, canvas labels and background patterns",
   },
   {
-    name: "menu-note-color",
-    group: "Panels",
-    light: "#8b9785",
-    dark: "#bdb4a2",
-    description: "CSS: #menu-note color",
-  },
-  {
-    name: "subtitle-color",
-    group: "Text",
-    light: "#929c8c",
-    dark: "#929c8c",
-    description: "CSS: .subtitle color",
-  },
-  {
-    name: "status-color",
-    group: "Text",
-    light: "#84917d",
-    dark: "#bdb4a2",
-    description: "CSS: .status color",
-  },
-  {
-    name: "status-snapping-color",
-    group: "Text",
-    light: "#3c7043",
-    dark: "#3c7043",
-    description: "CSS: .status .snapping color",
-  },
-  {
-    name: "constants-label-span-color",
-    group: "Text",
-    light: "#8a9684",
-    dark: "#8a9684",
-    description: "CSS: #constants label > span color",
-  },
-  {
-    name: "constants-small-color",
-    group: "Text",
-    light: "#919c8c",
-    dark: "#bdb4a2",
-    description: "CSS: #constants small color",
-  },
-  {
-    name: "dimensions-color",
-    group: "Text",
-    light: "#62725c",
-    dark: "#bdb4a2",
-    description: "CSS: #dimensions color",
-  },
-  {
-    name: "keys-panel-p-color",
-    group: "Text",
-    light: "#68785f",
-    dark: "#bdb4a2",
-    description: "CSS: #keys-panel p color",
-  },
-  {
-    name: "settings-panel-p-color",
-    group: "Text",
-    light: "#73826a",
-    dark: "#bdb4a2",
-    description: "CSS: #settings-panel p, color",
-  },
-  {
-    name: "settings-panel-label-span-color",
-    group: "Text",
-    light: "#829078",
-    dark: "#829078",
-    description: "CSS: #settings-panel label span color",
-  },
-  {
-    name: "prop-row-unit-color",
-    group: "Text",
-    light: "#8a9684",
-    dark: "#bdb4a2",
-    description: "CSS: .prop-row .unit color",
-  },
-  {
-    name: "button-background",
-    group: "Controls",
-    light: "#fffefa",
-    dark: "#fffefa",
-    description:
-      "CSS: #keys-panel background, #material-menu background, #settings-panel background, button background",
-  },
-  {
-    name: "button-hover-background",
-    group: "Controls",
-    light: "#eaf0e6",
-    dark: "#eaf0e6",
-    description: "CSS: button:hover background",
-  },
-  {
-    name: "focus-ring",
-    group: "Controls",
-    light: "#63876a",
-    dark: "#63876a",
-    description:
-      "CSS: .icon-toggle:has(input:focus-visible) outline, .nav-menu a:focus-visible outline, button:focus-visible, outline",
-  },
-  {
-    name: "run-button",
-    group: "Controls",
+    name: "accent",
+    group: "Accent",
     light: "#435d49",
     dark: "#435d49",
-    description: "CSS: #pause background, #pause border-color",
-  },
-  {
-    name: "tools-b-color",
-    group: "Controls",
-    light: "#82957e",
-    dark: "#82957e",
-    description: "CSS: .tools b color",
-  },
-  {
-    name: "tools-active-background",
-    group: "Controls",
-    light: "#e5eedf",
-    dark: "#3b4c3f",
     description:
-      'CSS: .edit-tools .active background, .icon-toggle:has(input:checked) background, .nav-menu a[aria-current="page"] background, .tools .active background',
-  },
-  {
-    name: "tools-active-border-color",
-    group: "Controls",
-    light: "#b6c9ad",
-    dark: "#768d70",
-    description:
-      'CSS: .edit-tools .active border-color, .icon-toggle:has(input:checked) border-color, .nav-menu a[aria-current="page"] border-color, .tools .active border-color',
-  },
-  {
-    name: "tools-active-b-color",
-    group: "Controls",
-    light: "#4f7547",
-    dark: "#4f7547",
-    description: "CSS: .tools .active b color",
-  },
-  {
-    name: "control-accent",
-    group: "Controls",
-    light: "#58784f",
-    dark: "#58784f",
-    description:
-      'CSS: #constants input[type="range"], accent-color, input[type="checkbox"] accent-color',
-  },
-  {
-    name: "constants-input-border",
-    group: "Controls",
-    light: "#d7ddcf",
-    dark: "#d7ddcf",
-    description: "CSS: #constants input border",
-  },
-  {
-    name: "constants-input-background",
-    group: "Controls",
-    light: "#f8f9f2",
-    dark: "#1c1a16",
-    description:
-      'CSS: #constants input background, #constants select background, #settings-panel input[type="number"] background',
-  },
-  {
-    name: "hover-tint",
-    group: "Controls",
-    light: "#8aa17c",
-    dark: "#8aa17c",
-    description:
-      "CSS: .edit-tools button:hover background, .icon-toggle:hover background, .nav-menu a:hover background, .selection-header button:hover background, button:hover background",
-  },
-  {
-    name: "icon-toggle-has-input-checked-color",
-    group: "Controls",
-    light: "#3e6237",
-    dark: "#ecf5e8",
-    description: "CSS: .icon-toggle:has(input:checked) color",
+      "Filled buttons (Run, Launch, the homepage's main button) and toasts",
   },
   {
     name: "accent-text",
-    group: "Controls",
+    group: "Accent",
     light: "#4f7547",
     dark: "#a9c49d",
-    description: "CSS: #preset-list .preset-expect color, .doc-main a color",
-  },
-  {
-    name: "fl-toolbar-box-shadow",
-    group: "Controls",
-    light: "#3b4b3610",
-    dark: "#3b4b3610",
-    description: "CSS: .fl-toolbar box-shadow",
-  },
-  {
-    name: "fl-toolbar-button-hover-background",
-    group: "Controls",
-    light: "#8aa17c",
-    dark: "#8aa17c",
-    description: "CSS: .fl-toolbar button:hover background",
-  },
-  {
-    name: "fl-toolbar-button-aria-pressed-true-background",
-    group: "Controls",
-    light: "#e5eedf",
-    dark: "#3b4c3f",
-    description: 'CSS: .fl-toolbar button[aria-pressed="true"] background',
-  },
-  {
-    name: "fl-toolbar-button-aria-pressed-true-border-color",
-    group: "Controls",
-    light: "#b6c9ad",
-    dark: "#768d70",
-    description: 'CSS: .fl-toolbar button[aria-pressed="true"] border-color',
-  },
-  {
-    name: "fl-display-input-type-range-accent-color",
-    group: "Controls",
-    light: "#58784f",
-    dark: "#58784f",
-    description: 'CSS: .fl-display input[type="range"], accent-color',
-  },
-  {
-    name: "ol-panel-input-type-range-accent-color",
-    group: "Controls",
-    light: "#58784f",
-    dark: "#58784f",
-    description: 'CSS: .ol-panel input[type="range"] accent-color',
-  },
-  {
-    name: "ol-chip-button-aria-pressed-true-background",
-    group: "Controls",
-    light: "#e5eedf",
-    dark: "#3b4c3f",
-    description: 'CSS: .ol-chip button[aria-pressed="true"] background',
-  },
-  {
-    name: "active-ink",
-    group: "Controls",
-    light: "#354438",
-    dark: "#ecf5e8",
     description:
-      'CSS: .fl-toolbar button[aria-pressed="true"] color, .ol-chip button[aria-pressed="true"] color, .tools .active color',
+      "Links, active and selected items, focus rings, checkboxes and sliders",
   },
   {
-    name: "fl-modes-button-aria-pressed-true-background",
-    group: "Controls",
-    light: "#fffefa",
-    dark: "#2a2722",
-    description: 'CSS: .fl-modes button[aria-pressed="true"] background',
+    name: "accent-soft",
+    group: "Accent",
+    light: "#e5eedf",
+    dark: "#3b4c3f",
+    description: "Background of active and pressed controls, and hover",
   },
   {
-    name: "fl-modes-button-aria-pressed-true-border-color",
-    group: "Controls",
-    light: "#ccd3c7",
-    dark: "#4a453b",
-    description: 'CSS: .fl-modes button[aria-pressed="true"] border-color',
+    name: "danger",
+    group: "Status",
+    light: "#a5544a",
+    dark: "#b35d52",
+    description: "Destructive buttons (Clear, Delete) and warning boxes",
   },
   {
-    name: "canvas-soft",
-    group: "Canvas",
-    light: "#6f7f63",
-    dark: "#bdb4a2",
-    description: "Secondary text, outlines and labels drawn on the canvas",
+    name: "danger-text",
+    group: "Status",
+    light: "#b3261e",
+    dark: "#ff8f7d",
+    description: "Faults, errors and the delete icon",
   },
   {
-    name: "canvas-grid-minor",
+    name: "on-colour",
+    group: "Status",
+    light: "#ffffff",
+    dark: "#ffffff",
+    description: "Text and marks drawn on filled colours",
+  },
+  {
+    name: "shadow",
+    group: "Status",
+    light: "#34473125",
+    dark: "#34473125",
+    description: "Shadows of panels, menus and toolbars",
+  },
+  {
+    name: "canvas-grid",
     group: "Canvas",
     light: "#dce1d4",
     dark: "#2a2721",
-    description: "Minor grid lines",
-  },
-  {
-    name: "canvas-grid-major",
-    group: "Canvas",
-    light: "#c6cebf",
-    dark: "#3d3930",
-    description: "Major grid lines (every metre or tenth)",
+    description:
+      "Grid lines (minor; major lines and graph axes are a little stronger)",
   },
   {
     name: "canvas-ground",
     group: "Canvas",
     light: "#e0e3d8",
     dark: "#25332a",
-    description: "Ground band below y = 0 (sandbox)",
+    description: "Ground below the floor, and belt dashes",
   },
   {
-    name: "canvas-wall",
+    name: "structure",
     group: "Canvas",
     light: "#7f9076",
     dark: "#7f9076",
-    description: "Floor line and scene walls (sandbox)",
-  },
-  {
-    name: "canvas-floor-label",
-    group: "Canvas",
-    light: "#819078",
-    dark: "#819078",
-    description: "Metre labels along the floor (sandbox)",
-  },
-  {
-    name: "canvas-select",
-    group: "Canvas",
-    light: "#4f7547",
-    dark: "#a9c49d",
-    description: "Selection outlines and handles (fields, circuits)",
+    description: "Floor, walls, springs, rods, cables and anchors",
   },
   {
     name: "body-ball",
     group: "Canvas",
     light: "#dba66b",
     dark: "#dba66b",
-    description: "Ball fill (sandbox; drawn at 88% opacity in the scene)",
+    description: "Balls (edges are drawn darker)",
   },
   {
     name: "body-block",
     group: "Canvas",
     light: "#8ca6bc",
     dark: "#8ca6bc",
-    description: "Block fill (sandbox)",
+    description: "Blocks (edges are drawn darker)",
   },
   {
     name: "body-wedge",
     group: "Canvas",
     light: "#a2b889",
     dark: "#a2b889",
-    description: "Wedge fill (sandbox)",
+    description: "Wedges",
   },
   {
-    name: "body-ball-edge",
+    name: "orbit-body",
     group: "Canvas",
-    light: "#a77943",
-    dark: "#a77943",
-    description: "Ball outline",
-  },
-  {
-    name: "body-edge",
-    group: "Canvas",
-    light: "#658199",
-    dark: "#658199",
-    description: "Block and wedge outline",
-  },
-  {
-    name: "body-selected-edge",
-    group: "Canvas",
-    light: "#334e3c",
-    dark: "#334e3c",
-    description: "Outline of a selected body",
-  },
-  {
-    name: "body-ruler",
-    group: "Canvas",
-    light: "#fff7e9",
-    dark: "#fff7e9",
-    description: "Tick marks on bodies",
-  },
-  {
-    name: "angle-label-inside",
-    group: "Canvas",
-    light: "#2f4630",
-    dark: "#1d2a1f",
-    description: "Wedge angle label drawn inside the wedge",
-  },
-  {
-    name: "angle-label-outside",
-    group: "Canvas",
-    light: "#46553e",
-    dark: "#cfd8c8",
-    description: "Wedge angle label drawn outside the wedge",
-  },
-  {
-    name: "link",
-    group: "Canvas",
-    light: "#879579",
-    dark: "#879579",
-    description: "Springs and rods",
-  },
-  {
-    name: "link-selected",
-    group: "Canvas",
-    light: "#566b91",
-    dark: "#8fa8d8",
-    description: "A selected spring or rod",
-  },
-  {
-    name: "cable",
-    group: "Canvas",
-    light: "#617569",
-    dark: "#617569",
-    description: "Belts and pulley cables",
-  },
-  {
-    name: "cable-selected",
-    group: "Canvas",
-    light: "#566b91",
-    dark: "#566b91",
-    description: "A selected belt or cable",
-  },
-  {
-    name: "belt-dash",
-    group: "Canvas",
-    light: "#cdd9bd",
-    dark: "#cdd9bd",
-    description: "Moving dashes on a belt",
-  },
-  {
-    name: "link-label",
-    group: "Canvas",
-    light: "#46553e",
-    dark: "#a9c49d",
-    description: 'The spring\'s "axis locked" label',
-  },
-  {
-    name: "anchor",
-    group: "Canvas",
-    light: "#65775c",
-    dark: "#a9c49d",
-    description: "Fixed anchor points of springs and rods",
-  },
-  {
-    name: "pending-link",
-    group: "Canvas",
-    light: "#7d946e",
-    dark: "#7d946e",
-    description: "Dashed line while a connection is being made",
-  },
-  {
-    name: "grab-handle",
-    group: "Canvas",
-    light: "#426f3e",
-    dark: "#426f3e",
-    description: "Rotation and grab guides",
-  },
-  {
-    name: "marquee-fill",
-    group: "Canvas",
-    light: "#63876a",
-    dark: "#63876a",
-    description: "Selection box fill (drawn at low opacity)",
-  },
-  {
-    name: "marquee-edge",
-    group: "Canvas",
-    light: "#507954",
-    dark: "#507954",
-    description: "Selection box outline",
-  },
-  {
-    name: "lock-badge",
-    group: "Canvas",
-    light: "#fffefa",
-    dark: "#2a2722",
-    description:
-      "Background of the lock badge on a body (drawn at 87% opacity)",
-  },
-  {
-    name: "lock-badge-edge",
-    group: "Canvas",
-    light: "#b6c9ad",
-    dark: "#768d70",
-    description: "Outline of the lock badge",
-  },
-  {
-    name: "lock-badge-ink",
-    group: "Canvas",
-    light: "#3a5140",
-    dark: "#cfdec8",
-    description: "Icons in the lock badge",
-  },
-  {
-    name: "charge-label-positive",
-    group: "Canvas",
-    light: "#bd5948",
-    dark: "#f08a78",
-    description: "Positive charge labels on bodies (sandbox)",
-  },
-  {
-    name: "charge-label-negative",
-    group: "Canvas",
-    light: "#467cb8",
-    dark: "#7fb2f0",
-    description: "Negative charge labels on bodies (sandbox)",
-  },
-  {
-    name: "preview-link",
-    group: "Canvas",
-    light: "#6f7f63",
-    dark: "#a9b89b",
-    description: "Connections in preset thumbnails",
-  },
-  {
-    name: "preview-field-electric",
-    group: "Canvas",
-    light: "#c8902c",
-    dark: "#c8902c",
-    description: "Electric regions in preset thumbnails",
-  },
-  {
-    name: "preview-field-magnetic",
-    group: "Canvas",
-    light: "#9474c8",
-    dark: "#9474c8",
-    description: "Magnetic regions in preset thumbnails",
+    light: "#9fb39a",
+    dark: "#5d6b5c",
+    description: "The central body in the orbits simulation",
   },
   {
     name: "vector-velocity",
     group: "Vectors",
     light: "#497caa",
     dark: "#6fa8ec",
-    description: "CSS: .swatch.velocity color",
+    description: "Velocity arrows, graph traces and selected connections",
   },
   {
     name: "vector-force",
     group: "Vectors",
     light: "#c2410c",
     dark: "#ef8a6f",
-    description: "CSS: .swatch.force color",
-  },
-  {
-    name: "vector-impulse",
-    group: "Vectors",
-    light: "#c16145",
-    dark: "#e9826e",
-    description: "Impulse tool arrow",
+    description: "Force and impulse arrows",
   },
   {
     name: "energy-kinetic",
     group: "Energy",
     light: "#497caa",
     dark: "#3987e5",
-    description: "CSS: .kinetic background",
+    description: "Kinetic energy",
   },
   {
     name: "energy-gravitational",
     group: "Energy",
     light: "#6d8f5f",
     dark: "#199e70",
-    description: "CSS: .gravitational background",
+    description: "Gravitational potential energy",
   },
   {
     name: "energy-elastic",
     group: "Energy",
     light: "#c99a3e",
     dark: "#c98500",
-    description: "CSS: .elastic background",
+    description: "Elastic energy",
   },
   {
     name: "energy-electric",
     group: "Energy",
     light: "#b0577f",
     dark: "#d55181",
-    description: "CSS: .electric background",
-  },
-  {
-    name: "energy-negative-hatch",
-    group: "Energy",
-    light: "#ffffff80",
-    dark: "#ffffff80",
-    description: "CSS: .energy-bar .negative background-image",
+    description: "Electric energy",
   },
   {
     name: "field-electric",
     group: "Fields",
     light: "#ae7d24",
     dark: "#e0a94a",
-    description: "CSS: .field-lab --electric",
+    description: "Electric fields and their lines",
   },
   {
     name: "field-magnetic",
     group: "Fields",
     light: "#8060ae",
     dark: "#a891e0",
-    description: "CSS: .field-lab --magnetic",
+    description: "Magnetic fields and their lines",
   },
   {
     name: "charge-positive",
     group: "Fields",
     light: "#c2503c",
     dark: "#e9826e",
-    description: "CSS: .field-lab --positive",
+    description: "Positive charges",
   },
   {
     name: "charge-negative",
     group: "Fields",
     light: "#3f76aa",
     dark: "#6fa8ec",
-    description: "CSS: .field-lab --negative",
-  },
-  {
-    name: "charge-glyph",
-    group: "Fields",
-    light: "#fff",
-    dark: "#fff",
-    description: "CSS: .glyph-mark stroke",
-  },
-  {
-    name: "field-electric-tint",
-    group: "Fields",
-    light: "#dea739",
-    dark: "#dea739",
-    description: "Fill of an electric region (sandbox; drawn transparent)",
-  },
-  {
-    name: "field-magnetic-tint",
-    group: "Fields",
-    light: "#9874cb",
-    dark: "#9874cb",
-    description: "Fill of a magnetic region (sandbox; drawn transparent)",
+    description: "Negative charges and electron flow",
   },
   {
     name: "field-equipotential",
@@ -727,6 +242,13 @@ export const COLOURS = [
     description: "Equipotential lines",
   },
   {
+    name: "field-test-charge",
+    group: "Fields",
+    light: "#2f7d4f",
+    dark: "#8fd3a4",
+    description: "Test charges, and voltmeter readings",
+  },
+  {
     name: "field-neutral",
     group: "Fields",
     light: "#9aa392",
@@ -734,151 +256,25 @@ export const COLOURS = [
     description: "Neutral (uncharged) objects",
   },
   {
-    name: "field-force",
-    group: "Fields",
-    light: "#b4530a",
-    dark: "#f2c14e",
-    description: "Force arrows on charges",
-  },
-  {
-    name: "field-test-charge",
-    group: "Fields",
-    light: "#2f7d4f",
-    dark: "#8fd3a4",
-    description: "Test charges and their trails",
-  },
-  {
-    name: "orbit-total",
-    group: "Orbits",
-    light: "#354438",
-    dark: "#ebe5d6",
-    description: "CSS: .orbit-lab --total",
-  },
-  {
-    name: "launch-background",
-    group: "Orbits",
-    light: "#435d49",
-    dark: "#435d49",
-    description: "CSS: #launch background, #launch border-color",
-  },
-  {
-    name: "launch-hover-background",
-    group: "Orbits",
-    light: "#37503d",
-    dark: "#37503d",
-    description: "CSS: #launch:hover background",
-  },
-  {
-    name: "orbit-body",
-    group: "Orbits",
-    light: "#9fb39a",
-    dark: "#5d6b5c",
-    description: "Central body fill",
-  },
-  {
-    name: "orbit-body-edge",
-    group: "Orbits",
-    light: "#4f7547",
-    dark: "#a9c49d",
-    description: "Central body outline and surface",
-  },
-  {
-    name: "orbit-satellite-1",
-    group: "Orbits",
-    light: "#ae7d24",
-    dark: "#e0a94a",
-    description: "Satellite 1 (in launch order)",
-  },
-  {
-    name: "orbit-satellite-2",
-    group: "Orbits",
-    light: "#3f76aa",
-    dark: "#6fa8ec",
-    description: "Satellite 2 (in launch order)",
-  },
-  {
-    name: "orbit-satellite-3",
-    group: "Orbits",
-    light: "#c2503c",
-    dark: "#e9826e",
-    description: "Satellite 3 (in launch order)",
-  },
-  {
-    name: "orbit-satellite-4",
-    group: "Orbits",
-    light: "#2f7d4f",
-    dark: "#8fd3a4",
-    description: "Satellite 4 (in launch order)",
-  },
-  {
-    name: "orbit-satellite-5",
-    group: "Orbits",
-    light: "#8060ae",
-    dark: "#a891e0",
-    description: "Satellite 5 (in launch order)",
-  },
-  {
-    name: "orbit-satellite-6",
-    group: "Orbits",
-    light: "#3f8c7c",
-    dark: "#6fbfae",
-    description: "Satellite 6 (in launch order)",
-  },
-  {
-    name: "orbit-satellite-7",
-    group: "Orbits",
-    light: "#b0577f",
-    dark: "#e58bb0",
-    description: "Satellite 7 (in launch order)",
-  },
-  {
-    name: "orbit-satellite-8",
-    group: "Orbits",
-    light: "#6f7f63",
-    dark: "#bdb4a2",
-    description: "Satellite 8 (in launch order)",
-  },
-  {
     name: "circuit-current",
     group: "Circuits",
     light: "#b4530a",
     dark: "#f2c14e",
-    description: "CSS: .circuit-lab --current",
+    description: "Current arrows and ammeter readings",
   },
   {
     name: "circuit-dot",
     group: "Circuits",
     light: "#ff7a00",
     dark: "#ff4d2e",
-    description: "CSS: .circuit-lab --dot",
+    description: "Moving current dots (conventional current)",
   },
   {
     name: "circuit-dot-electron",
     group: "Circuits",
     light: "#00a3ff",
     dark: "#1f8bff",
-    description: "CSS: .circuit-lab --dot-electron",
-  },
-  {
-    name: "circuit-voltage",
-    group: "Circuits",
-    light: "#2f7d4f",
-    dark: "#8fd3a4",
-    description: "CSS: .circuit-lab --voltage",
-  },
-  {
-    name: "circuit-danger",
-    group: "Circuits",
-    light: "#a5544a",
-    dark: "#e08a7e",
-    description: "CSS: .circuit-lab --danger",
-  },
-  {
-    name: "circuit-electron",
-    group: "Circuits",
-    light: "#3f76aa",
-    dark: "#6fa8ec",
-    description: "Electron flow arrows",
+    description: "Moving current dots (electron flow)",
   },
   {
     name: "circuit-glow",
@@ -886,136 +282,6 @@ export const COLOURS = [
     light: "#f5b700",
     dark: "#ffd866",
     description: "Glow of a lit lamp",
-  },
-  {
-    name: "circuit-fault",
-    group: "Circuits",
-    light: "#b3261e",
-    dark: "#ff8f7d",
-    description: "Faults drawn on the circuit (short circuits, conflicts)",
-  },
-  {
-    name: "circuit-graph-axis",
-    group: "Circuits",
-    light: "#dce1d4",
-    dark: "#3d3930",
-    description: "Axes of the oscilloscope and graphs",
-  },
-  {
-    name: "graph-grid",
-    group: "Graphs",
-    light: "#dfe4d9",
-    dark: "#4a453b",
-    description: "Graph grid lines and orbit axes",
-  },
-  {
-    name: "graph-trace",
-    group: "Graphs",
-    light: "#3d6f9f",
-    dark: "#8fb6e0",
-    description: "The plotted line on the sandbox graph",
-  },
-  {
-    name: "toast",
-    group: "Status",
-    light: "#3e5543",
-    dark: "#3e5543",
-    description: "CSS: #toast background",
-  },
-  {
-    name: "selection-header-delete-color",
-    group: "Status",
-    light: "#a56c62",
-    dark: "#a56c62",
-    description: "CSS: .selection-header #delete color",
-  },
-  {
-    name: "danger-button",
-    group: "Status",
-    light: "#a5544a",
-    dark: "#a5544a",
-    description:
-      "CSS: #clear-confirm .danger background, #clear-confirm .danger border-color",
-  },
-  {
-    name: "danger-button-hover",
-    group: "Status",
-    light: "#8e463d",
-    dark: "#8e463d",
-    description: "CSS: #clear-confirm .danger:hover background",
-  },
-  {
-    name: "clear-button",
-    group: "Status",
-    light: "#a5544a",
-    dark: "#b35d52",
-    description: "CSS: #clear background, #clear border-color",
-  },
-  {
-    name: "clear-button-hover",
-    group: "Status",
-    light: "#8e463d",
-    dark: "#c46b5f",
-    description: "CSS: #clear:hover background",
-  },
-  {
-    name: "cl-warning-background",
-    group: "Status",
-    light: "#a5544a",
-    dark: "#a5544a",
-    description: "CSS: .cl-warning background",
-  },
-  {
-    name: "cl-warning-border",
-    group: "Status",
-    light: "#8e463d",
-    dark: "#8e463d",
-    description: "CSS: .cl-warning border",
-  },
-  {
-    name: "cl-warning-box-shadow",
-    group: "Status",
-    light: "#6b2a2330",
-    dark: "#6b2a2330",
-    description: "CSS: .cl-warning box-shadow",
-  },
-  {
-    name: "on-colour",
-    group: "Controls",
-    light: "#ffffff",
-    dark: "#ffffff",
-    description:
-      "Text on coloured buttons and on toasts (Run, Clear, Delete, toast)",
-  },
-  {
-    name: "equation",
-    group: "Text",
-    light: "#354438",
-    dark: "#ebe5d6",
-    description: "Typeset equations",
-  },
-  {
-    name: "math-error",
-    group: "Status",
-    light: "#b3261e",
-    dark: "#ff8f7d",
-    description: "An equation that could not be typeset: its source text",
-  },
-  {
-    name: "pattern-page",
-    group: "Patterns",
-    light: "#6f7f63",
-    dark: "#bdb4a2",
-    description:
-      "Background pattern of the page (developer scheme; strength sets how much shows)",
-  },
-  {
-    name: "pattern-canvas",
-    group: "Patterns",
-    light: "#6f7f63",
-    dark: "#bdb4a2",
-    description:
-      "Background pattern behind the simulation canvas (developer scheme)",
   },
   {
     name: "dev-outline",
@@ -1029,7 +295,7 @@ export const COLOURS = [
     group: "Developer",
     light: "#2f7dd0",
     dark: "#6fa8ec",
-    description: "Developer layout aid: spacing grid and size badge",
+    description: "Developer layout aid: spacing grid and badges",
   },
 ];
 
@@ -1515,6 +781,68 @@ export const CUSTOM_CSS = "";
 
 // ---- Not part of a scheme.
 
+// Colours mixed from the ones above, so that a scheme only sets the base
+// colours: `percent` of `from` with the rest `with` (a colour token, "black"
+// or "transparent"), as CSS color-mix() in sRGB does it.
+export const DERIVED = [
+  {
+    name: "canvas-grid-major",
+    from: "canvas-grid",
+    percent: 85,
+    with: "ink-soft",
+    description: "Major grid lines and graph axes",
+  },
+  {
+    name: "accent-border",
+    from: "line",
+    percent: 70,
+    with: "accent-text",
+    description: "Border of active and pressed controls",
+  },
+  {
+    name: "accent-hover",
+    from: "accent",
+    percent: 82,
+    with: "black",
+    description: "A filled button under the pointer",
+  },
+  {
+    name: "danger-hover",
+    from: "danger",
+    percent: 85,
+    with: "black",
+    description: "A destructive button under the pointer; warning borders",
+  },
+  {
+    name: "body-ball-edge",
+    from: "body-ball",
+    percent: 72,
+    with: "black",
+    description: "Ball edges",
+  },
+  {
+    name: "body-edge",
+    from: "body-block",
+    percent: 72,
+    with: "black",
+    description: "Block and wedge edges",
+  },
+  {
+    name: "body-label",
+    from: "body-wedge",
+    percent: 25,
+    with: "black",
+    description: "Labels drawn on a wedge",
+  },
+  {
+    name: "hatch",
+    from: "on-colour",
+    percent: 50,
+    with: "transparent",
+    description: "Hatching on negative energy bars",
+  },
+];
+
 // Fonts a scheme can choose: system stacks, and open fonts in vendor/fonts/
 // (see its NOTICE.txt), loaded only when a scheme uses them.
 export const FONTS = [
@@ -1616,35 +944,19 @@ export const FONTS = [
 export const PAIRS = [
   ["ink", "canvas-bg", "Page text"],
   ["ink", "panel", "Panel and menu text"],
-  ["active-ink", "tools-active-background", "Active tool"],
-  [
-    "active-ink",
-    "fl-toolbar-button-aria-pressed-true-background",
-    "Pressed toolbar button",
-  ],
-  [
-    "active-ink",
-    "ol-chip-button-aria-pressed-true-background",
-    "Pressed satellite chip",
-  ],
-  [
-    "icon-toggle-has-input-checked-color",
-    "tools-active-background",
-    "Checked icon toggle",
-  ],
-  ["accent-text", "panel", "Accent text in panels"],
+  ["ink", "accent-soft", "Active and pressed controls"],
+  ["ink-soft", "canvas-bg", "Secondary text on the page"],
+  ["ink-soft", "panel", "Secondary text in panels"],
+  ["accent-text", "panel", "Links and accents in panels"],
   ["accent-text", "canvas-bg", "Links on the page"],
-  ["status-color", "canvas-bg", "Status line"],
-  ["on-colour", "run-button", "Run button"],
-  ["on-colour", "clear-button", "Clear button"],
-  ["on-colour", "danger-button", "Confirm clear button"],
-  ["on-colour", "toast", "Toast"],
-  ["canvas-soft", "canvas-bg", "Canvas labels"],
-  ["link-label", "canvas-bg", "Spring label"],
-  ["charge-label-positive", "canvas-bg", "Positive charge label"],
-  ["charge-label-negative", "canvas-bg", "Negative charge label"],
-  ["circuit-current", "canvas-bg", "Ammeter reading"],
-  ["circuit-voltage", "canvas-bg", "Voltmeter reading"],
+  ["on-colour", "accent", "Filled buttons and toasts"],
+  ["on-colour", "danger", "Destructive buttons"],
+  ["danger-text", "panel", "Errors in panels"],
+  ["charge-positive", "canvas-bg", "Positive charge labels"],
+  ["charge-negative", "canvas-bg", "Negative charge labels"],
+  ["circuit-current", "canvas-bg", "Ammeter readings"],
+  ["field-test-charge", "canvas-bg", "Voltmeter readings"],
+  ["body-label", "body-wedge", "Angles drawn on a wedge"],
 ];
 
 const byName = new Map(COLOURS.map((t) => [t.name, t]));
@@ -1662,11 +974,53 @@ export function setOverrides(next = {}) {
 }
 export const getOverrides = () => structuredClone(overrides);
 
+const derivedByName = new Map(DERIVED.map((t) => [t.name, t]));
+const FIXED = { black: "#000000", transparent: "#00000000" };
+
+// "#rgb", "#rrggbb" or "#rrggbbaa" as [r, g, b, a], all 0–255.
+function channels(hex) {
+  let h = hex.slice(1);
+  if (h.length === 3) h = h.replace(/./g, (d) => d + d);
+  if (h.length === 6) h += "ff";
+  return [0, 2, 4, 6].map((i) => parseInt(h.slice(i, i + 2), 16));
+}
+const hex = (cs) =>
+  "#" +
+  cs
+    .map((v) =>
+      Math.round(Math.min(255, Math.max(0, v)))
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")
+    .replace(/ff$/, "");
+// CSS color-mix(in srgb, a p%, b): premultiplied by alpha, as browsers do.
+export function mixColours(a, p, b) {
+  const x = channels(a),
+    y = channels(b),
+    t = p / 100,
+    alpha = x[3] * t + y[3] * (1 - t);
+  if (alpha === 0) return "#00000000";
+  const out = [0, 1, 2].map(
+    (i) => (x[i] * x[3] * t + y[i] * y[3] * (1 - t)) / alpha,
+  );
+  return hex([...out, alpha]);
+}
+
 export function colourValue(name, mode) {
   const token = byName.get(name);
-  if (!token) throw new Error("Unknown colour token: " + name);
-  return overrides[mode][name] ?? token[mode];
+  if (token) return overrides[mode][name] ?? token[mode];
+  const derived = derivedByName.get(name);
+  if (!derived) throw new Error("Unknown colour token: " + name);
+  const other = FIXED[derived.with] ?? colourValue(derived.with, mode);
+  return mixColours(colourValue(derived.from, mode), derived.percent, other);
 }
+// Every colour name canvas code may ask for: the base colours and the
+// derived ones.
+export const colourNames = () => [
+  ...COLOURS.map((t) => t.name),
+  ...DERIVED.map((t) => t.name),
+];
 // The value of a size or choice token (the default unless a developer
 // scheme changes it).
 export function value(name) {
@@ -1687,12 +1041,20 @@ export function paletteOf(names, dark = pageIsDark()) {
 }
 
 // The text of styles/tokens.css: every colour as a custom property, light
-// values on :root and dark values in one :root[data-theme="dark"] block.
-// Size and choice tokens are applied by the developer options only (see
-// src/site/surface.js), so the stylesheets keep their own sizes.
+// values on :root and dark values in one :root[data-theme="dark"] block,
+// then the derived colours as color-mix() of those (so they follow both
+// themes and any developer scheme). Size and choice tokens are applied by
+// the developer options only (see src/site/surface.js), so the stylesheets
+// keep their own sizes.
 export function tokensCss() {
   const light = COLOURS.map((t) => `  --${t.name}: ${t.light};`),
-    dark = COLOURS.map((t) => `  --${t.name}: ${t.dark};`);
+    dark = COLOURS.map((t) => `  --${t.name}: ${t.dark};`),
+    mixed = DERIVED.map(
+      (t) =>
+        `  --${t.name}: color-mix(in srgb, var(--${t.from}) ${t.percent}%, ${
+          FIXED[t.with] ? t.with : `var(--${t.with})`
+        });`,
+    );
   return [
     "/* Generated from src/site/theme.js by `npm run tokens`. Do not edit. */",
     ":root {",
@@ -1701,6 +1063,10 @@ export function tokensCss() {
     ':root[data-theme="dark"] {',
     "  color-scheme: dark;",
     ...dark,
+    "}",
+    ":root,",
+    ':root[data-theme="dark"] {',
+    ...mixed,
     "}",
     "",
   ].join("\n");

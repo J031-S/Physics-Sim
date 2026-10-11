@@ -21,27 +21,35 @@ export const TAU = 2 * Math.PI,
 // Canvas colours, by key, from the theme tokens (src/site/theme.js).
 export const ORBIT_COLOURS = {
   ink: "ink",
-  soft: "canvas-soft",
+  soft: "ink-soft",
   panel: "panel",
   paper: "canvas-bg",
-  gridMinor: "canvas-grid-minor",
+  gridMinor: "canvas-grid",
   gridMajor: "canvas-grid-major",
   body: "orbit-body",
-  bodyEdge: "orbit-body-edge",
+  bodyEdge: "accent-text",
   velocity: "vector-velocity",
   force: "vector-force",
   kinetic: "energy-kinetic",
   potential: "energy-gravitational",
-  axis: "graph-grid",
+  axis: "canvas-grid-major",
 };
+const SATELLITE_COLOURS = [
+  "field-electric",
+  "charge-negative",
+  "charge-positive",
+  "field-test-charge",
+  "field-magnetic",
+  "field-equipotential",
+  "energy-electric",
+  "ink-soft",
+];
 export function orbitPalette(dark) {
   return {
     dark,
     ...paletteOf(ORBIT_COLOURS, dark),
-    // One colour per satellite, in launch order.
-    satellites: [1, 2, 3, 4, 5, 6, 7, 8].map((i) =>
-      color("orbit-satellite-" + i, dark),
-    ),
+    // One colour per satellite, in launch order: the site's data colours.
+    satellites: SATELLITE_COLOURS.map((name) => color(name, dark)),
   };
 }
 

@@ -89,7 +89,7 @@
   border-color: var(--accent-text);
 }
 .mt-card:focus-visible {
-  outline: 2px solid var(--focus-ring);
+  outline: 2px solid var(--accent-text);
   outline-offset: 2px;
 }
 .mt-card[hidden] {
@@ -175,9 +175,9 @@
   padding: 4px 10px;
 }
 .mt-solve-buttons button[aria-pressed="true"] {
-  background: var(--tools-active-background);
-  border-color: var(--tools-active-border-color);
-  color: var(--active-ink);
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--ink);
 }
 .mt-rearranged {
   font-size: 18px;
@@ -206,7 +206,7 @@
 }
 .mt-row input[type="range"] {
   width: 100%;
-  accent-color: var(--control-accent);
+  accent-color: var(--accent-text);
 }
 .mt-row input[type="number"] {
   width: 96px;

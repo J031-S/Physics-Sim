@@ -107,7 +107,7 @@ export function drawFields(
     ) {
       ctx.fillStyle =
         color(
-          f.type === "electric" ? "field-electric-tint" : "field-magnetic-tint",
+          f.type === "electric" ? "field-electric" : "field-magnetic",
           dark,
         ) + "18";
       ctx.fill();

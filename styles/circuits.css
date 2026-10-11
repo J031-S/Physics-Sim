@@ -8,8 +8,7 @@
   --electron: var(--charge-negative);
   --dot: var(--circuit-dot);
   --dot-electron: var(--circuit-dot-electron);
-  --voltage: var(--circuit-voltage);
-  --danger: var(--circuit-danger);
+  --voltage: var(--field-test-charge);
 }
 
 /* The row across the top reaches down the page so that the right-hand
@@ -172,10 +171,10 @@
   line-height: 1.45;
 }
 .cl-warning {
-  background: var(--cl-warning-background);
-  border: 1px solid var(--cl-warning-border);
-  color: white;
-  box-shadow: 0 8px 30px var(--cl-warning-box-shadow);
+  background: var(--danger);
+  border: 1px solid var(--danger-hover);
+  color: var(--on-colour);
+  box-shadow: 0 8px 30px var(--shadow);
 }
 .cl-warning strong {
   margin-right: 6px;

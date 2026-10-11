@@ -6,7 +6,7 @@ export default function particle(
   { width: w, height: h, values: v, dark },
 ) {
   // A charge entering a field region (dots: B out of the screen).
-  ctx.fillStyle = c("field-magnetic-tint", dark);
+  ctx.fillStyle = c("field-magnetic", dark);
   ctx.globalAlpha = 0.15;
   ctx.fillRect(w * 0.35, 10, w * 0.6, h - 20);
   ctx.globalAlpha = 1;
@@ -18,7 +18,7 @@ export default function particle(
       ctx.fill();
     }
   const r = Math.min(h * 0.35, w * 0.3);
-  ctx.strokeStyle = c("graph-trace", dark);
+  ctx.strokeStyle = c("vector-velocity", dark);
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(w * 0.08, h / 2 - r);

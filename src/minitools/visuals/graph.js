@@ -52,11 +52,11 @@ export default function graph(ctx, o) {
       (ylog ? Math.log(y / lo) / Math.log(hi / lo) : (y - lo) / (hi - lo)) *
         (h - top - bottom);
   // Axes and end labels.
-  ctx.strokeStyle = c("graph-grid", dark);
+  ctx.strokeStyle = c("canvas-grid-major", dark);
   ctx.lineWidth = 1;
   ctx.strokeRect(left, top, w - left - right, h - top - bottom);
   ctx.font = "11px system-ui, sans-serif";
-  ctx.fillStyle = c("canvas-soft", dark);
+  ctx.fillStyle = c("ink-soft", dark);
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   ctx.fillText(numberText(hi), left - 6, top + 4);
@@ -79,7 +79,7 @@ export default function graph(ctx, o) {
   ctx.fillText(`${yVar.name}${yVar.unit ? ` (${yVar.unit})` : ""}`, 0, -6);
   ctx.restore();
   // The curve, broken where there is no value.
-  ctx.strokeStyle = c("graph-trace", dark);
+  ctx.strokeStyle = c("vector-velocity", dark);
   ctx.lineWidth = 2;
   ctx.beginPath();
   let pen = false;

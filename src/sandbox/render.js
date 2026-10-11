@@ -72,12 +72,12 @@ export function createSceneRenderer(ctx, view) {
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(-w / 2, -h / 2, w, h, h / 2);
     else ctx.rect(-w / 2, -h / 2, w, h);
-    ctx.fillStyle = color("lock-badge", dark) + "dd";
+    ctx.fillStyle = color("panel", dark) + "dd";
     ctx.fill();
     ctx.lineWidth = 0.75;
-    ctx.strokeStyle = color("lock-badge-edge", dark);
+    ctx.strokeStyle = color("accent-border", dark);
     ctx.stroke();
-    const ink = color("lock-badge-ink", dark);
+    const ink = color("ink", dark);
     icons.forEach((icon, i) => {
       ctx.save();
       ctx.translate(-w / 2 + 4 + i * (px + gap), -px / 2);
@@ -142,7 +142,7 @@ export function createSceneRenderer(ctx, view) {
   // lengths and spacing are fixed in metres, so a large body is marked exactly
   // like a small one (ticks still scale with zoom, like the body itself).
   const TICK = { gap: 0.025, minor: 0.075, mid: 0.1, major: 0.13 },
-    RULER_INK = "body-ruler";
+    RULER_INK = "on-colour";
   function distanceToSegment(p, a, b) {
     const dx = b.x - a.x,
       dy = b.y - a.y,
@@ -236,8 +236,8 @@ export function createSceneRenderer(ctx, view) {
     const corners = o.body.vertices.map((v) =>
         screen({ x: v.x / 100, y: -v.y / 100 }),
       ),
-      inside = color("angle-label-inside", dark),
-      outside = color("angle-label-outside", dark);
+      inside = color("body-label", dark),
+      outside = color("ink", dark);
     ctx.save();
     ctx.font = "600 10px ui-monospace, monospace";
     ctx.textAlign = "center";
@@ -325,7 +325,7 @@ export function createSceneRenderer(ctx, view) {
         line(
           screen({ x, y: min.y }),
           screen({ x, y: max.y }),
-          color(major ? "canvas-grid-major" : "canvas-grid-minor", dark),
+          color(major ? "canvas-grid-major" : "canvas-grid", dark),
           major ? 1 : 0.75,
         );
       }
@@ -345,7 +345,7 @@ export function createSceneRenderer(ctx, view) {
         line(
           screen({ x: min.x, y }),
           screen({ x: max.x, y }),
-          color(major ? "canvas-grid-major" : "canvas-grid-minor", dark),
+          color(major ? "canvas-grid-major" : "canvas-grid", dark),
           major ? 1 : 0.75,
         );
       }
@@ -355,11 +355,11 @@ export function createSceneRenderer(ctx, view) {
     line(
       { x: 0, y: view.y },
       { x: o.width, y: view.y },
-      color("canvas-wall", dark),
+      color("structure", dark),
       2,
     );
     if (sim.settings.walls) {
-      ctx.strokeStyle = color("canvas-wall", dark);
+      ctx.strokeStyle = color("structure", dark);
       ctx.lineWidth = 4;
       const v = sim.viewport,
         p = screen({ x: v.minX, y: v.maxY });
@@ -371,7 +371,7 @@ export function createSceneRenderer(ctx, view) {
       );
     }
     ctx.font = "9px ui-monospace,monospace";
-    ctx.fillStyle = color("canvas-floor-label", dark);
+    ctx.fillStyle = color("structure", dark);
     const labelStep = Math.max(1, Math.ceil(60 / view.scale));
     for (
       let x = Math.ceil(min.x / labelStep) * labelStep;
@@ -396,7 +396,7 @@ export function createSceneRenderer(ctx, view) {
           i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y),
         );
         ctx.strokeStyle = color(
-          o.highlighted(l.id) ? "cable-selected" : "cable",
+          o.highlighted(l.id) ? "vector-velocity" : "structure",
           dark,
         );
         ctx.lineWidth = l.type === "belt" ? 5 : 2.5;
@@ -404,7 +404,7 @@ export function createSceneRenderer(ctx, view) {
         if (l.type === "belt") {
           ctx.setLineDash([5, 14]);
           ctx.lineDashOffset = -l.travel * view.scale;
-          ctx.strokeStyle = color("belt-dash", dark);
+          ctx.strokeStyle = color("canvas-ground", dark);
           ctx.lineWidth = 2;
           ctx.stroke();
           ctx.setLineDash([]);
@@ -429,14 +429,14 @@ export function createSceneRenderer(ctx, view) {
         }
       ctx.lineTo(b.x, b.y);
       ctx.strokeStyle = color(
-        o.highlighted(l.id) ? "link-selected" : "link",
+        o.highlighted(l.id) ? "vector-velocity" : "structure",
         dark,
       );
       ctx.lineWidth = l.type === "rod" ? 3 : 1.8;
       ctx.stroke();
       if (l.type === "spring" && l.lockAngle) {
         ctx.font = "10px system-ui";
-        ctx.fillStyle = color("link-label", dark);
+        ctx.fillStyle = color("accent-text", dark);
         ctx.fillText("axis locked", (a.x + b.x) / 2 + 8, (a.y + b.y) / 2 - 12);
       }
       for (const [id, p] of [
@@ -446,7 +446,7 @@ export function createSceneRenderer(ctx, view) {
         if (!id) {
           ctx.beginPath();
           ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-          ctx.fillStyle = color("anchor", dark);
+          ctx.fillStyle = color("structure", dark);
           ctx.fill();
         }
     }
@@ -472,7 +472,7 @@ export function createSceneRenderer(ctx, view) {
       ctx.fill();
       ctx.strokeStyle = color(
         o.highlighted(body.id)
-          ? "body-selected-edge"
+          ? "ink"
           : body.shape === "ball"
             ? "body-ball-edge"
             : "body-edge",
@@ -484,7 +484,7 @@ export function createSceneRenderer(ctx, view) {
       if (body.shape === "wedge") drawWedgeAngles(body, dark, o.angleUnit);
       if (body.charge) {
         ctx.fillStyle = color(
-          body.charge > 0 ? "charge-label-positive" : "charge-label-negative",
+          body.charge > 0 ? "charge-positive" : "charge-negative",
           dark,
         );
         ctx.font = "bold 11px system-ui";

@@ -11,20 +11,20 @@ export default function pendulum(
     py = 16,
     bx = px + L * Math.sin(th),
     by = py + L * Math.cos(th);
-  ctx.strokeStyle = c("canvas-wall", dark);
+  ctx.strokeStyle = c("structure", dark);
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(px - 40, py);
   ctx.lineTo(px + 40, py);
   ctx.stroke();
-  ctx.strokeStyle = c("link", dark);
+  ctx.strokeStyle = c("structure", dark);
   ctx.lineWidth = 1.8;
   ctx.beginPath();
   ctx.moveTo(px, py);
   ctx.lineTo(bx, by);
   ctx.stroke();
   ctx.setLineDash([3, 4]);
-  ctx.strokeStyle = c("canvas-soft", dark);
+  ctx.strokeStyle = c("ink-soft", dark);
   ctx.beginPath();
   ctx.moveTo(px, py);
   ctx.lineTo(px, py + L);

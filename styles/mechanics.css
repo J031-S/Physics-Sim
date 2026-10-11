@@ -8,10 +8,10 @@
   align-items: center;
   gap: 7px;
   padding: 9px;
-  background: var(--tools-background);
-  border: 1px solid var(--tools-border);
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 13px;
-  box-shadow: 0 8px 30px var(--toolbar-shadow);
+  box-shadow: 0 8px 30px var(--shadow);
   white-space: nowrap;
 }
 .tools button {
@@ -26,7 +26,7 @@
   font-size: 23px;
   line-height: 1;
   font-weight: 400;
-  color: var(--tools-b-color);
+  color: var(--ink-soft);
 }
 #material-menu {
   position: fixed;
@@ -34,16 +34,16 @@
   width: min(330px, calc(100vw - 20px));
   max-height: calc(100dvh - 20px);
   overflow: auto;
-  background: var(--button-background);
-  border: 1px solid var(--material-menu-border);
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 15px 45px var(--panel-shadow);
+  box-shadow: 0 15px 45px var(--shadow);
   padding: 15px;
 }
 #menu-note {
   font-size: 10px;
   line-height: 1.6;
-  color: var(--menu-note-color);
+  color: var(--ink-soft);
   margin: 5px 0 10px;
 }
 #constants label {
@@ -53,14 +53,14 @@
 }
 #constants label > span {
   float: right;
-  color: var(--constants-label-span-color);
+  color: var(--ink-soft);
   font-size: 10px;
 }
 #constants input {
   display: block;
   width: 100%;
-  border: 1px solid var(--constants-input-border);
-  background: var(--constants-input-background);
+  border: 1px solid var(--line);
+  background: var(--canvas-bg);
   border-radius: 5px;
   padding: 8px;
   margin-top: 6px;
@@ -68,7 +68,7 @@
 #constants small {
   display: block;
   margin-top: 5px;
-  color: var(--constants-small-color);
+  color: var(--ink-soft);
   font-size: 9px;
   line-height: 1.5;
 }
@@ -76,7 +76,7 @@
   font:
     10px ui-monospace,
     monospace;
-  color: var(--dimensions-color);
+  color: var(--ink-soft);
 }
 #belt-speed {
   width: 65px;
@@ -95,7 +95,7 @@
   margin-top: 6px;
   border: 1px solid var(--line);
   border-radius: 5px;
-  background: var(--constants-input-background);
+  background: var(--canvas-bg);
 }
 .tools {
   top: 12px;
@@ -168,7 +168,7 @@
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 11px;
-  box-shadow: 0 10px 30px var(--panel-shadow);
+  box-shadow: 0 10px 30px var(--shadow);
 }
 .tools .category-menu button {
   justify-content: flex-start;
@@ -358,7 +358,7 @@
   background-image: repeating-linear-gradient(
     135deg,
     transparent 0 3px,
-    var(--energy-negative-hatch) 3px 5px
+    var(--hatch) 3px 5px
   );
 }
 .graph-panel {

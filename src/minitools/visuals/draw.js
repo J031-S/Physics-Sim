@@ -24,7 +24,7 @@ export function label(ctx, text, x, y, dark, align = "center") {
   ctx.font = "12px system-ui, sans-serif";
   ctx.textAlign = align;
   ctx.textBaseline = "middle";
-  ctx.fillStyle = c("canvas-soft", dark);
+  ctx.fillStyle = c("ink-soft", dark);
   ctx.fillText(text, x, y);
 }
 export const val = (v, key, fallback) =>

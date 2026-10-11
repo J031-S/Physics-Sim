@@ -6,6 +6,7 @@
 import { $, option, showToast } from "./dom.js";
 import {
   COLOURS,
+  DERIVED,
   CHOICES,
   FONTS,
   GROUPS,
@@ -554,7 +555,7 @@ function fill() {
 
   panel.replaceChildren();
   if (tab === "css") cssPanel(panel, scheme);
-  else if (tab === "colours")
+  else if (tab === "colours") {
     for (const group of GROUPS) {
       const tokens = COLOURS.filter((t) => t.group === group && matches(t));
       if (!tokens.length) continue;
@@ -562,7 +563,29 @@ function fill() {
       h.textContent = group;
       panel.append(h, ...tokens.map((t) => colourRow(t, scheme)));
     }
-  else
+    // Shades mixed from the colours above: shown, not set.
+    const derived = DERIVED.filter(
+      (t) => matches({ ...t, group: "Derived" }) && !picked,
+    );
+    if (derived.length) {
+      const h = document.createElement("h3");
+      h.textContent = "Derived (follow the colours above)";
+      panel.append(h);
+      for (const t of derived) {
+        const row = document.createElement("div");
+        row.className = "dev-token dev-derived";
+        row.innerHTML = `<span class="dev-swatch"></span><span></span><span class="dev-token-name"></span><small></small>`;
+        row.querySelector(".dev-swatch").style.background = colourValue(
+          t.name,
+          mode,
+        );
+        row.querySelector(".dev-token-name").textContent = t.name;
+        row.querySelector("small").textContent =
+          `${t.description}: ${t.percent}% ${t.from}, the rest ${t.with}`;
+        panel.append(row);
+      }
+    }
+  } else
     for (const group of TAB_GROUPS[tab]) {
       const tokens = [...SIZES, ...CHOICES].filter(
         (t) => t.group === group && matches(t),

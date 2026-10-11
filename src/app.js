@@ -1477,7 +1477,7 @@ function drawPreview(el, scene, dark) {
   g.fillRect(0, 0, w, h);
   g.fillStyle = color("canvas-ground", dark);
   g.fillRect(0, oy, w, h - oy);
-  g.strokeStyle = color("canvas-wall", dark);
+  g.strokeStyle = color("structure", dark);
   g.lineWidth = 1;
   if (scene.settings.walls) {
     const a = at({ x: v.minX, y: v.maxY });
@@ -1504,14 +1504,14 @@ function drawPreview(el, scene, dark) {
       g.ellipse(0, 0, (f.width * k) / 2, (f.height * k) / 2, 0, 0, 2 * Math.PI);
     g.fillStyle =
       color(
-        f.type === "electric" ? "field-electric-tint" : "field-magnetic-tint",
+        f.type === "electric" ? "field-electric" : "field-magnetic",
         dark,
       ) + "40";
     g.fill();
     g.strokeStyle = color(
       f.type === "electric"
-        ? "preview-field-electric"
-        : "preview-field-magnetic",
+        ? "field-electric"
+        : "field-magnetic",
       dark,
     );
     g.stroke();
@@ -1528,7 +1528,7 @@ function drawPreview(el, scene, dark) {
     path
       .map(at)
       .forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)));
-    g.strokeStyle = color("preview-link", dark);
+    g.strokeStyle = color("ink-soft", dark);
     g.lineWidth = l.type === "rod" ? 1.5 : 1;
     g.stroke();
   }
@@ -2067,8 +2067,8 @@ function drawGraph(dark) {
   const key = $("graph-quantity").value,
     unit = GRAPH_UNITS[key],
     ink = color("ink", dark),
-    grid = color("graph-grid", dark),
-    trace = color("graph-trace", dark),
+    grid = color("canvas-grid-major", dark),
+    trace = color("vector-velocity", dark),
     left = 44,
     right = 8,
     top = 16,
@@ -2357,7 +2357,7 @@ function draw() {
     const g = sim.grab;
     if (g.snapCentre) {
       const p = screen(g.snapCentre);
-      ctx.strokeStyle = color("grab-handle", dark);
+      ctx.strokeStyle = color("accent-text", dark);
       ctx.lineWidth = 2;
       ctx.strokeRect(p.x - 6, p.y - 6, 12, 12);
     }
@@ -2365,8 +2365,8 @@ function draw() {
   if (marquee) {
     const a = screen(marquee.start),
       b = screen(marquee.end);
-    ctx.fillStyle = color("marquee-fill", dark) + "22";
-    ctx.strokeStyle = color("marquee-edge", dark);
+    ctx.fillStyle = color("accent-text", dark) + "22";
+    ctx.strokeStyle = color("accent-text", dark);
     ctx.lineWidth = 1;
     ctx.setLineDash([5, 3]);
     ctx.fillRect(
@@ -2393,7 +2393,7 @@ function draw() {
         };
       const end = screen({ x: o.x + delta.x, y: o.y + delta.y }),
         a = Math.atan2(end.y - start.y, end.x - start.x);
-      const impulseColour = color("vector-impulse", dark);
+      const impulseColour = color("vector-force", dark);
       line(start, end, impulseColour, 3);
       line(
         end,
@@ -2429,7 +2429,7 @@ function draw() {
     line(
       screen(pending.point),
       screen(pointer),
-      color("pending-link", dark),
+      color("structure", dark),
       2,
     );
     ctx.setLineDash([]);

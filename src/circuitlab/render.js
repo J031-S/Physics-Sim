@@ -115,22 +115,22 @@ export function meterText(item, r, ac) {
 // dots are a saturated colour with a ring of the page colour round them.
 export const CIRCUIT_COLOURS = {
   ink: "ink",
-  soft: "canvas-soft",
+  soft: "ink-soft",
   panel: "panel",
   back: "canvas-bg",
-  gridMinor: "canvas-grid-minor",
+  gridMinor: "canvas-grid",
   gridMajor: "canvas-grid-major",
   positive: "charge-positive",
   negative: "charge-negative",
   current: "circuit-current",
-  electron: "circuit-electron",
+  electron: "charge-negative",
   dot: "circuit-dot",
   dotElectron: "circuit-dot-electron",
-  voltage: "circuit-voltage",
+  voltage: "field-test-charge",
   glow: "circuit-glow",
-  danger: "circuit-fault",
-  select: "canvas-select",
-  axis: "circuit-graph-axis",
+  danger: "danger-text",
+  select: "accent-text",
+  axis: "canvas-grid-major",
 };
 export function circuitPalette(dark) {
   return {

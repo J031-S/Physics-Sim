@@ -69,7 +69,7 @@
   color: var(--ink);
   border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 10px 40px var(--panel-shadow);
+  box-shadow: 0 10px 40px var(--shadow);
   font-size: 12px;
   zoom: var(--ui-scale);
 }
@@ -87,7 +87,7 @@
   user-select: none;
 }
 .dev-window-bar:focus-visible {
-  outline: 2px solid var(--focus-ring);
+  outline: 2px solid var(--accent-text);
   outline-offset: -2px;
 }
 .dev-window-title {
@@ -135,9 +135,9 @@
 }
 .dev-window [aria-pressed="true"],
 .dev-tabs [aria-selected="true"] {
-  background: var(--tools-active-background);
-  border-color: var(--tools-active-border-color);
-  color: var(--active-ink);
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--ink);
 }
 .dev-tabs {
   display: flex;
@@ -212,8 +212,8 @@
     monospace;
 }
 .dev-contrast.low {
-  border-color: var(--danger-button);
-  color: var(--danger-button);
+  border-color: var(--danger);
+  color: var(--danger);
   font-weight: 700;
 }
 .dev-value {
@@ -345,10 +345,16 @@
     monospace;
 }
 [data-dev-review="on"] .dev-review.unverified {
-  border-color: var(--danger-button);
-  color: var(--danger-button);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 .dev-window input[type="range"],
 .dev-window input[type="checkbox"] {
-  accent-color: var(--control-accent);
+  accent-color: var(--accent-text);
+}
+.dev-swatch {
+  width: 28px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
 }

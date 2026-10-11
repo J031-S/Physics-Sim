@@ -74,7 +74,7 @@
   display: inline-block;
 }
 .gallery-focus {
-  outline: 2px solid var(--focus-ring);
+  outline: 2px solid var(--accent-text);
   outline-offset: 3px;
 }
 .gallery-nav {

@@ -18,13 +18,13 @@ export default function projectile(
     ),
     x0 = pad,
     y0 = h - pad;
-  ctx.strokeStyle = c("canvas-wall", dark);
+  ctx.strokeStyle = c("structure", dark);
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(0, y0);
   ctx.lineTo(w, y0);
   ctx.stroke();
-  ctx.strokeStyle = c("graph-trace", dark);
+  ctx.strokeStyle = c("vector-velocity", dark);
   ctx.lineWidth = 2;
   ctx.beginPath();
   const T = (2 * u * Math.sin(th)) / g;

@@ -6,14 +6,14 @@ export default function circle(ctx, { width: w, height: h, values: v, dark }) {
   const r = Math.min(w, h) * 0.34,
     cx = w / 2,
     cy = h / 2;
-  ctx.strokeStyle = c("canvas-soft", dark);
+  ctx.strokeStyle = c("ink-soft", dark);
   ctx.setLineDash([4, 4]);
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, TAU);
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.strokeStyle = c("link", dark);
+  ctx.strokeStyle = c("structure", dark);
   ctx.beginPath();
   ctx.moveTo(cx, cy);
   ctx.lineTo(cx, cy - r);

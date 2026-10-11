@@ -25,10 +25,10 @@ export const GRID = 0.25,
 // Canvas colours, by key, from the theme tokens (src/site/theme.js).
 export const FIELD_COLOURS = {
   ink: "ink",
-  soft: "canvas-soft",
+  soft: "ink-soft",
   panel: "panel",
   back: "canvas-bg",
-  gridMinor: "canvas-grid-minor",
+  gridMinor: "canvas-grid",
   gridMajor: "canvas-grid-major",
   electric: "field-electric",
   magnetic: "field-magnetic",
@@ -36,10 +36,10 @@ export const FIELD_COLOURS = {
   positive: "charge-positive",
   negative: "charge-negative",
   neutral: "field-neutral",
-  force: "field-force",
-  select: "canvas-select",
+  force: "vector-force",
+  select: "accent-text",
   test: "field-test-charge",
-  glyph: "charge-glyph",
+  glyph: "on-colour",
 };
 export const fieldPalette = (dark) => ({
   dark,
