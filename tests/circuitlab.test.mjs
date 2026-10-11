@@ -1552,3 +1552,30 @@ test("AC faults and limits: a shorted source is reported even at a zero of its E
   assert.equal(turn.period > 0, true);
   assert.equal(new CircuitLab().period, null);
 });
+
+test("a saved AC circuit loads back as the same circuit", () => {
+  const lab = new CircuitLab();
+  presets.find((p) => p.id === "rlc").build(lab);
+  const copy = CircuitLab.fromScene(JSON.parse(JSON.stringify(lab.exportScene())));
+  assert.deepEqual(
+    copy.list().map((i) => [i.kind, i.name, i.nodes.join()]),
+    lab.list().map((i) => [i.kind, i.name, i.nodes.join()]),
+  );
+  for (const circuit of [lab, copy]) circuit.advance(0.5);
+  const id = (circuit, name) => circuit.list().find((i) => i.name === name).id;
+  assert.equal(
+    copy.solve().of(id(copy, "A1")).rmsCurrent,
+    lab.solve().of(id(lab, "A1")).rmsCurrent,
+  );
+  // An inductor, a source and a lamp keep their names: L1, E1, La1.
+  const named = new CircuitLab();
+  named.add("lamp", { x: 0, y: 0 });
+  named.add("inductor", { x: 4, y: 0 });
+  named.add("source", { x: 8, y: 0 });
+  assert.deepEqual(
+    CircuitLab.fromScene(named.exportScene())
+      .list()
+      .map((i) => i.name),
+    ["La1", "L1", "E1"],
+  );
+});

@@ -1885,10 +1885,15 @@ export class CircuitLab {
       if (sum[7] !== perCycle) continue;
       const n = perCycle,
         size = (a, b) => (2 / n) * Math.hypot(a, b);
+      const rmsCurrent = Math.sqrt(sum[0] / n),
+        rmsVoltage = Math.sqrt(sum[1] / n),
+        apparent = rmsCurrent * rmsVoltage;
       this.#measured.set(id, {
-        rmsCurrent: Math.sqrt(sum[0] / n),
-        rmsVoltage: Math.sqrt(sum[1] / n),
-        meanPower: sum[2] / n,
+        rmsCurrent,
+        rmsVoltage,
+        // A capacitor or inductor returns all it takes: what is left of
+        // its mean power is rounding, and is reported as zero.
+        meanPower: Math.abs(sum[2] / n) <= 1e-12 * apparent ? 0 : sum[2] / n,
         phaseCurrent: Math.atan2(sum[4], sum[3]),
         phaseVoltage: Math.atan2(sum[6], sum[5]),
         peakCurrent: size(sum[3], sum[4]),
