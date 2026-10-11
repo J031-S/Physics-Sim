@@ -99,7 +99,7 @@ const sandboxDriver = {
       height: size.height,
       grid: prefs.grid,
       vectors: true,
-      iconSet: prefs.iconSet,
+      iconWeight: prefs.iconWeight,
       angleUnit: prefs.angleUnit,
     });
   },

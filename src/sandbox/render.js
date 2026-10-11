@@ -54,13 +54,13 @@ export function createSceneRenderer(ctx, view) {
   }
   // Lock indicator at a body's centre (or beside a body too small on screen),
   // sized in screen pixels so it does not grow with zoom. It uses the same icons
-  // as the Lock toggles in the selected-item panel, so it follows the icon set.
-  function lockGlyph(o, p, dark, size, iconSet) {
+  // as the Lock toggles in the selected-item panel, so it follows the icon weight.
+  function lockGlyph(o, p, dark, size, iconWeight) {
     const names = [
         ...(o.lockPosition ? ["lockPosition"] : []),
         ...(o.lockRotation ? ["lockRotation"] : []),
       ],
-      icons = names.map((n) => canvasIcon(iconSet, n)).filter(Boolean),
+      icons = names.map((n) => canvasIcon(iconWeight, n)).filter(Boolean),
       px = 14,
       gap = 3,
       w = icons.length * px + (icons.length - 1) * gap + 8,
@@ -85,9 +85,11 @@ export function createSceneRenderer(ctx, view) {
       ctx.fillStyle = ctx.strokeStyle = ink;
       ctx.lineWidth = 2;
       ctx.lineCap = ctx.lineJoin = "round";
-      for (const path of icon.paths)
-        if (icon.filled) ctx.fill(path);
-        else ctx.stroke(path);
+      for (const { path, opacity } of icon.paths) {
+        ctx.globalAlpha = opacity;
+        ctx.fill(path);
+      }
+      ctx.globalAlpha = 1;
       ctx.restore();
     });
     ctx.restore();
@@ -285,7 +287,7 @@ export function createSceneRenderer(ctx, view) {
   // and (as chosen) velocity and net-force arrows.
   // Options: dark, width, height (CSS px), grid, vectors, forceVectors,
   // highlighted(id), selected, forceOf(id) → {x, y} N, forceScale (px/N),
-  // iconSet, angleUnit.
+  // iconWeight, angleUnit.
   function drawScene(sim, options) {
     const o = {
         grid: true,
@@ -295,7 +297,7 @@ export function createSceneRenderer(ctx, view) {
         selected: null,
         forceOf: (id) => sim.netForce(id),
         forceScale: 4,
-        iconSet: "material",
+        iconWeight: "regular",
         angleUnit: "degrees",
         ...options,
       },
@@ -500,7 +502,7 @@ export function createSceneRenderer(ctx, view) {
           (body.shape === "ball"
             ? body.radius
             : Math.min(body.width, body.height) / 2) * view.scale,
-          o.iconSet,
+          o.iconWeight,
         );
       if (o.vectors) {
         const speed = Math.hypot(s.vx, s.vy);

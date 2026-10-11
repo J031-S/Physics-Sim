@@ -101,7 +101,8 @@ for (const page of shellPages) {
       (a) => a.getAttribute("href") === "https://github.com/J031-S/Physics-Sim",
     );
     assert.equal(github.length, 2, "GitHub link at the top and in the footer");
-    for (const a of github) assert.ok(a.querySelector("svg"), "GitHub mark");
+    for (const a of github)
+      assert.equal(a.dataset.icon, "github", "GitHub icon");
     // Every simulation and the minitool catalogue one click away.
     const hrefs = [...doc.querySelectorAll("main a")].map((a) =>
       a.getAttribute("href"),
@@ -148,8 +149,10 @@ for (const page of shellPages) {
     doc.getElementById("developer-settings").nextElementSibling,
     doc.getElementById("ui-developer").parentElement,
   );
-  const sets = [...doc.getElementById("ui-icons").options].map((o) => o.value);
-  assert.ok(sets.length >= 8, "eight icon sets");
+  const weights = [...doc.getElementById("ui-icons").options].map(
+    (o) => o.value,
+  );
+  assert.equal(weights.length, 6, "six Phosphor weights");
 }
 
 // Lookups the 404 page redirects: case, ".html", trailing slash, old names.

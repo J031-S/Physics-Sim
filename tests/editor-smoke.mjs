@@ -775,7 +775,7 @@ $("close-menu").click();
 $("settings-toggle").click();
 const wedgeButton = document.querySelector('[data-tool="wedge"]');
 const initialIcon = wedgeButton.querySelector("svg").innerHTML;
-// The icon set is a developer option: hidden until developer mode is on.
+// The icon weight is a developer option: hidden until developer mode is on.
 assert.equal($("ui-icons"), null);
 const tick = (node, on) => {
   node.checked = on;
@@ -783,32 +783,39 @@ const tick = (node, on) => {
 };
 tick($("ui-developer"), true);
 assert.ok($("developer-settings"), "developer group shown");
-const iconSets = [...$("ui-icons").options].map((o) => o.value);
-assert.ok(iconSets.length >= 8, "at least eight icon sets");
-for (const name of [...iconSets.slice(1), "material"]) {
+const weights = [...$("ui-icons").options].map((o) => o.value);
+assert.deepEqual(weights, [
+  "thin",
+  "light",
+  "regular",
+  "bold",
+  "fill",
+  "duotone",
+]);
+for (const name of [...weights.filter((w) => w !== "regular"), "regular"]) {
   change($("ui-icons"), name);
-  assert.equal(wedgeButton.dataset.iconSet, name);
+  assert.equal(wedgeButton.dataset.iconWeight, name);
   assert.equal(wedgeButton.textContent, "Wedge");
   assert.equal($("pause").textContent, "Run");
   assert.ok($("pause").querySelector("svg"));
   const stored = JSON.parse(window.localStorage.getItem("physium-schemes"));
   assert.equal(
-    stored.current.values["icon-set"],
-    name === "material" ? undefined : name,
+    stored.current.values["icon-weight"],
+    name === "regular" ? undefined : name,
   );
   for (const button of document.querySelectorAll("[data-icon]"))
     assert.ok(
       button.querySelector("svg"),
       "missing icon " + button.dataset.icon,
     );
-  if (name !== "material")
+  if (name !== "regular")
     assert.notEqual(wedgeButton.querySelector("svg").innerHTML, initialIcon);
 }
 // With developer mode off the site is back to its defaults.
-change($("ui-icons"), "feather");
+change($("ui-icons"), "bold");
 tick($("ui-developer"), false);
 assert.equal($("developer-settings"), null);
-assert.equal(wedgeButton.dataset.iconSet, "material");
+assert.equal(wedgeButton.dataset.iconWeight, "regular");
 assert.equal(wedgeButton.querySelector("svg").innerHTML, initialIcon);
 $("close-settings").click();
 key(" ");

@@ -9,7 +9,7 @@ import { colourValue, setOverrides, value } from "./theme.js";
 import { checkScheme, emptyScheme, isDefault } from "./scheme.js";
 import { fontStack, surfaceCss } from "./surface.js";
 import { failedEquations, onFrame } from "./dev-hooks.js";
-import { iconSetNames } from "./icons.js";
+import { iconWeights } from "./icons.js";
 
 const root = new URL("../../", import.meta.url);
 export const DEV_KEY = "physium-developer";
@@ -19,17 +19,6 @@ const forget = (key) => {
   try {
     window.localStorage.removeItem(key);
   } catch {}
-};
-
-const ICON_LABELS = {
-  material: "Material Rounded",
-  lucide: "Lucide",
-  tabler: "Tabler",
-  phosphor: "Phosphor",
-  heroicons: "Heroicons",
-  feather: "Feather",
-  bootstrap: "Bootstrap Icons",
-  remix: "Remix Icon",
 };
 
 const read = (key, fallback) => {
@@ -129,7 +118,7 @@ function applyToPage(scheme) {
       document.fonts?.load?.(`16px ${fontStack(value("font-canvas"))}`);
   }
   if (prefs) {
-    prefs.iconSet = scheme ? value("icon-set") : "material";
+    prefs.iconWeight = scheme ? value("icon-weight") : "regular";
     prefs.refresh();
   }
   window.dispatchEvent(new window.Event("physium-scheme"));
@@ -225,7 +214,7 @@ const GROUP = `<summary>Developer</summary>
     <select id="dev-scheme"></select>
   </label>
   <label class="select-row"
-    >Icon set
+    >Icon weight
     <select id="ui-icons"></select>
   </label>
   <fieldset class="dev-set">
@@ -346,13 +335,13 @@ function buildGroup() {
   $("dev-gallery").href = new URL("dev/gallery", root).href;
   const icons = $("ui-icons");
   icons.replaceChildren(
-    ...iconSetNames.map((n) => option(ICON_LABELS[n] ?? n, n)),
+    ...iconWeights.map((n) => option(n[0].toUpperCase() + n.slice(1), n)),
   );
-  icons.value = value("icon-set");
+  icons.value = value("icon-weight");
   icons.addEventListener("change", () =>
     setScheme({
       ...store.current,
-      values: { ...store.current.values, "icon-set": icons.value },
+      values: { ...store.current.values, "icon-weight": icons.value },
     }),
   );
   fillSchemes();
@@ -362,7 +351,7 @@ function buildGroup() {
   });
   window.addEventListener("physium-scheme-edit", () => {
     fillSchemes();
-    if ($("ui-icons")) $("ui-icons").value = value("icon-set");
+    if ($("ui-icons")) $("ui-icons").value = value("icon-weight");
   });
   $("dev-tweaker").addEventListener("click", openTweaker);
 

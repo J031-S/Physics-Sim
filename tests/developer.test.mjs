@@ -21,7 +21,7 @@ import {
 } from "../src/site/scheme.js";
 import { fontFaces, surfaceCss } from "../src/site/surface.js";
 import { canvasFont } from "../src/site/canvas-style.js";
-import { iconSetNames } from "../src/site/icons.js";
+import { iconWeights } from "../src/site/icons.js";
 
 const root = new URL("../", import.meta.url);
 const defaults = Object.fromEntries(
@@ -64,10 +64,10 @@ test("schemes are checked strictly and drop default values", () => {
     name: "Mine",
     light: { ink: "#354438", line: "#ABCDEF" },
     dark: {},
-    values: { "border-width": 1, "icon-set": "feather" },
+    values: { "border-width": 1, "icon-weight": "bold" },
   });
   assert.deepEqual(ok.light, { line: "#abcdef" });
-  assert.deepEqual(ok.values, { "icon-set": "feather" });
+  assert.deepEqual(ok.values, { "icon-weight": "bold" });
   assert.ok(isDefault(emptyScheme()));
   const bad = (scheme, pattern) =>
     assert.throws(
@@ -89,10 +89,10 @@ test("every choice's default is one of its options", () => {
   for (const t of CHOICES) assert.ok(optionsOf(t).includes(t.value), t.name);
   for (const t of SIZES)
     assert.ok(t.value >= t.min && t.value <= t.max, t.name);
-  // The icon-set choice lists exactly the bundled sets.
+  // The icon-weight choice lists exactly the bundled weights.
   assert.deepEqual(
-    optionsOf(CHOICES.find((t) => t.name === "icon-set")),
-    iconSetNames,
+    optionsOf(CHOICES.find((t) => t.name === "icon-weight")),
+    iconWeights,
   );
 });
 

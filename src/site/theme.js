@@ -1130,12 +1130,13 @@ export const SIZES = [
   {
     name: "icon-stroke",
     group: "Icons",
-    unit: "px",
+    unit: "%",
     value: 0,
     min: 0,
-    max: 3,
-    step: 0.25,
-    description: "Stroke weight of outline icon sets (0 keeps each set's own)",
+    max: 8,
+    step: 0.5,
+    description:
+      "Extra outline round every icon shape, as a share of the icon's size (on top of the weight)",
   },
   {
     name: "canvas-line",
@@ -1466,20 +1467,11 @@ export const CHOICES = [
     description: "Grid lines on the canvas",
   },
   {
-    name: "icon-set",
+    name: "icon-weight",
     group: "Icons",
-    value: "material",
-    options: [
-      "material",
-      "lucide",
-      "tabler",
-      "phosphor",
-      "heroicons",
-      "feather",
-      "bootstrap",
-      "remix",
-    ],
-    description: "Interface icon set",
+    value: "regular",
+    options: ["thin", "light", "regular", "bold", "fill", "duotone"],
+    description: "Phosphor icon weight",
   },
   {
     name: "font-ui",

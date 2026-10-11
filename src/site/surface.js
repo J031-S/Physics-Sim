@@ -349,10 +349,17 @@ export function surfaceCss(get, { colours, fontRoot }) {
   // Icons.
   if (changed("icon-size"))
     rule(".ui-icon", imp([`zoom: ${get("icon-size") / 100}`]));
+  // Phosphor icons are filled shapes, so a stroke round each one thickens
+  // it; the icons are 256 units across.
   if (changed("icon-stroke"))
     rule(
-      '.ui-icon [stroke-width], .ui-icon [stroke="currentColor"], .ui-icon g[stroke]',
-      imp([`stroke-width: ${get("icon-stroke")}`]),
+      ".ui-icon path",
+      imp([
+        "stroke: currentColor",
+        `stroke-width: ${(get("icon-stroke") * 2.56).toFixed(2)}`,
+        "stroke-linejoin: round",
+        "paint-order: stroke",
+      ]),
     );
 
   return [...fontFaces(used, fontRoot), ...rules].join("\n");

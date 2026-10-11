@@ -5,22 +5,21 @@ import { setupSite, setupSettingsPanel, pageUrl } from "./shell.js";
 import { $ } from "./dom.js";
 import { pages } from "./pages.js";
 import { renderAllMath } from "./math.js";
-import { iconSets } from "../../vendor/icons/sets.js";
+import { renderIcons } from "./icons.js";
 import { toolById } from "../minitools/catalogue.js";
 import { toolCard } from "../minitools/card.js";
 
-setupSite();
+const prefs = setupSite();
 setupSettingsPanel();
 
 const copy = JSON.parse($("home-copy").textContent);
 for (const el of document.querySelectorAll("[data-copy]"))
   el.textContent = copy[el.dataset.copy] ?? "";
 
-// The GitHub mark (from the bundled Bootstrap Icons) whatever icon set the
-// interface uses.
-const mark = iconSets.bootstrap.github;
-for (const el of document.querySelectorAll("[data-github]"))
-  el.outerHTML = `<svg class="home-github-mark" viewBox="0 0 ${mark.width} ${mark.height}" aria-hidden="true" focusable="false">${mark.body}</svg>`;
+// The GitHub links carry the GitHub icon, drawn like every other icon.
+for (const el of document.querySelectorAll("[data-copy-label]"))
+  el.dataset.iconLabel = copy[el.dataset.copyLabel] ?? "";
+renderIcons(prefs.iconWeight);
 
 const sims = document.querySelector(".home-sims");
 for (const page of pages.filter((p) => p.group === "simulation")) {

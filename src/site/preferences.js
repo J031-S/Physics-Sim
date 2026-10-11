@@ -16,9 +16,9 @@ export function setupPreferences($) {
   if (!saved || typeof saved !== "object") saved = {};
   prepareIcons();
   const prefs = {
-    // The icon set belongs to developer schemes (developer.js), which set
-    // it after loading; without developer mode it is always Material.
-    iconSet: "material",
+    // The icon weight belongs to developer schemes (developer.js), which
+    // set it after loading; without developer mode it is Phosphor regular.
+    iconWeight: "regular",
     theme: ["light", "dark", "system"].includes(saved.theme)
       ? saved.theme
       : "light",
@@ -37,9 +37,9 @@ export function setupPreferences($) {
           : "light"
         : prefs.theme;
     document.documentElement.style.setProperty("--ui-scale", prefs.size / 100);
-    // The icon-set control exists only in developer mode.
-    if ($("ui-icons")) $("ui-icons").value = prefs.iconSet;
-    renderIcons(prefs.iconSet);
+    // The icon-weight control exists only in developer mode.
+    if ($("ui-icons")) $("ui-icons").value = prefs.iconWeight;
+    renderIcons(prefs.iconWeight);
     $("ui-theme").value = prefs.theme;
     $("ui-size").value = prefs.size;
     $("ui-size-value").textContent = prefs.size + "%";
@@ -53,7 +53,7 @@ export function setupPreferences($) {
       );
     } catch {}
   };
-  // For the developer options: apply after changing prefs.iconSet.
+  // For the developer options: apply after changing prefs.iconWeight.
   Object.defineProperty(prefs, "refresh", { value: apply });
   $("ui-theme").onchange = (e) => {
     prefs.theme = e.target.value;

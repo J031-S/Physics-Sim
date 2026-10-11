@@ -92,7 +92,7 @@ function chooseTool(next) {
       ? `${group.dataset.label}: ${current.dataset.iconLabel} active`
       : group.dataset.label;
   }
-  renderIcons(prefs.iconSet);
+  renderIcons(prefs.iconWeight);
   // One hint per tool, shown in the tool-options strip under the toolbar.
   $("tool-help").textContent = {
     select:
@@ -1327,7 +1327,7 @@ function setRunning(next) {
   }
   running = next;
   accumulator = 0;
-  setPlaybackIcon(running, prefs.iconSet);
+  setPlaybackIcon(running, prefs.iconWeight);
   $("step").disabled = running;
 }
 // One fixed 1/120 s step while paused.
@@ -2350,7 +2350,7 @@ function draw() {
     selected,
     forceOf: averageForce,
     forceScale: forceScale(),
-    iconSet: prefs.iconSet,
+    iconWeight: prefs.iconWeight,
     angleUnit: prefs.angleUnit,
   });
   if (sim.grab) {

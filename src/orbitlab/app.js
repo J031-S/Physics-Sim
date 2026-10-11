@@ -293,7 +293,7 @@ function setRunning(on) {
   state.running = on;
   state.achieved = state.warp;
   last = 0;
-  setPlaybackIcon(on, prefs.iconSet);
+  setPlaybackIcon(on, prefs.iconWeight);
   $("pause").title = on ? "Pause (Space)" : "Run (Space)";
 }
 function toggleRunning() {

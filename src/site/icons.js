@@ -1,7 +1,8 @@
 import { iconSets } from "../../vendor/icons/sets.js";
-export const iconSetNames = Object.keys(iconSets);
-export function renderIcons(set = "material") {
-  const icons = iconSets[set] || iconSets.material;
+// Phosphor's six weights, lightest first.
+export const iconWeights = Object.keys(iconSets);
+export function renderIcons(weight = "regular") {
+  const icons = iconSets[weight] || iconSets.regular;
   for (const button of document.querySelectorAll("[data-icon]")) {
     const icon = icons[button.dataset.icon];
     if (!icon) continue;
@@ -15,7 +16,7 @@ export function renderIcons(set = "material") {
     label.textContent = button.dataset.iconLabel;
     if (button.dataset.iconOnly === "true") label.classList.add("sr-only");
     button.replaceChildren(svg, label);
-    button.dataset.iconSet = set;
+    button.dataset.iconWeight = weight;
   }
 }
 export function prepareIcons() {
@@ -60,27 +61,33 @@ export function prepareIcons() {
     if (only) button.dataset.iconOnly = "true";
   }
 }
-export function setPlaybackIcon(running, set) {
+export function setPlaybackIcon(running, weight) {
   const button = document.getElementById("pause");
   button.dataset.icon = running ? "pause" : "play";
   button.dataset.iconLabel = running ? "Pause" : "Run";
-  renderIcons(set);
+  renderIcons(weight);
 }
-// Canvas version of an icon: its SVG path data as Path2D objects, filled for
-// sets drawn with fill (Material) and stroked at width 2 for outline sets.
+// Canvas version of an icon: its SVG paths as Path2D objects, each with its
+// opacity (duotone icons have a faint layer).
 const canvasIcons = new Map();
-export function canvasIcon(set, name) {
-  const key = set + ":" + name;
+export function canvasIcon(weight, name) {
+  const key = weight + ":" + name;
   if (!canvasIcons.has(key)) {
-    const icon = (iconSets[set] || iconSets.material)[name];
+    const icon = (iconSets[weight] || iconSets.regular)[name];
     canvasIcons.set(
       key,
       icon && typeof Path2D === "function"
         ? {
-            paths: [...icon.body.matchAll(/\sd="([^"]+)"/g)].map(
-              (m) => new Path2D(m[1]),
-            ),
-            filled: /fill="currentColor"/.test(icon.body),
+            paths: [
+              ...icon.body.matchAll(/<path([^>]*)\sd="([^"]+)"([^>]*)>/g),
+            ].map((m) => {
+              const opacity = /opacity="([\d.]+)"/.exec(m[1] + m[3]);
+              return {
+                path: new Path2D(m[2]),
+                opacity: opacity ? Number(opacity[1]) : 1,
+              };
+            }),
+            filled: true,
             size: icon.width,
           }
         : null,

@@ -70,10 +70,11 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
-.home-github-mark {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
+.home-button .ui-icon,
+.home-github .ui-icon {
+  width: 1.4em;
+  height: 1.4em;
+  flex: 0 0 1.4em;
 }
 .home-section {
   padding: 24px 0;
@@ -137,6 +138,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  vertical-align: middle;
 }
 .home-credits {
   font-size: 12px;

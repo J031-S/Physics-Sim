@@ -1,40 +1,4 @@
-Material Symbols — @iconify-json/material-symbols 1.2.94
-Apache 2.0 — https://github.com/google/material-design-icons/blob/master/LICENSE
-Icons bundled via Iconify; selected original SVGs only.
-
-Lucide — @iconify-json/lucide 1.2.140
-ISC — https://github.com/lucide-icons/lucide/blob/main/LICENSE
-Icons bundled via Iconify; selected original SVGs only.
-
-Tabler Icons — @iconify-json/tabler 1.2.41
-MIT — https://github.com/tabler/tabler-icons/blob/master/LICENSE
-Icons bundled via Iconify; selected original SVGs only.
-
-Phosphor Icons (regular weight) — @iconify-json/ph 1.2.2 (Phosphor 2.1.1)
-MIT — https://github.com/phosphor-icons/core/blob/main/LICENSE
-Icons bundled via Iconify; selected original SVGs only.
-
-Heroicons (24 px outline) — @iconify-json/heroicons 1.2.3 (Heroicons 2.2.0)
-MIT — https://github.com/tailwindlabs/heroicons/blob/master/LICENSE
-Icons bundled via Iconify; selected original SVGs only.
-
-Feather — @iconify-json/feather 1.2.1
-MIT — https://github.com/feathericons/feather/blob/main/LICENSE
-Icons bundled via Iconify; selected original SVGs only.
-
-Bootstrap Icons — @iconify-json/bi 1.2.7 (Bootstrap Icons 1.13.1)
-MIT — https://github.com/twbs/icons/blob/main/LICENSE
-Icons bundled via Iconify; selected original SVGs only.
-
-Remix Icon — @iconify-json/ri 1.2.10 (Remix Icon 4.8.0)
-Apache 2.0 — https://github.com/Remix-Design/RemixIcon/blob/v4.8.0/License
-(the licence of the 4.8.0 release bundled here; later Remix releases use a
-different licence). Icons bundled via Iconify; selected original SVGs only.
-
-Closest matches: a set with no glyph for a name uses the nearest one —
-Material and Heroicons have no GitHub mark (a code glyph is used);
-Heroicons has no circle, triangle, wave, magnet or keyboard (stop-circle,
-exclamation-triangle, signal, speaker-wave and command-line are used);
-Feather has no spring, infinity, magnet or flask (activity, link-2, radio
-and box); Remix 4.8.0 has no magnet (sensor-line); Bootstrap has no flask
-(eyedropper).
+Phosphor Icons 2.1.1 — @iconify-json/ph 1.2.2
+MIT — https://github.com/phosphor-icons/core/blob/main/LICENSE (phosphor-LICENSE.txt)
+Icons bundled via Iconify; the original SVGs of the icons the site uses, in
+each of Phosphor's six weights (thin, light, regular, bold, fill, duotone).
