@@ -12,7 +12,7 @@ npm start
 
 Open http://localhost:3000. Running the app needs no package installation or build step. The bundled Matter.js 0.20.0 engine includes its MIT licence. Any ordinary static server also works; opening via `file://` does not.
 
-The site has three tools. The drop-down at the left of the top bar switches between them: the **Mechanics sandbox** (`index.html`, described first below), **Electric & magnetic fields** (`fields.html`) and **Orbits & gravitation** (`orbits.html`), each of the last two described in its own section.
+The site has four tools. The drop-down at the left of the top bar switches between them: the **Mechanics sandbox** (`index.html`, described first below), **Electric & magnetic fields** (`fields.html`), **Orbits & gravitation** (`orbits.html`) and **Electric circuits** (`circuits.html`), each of the last three described in its own section.
 
 ## Controls
 
@@ -321,6 +321,99 @@ The motion itself is integrated numerically, in SI units, with `G = 6.674 × 10�
 - **"Circular" is a label** for eccentricity below 0.001, and "parabolic" for total energy that is zero to rounding. Typing the escape speed to four figures gives a very long ellipse or a hyperbola, correctly; **Use** gives the parabola.
 - **An escaping satellite is followed out to 200 launch radii** and then left. The graphs keep the most recent few orbits.
 
+## Electric circuits tool
+
+A separate page for building DC circuits and reading the current, potential difference and power anywhere in them, with capacitors that charge and discharge in time. It is meant for checking a calculation: every reading is the exact solution of Kirchhoff's laws for ideal components, shown to four significant figures. Open it from the drop-down at the left of the top bar.
+
+The **DC** button at the left of the toolbar is the page's view. There is one so far; an AC view (AC source, inductors, RMS meters) is planned to sit beside it, switched the way the fields tool switches between Electric and Magnetic.
+
+### Building a circuit
+
+- **Place a component**: click it in the toolbar (or press its number key), then click the grid; or drag it straight out of the toolbar onto the grid. Everything snaps to the grid. `R` turns the component before it is placed. The tool then returns to **Grab**.
+- **Wire it up**: drag from any terminal to wherever the wire should end. If the two points are not in line the wire is drawn with one corner, along the direction you set off in; hold Shift for a single straight wire. The **Wire** tool (`W`) starts a wire from any grid point and stays on until Esc or `G`.
+- **Junctions**: ends that share a grid point are joined. A wire that ends part-way along another wire joins it there (the other wire is cut at that point). A filled dot marks three or more ends meeting; a small open ring marks an end joined to nothing.
+- **Put a meter in series**: drop a component onto a wire and the wire is cut and the component inserted.
+- **Move**: drag a component and the wires on its terminals stretch to follow. Arrow keys move the selected component one square. A selected wire has a handle at each end.
+- **Turn**: `R` (or the button in the panel) turns the selected component a quarter-turn about its centre. The wires stay put, so one quarter-turn takes it off them and a second puts it back the other way round: that is how to reverse a cell or a meter.
+- **Delete**: `Delete`. **Clear scene** removes everything.
+- **View**: drag empty space to pan (or use Pan, `H`), scroll or `+` / `−` to zoom, **Fit scene** (`F`).
+
+### Components
+
+| Component | What it is | Values |
+| --- | --- | --- |
+| Cell | An EMF `E` in series with an internal resistance `r`. The long plate, marked +, is the positive terminal. | `E` up to 1000 V; `r` from 0 (ideal, the default) to 1 MΩ |
+| Resistor | Obeys `V = IR` exactly. | 0 to 1 GΩ (0 Ω behaves as a wire) |
+| Variable resistor | A resistor with a slider from 0 to its maximum. | maximum up to 1 GΩ |
+| Lamp | A fixed resistance. Its glow is drawn from its power as a fraction of its rated power. | 0.01 Ω to 1 MΩ; rated power 1 mW to 10 kW |
+| Switch | Open: no current at all. Closed: no resistance at all. Click it to work it, also while running. | |
+| Two-way switch | Joins its common contact to one of two others; click it to change over. | |
+| Capacitor | `Q = CV`. Uncharged to begin with unless given a **starting p.d.** The plate marked + is the one the p.d. is measured from. | 1 pF to 100 F; starting p.d. up to ±1000 V |
+| Ammeter | Ideal: zero resistance. Goes in series. | |
+| Voltmeter | Ideal: infinite resistance, takes no current. Goes in parallel. | |
+| Wire | Ideal: zero resistance, so no p.d. along it. | |
+
+Click a component to see and change its values. The number box is in the unit shown beside it; choosing another unit (Ω, kΩ, MΩ; pF to F) re-expresses the number without changing the value. A value outside its range is refused with a message and nothing changes.
+
+### Readings
+
+- **Meters** show their reading beside them on the circuit, and all of them are listed in the **Meters** panel. A meter has a + terminal: an ammeter reads positive when conventional current enters by it, a voltmeter when it is at the higher potential. Turn a meter round and the sign changes.
+- **Any selected component** shows its current (with an arrow for the direction of conventional current on the screen), the p.d. across it, its power, and the potential at each end. A cell also shows its EMF, terminal p.d. `V = E − Ir`, the power it delivers `VI`, the power lost inside it `I²r`, and the energy it has supplied since the last reset. A resistor or lamp shows the energy it has dissipated. A capacitor shows its charge `Q = CV`, stored energy `½CV²` and time constant.
+- **Potentials** are measured from the negative terminal of the first cell in each separate section of the circuit, which is that section's 0 V. (A section with no cell takes one of its own nodes as 0 V.)
+- A reading of **–** means there is no value to give: the component is in a short-circuited loop, or a voltmeter joins two sections that are not connected to each other.
+- Readings are live whether or not the clock is running. In a circuit with no capacitor nothing depends on time, so there is no need to press Run to read it.
+
+### Running it
+
+- **Run / Pause** (`Space`) starts and stops the clock. The dots move, capacitors charge and discharge, and the graphs are drawn, only while it runs.
+- **Step** (`.`) advances one frame of simulated time while paused: the time scale × 1/60 s.
+- **Reset** (`0`) sets the clock to zero, returns every capacitor to its starting p.d. and clears the energy totals and graphs. The circuit is kept.
+- **Time scale** (`[` and `]`): simulated seconds per real second, from 0.001× to 60×, for time constants from milliseconds to minutes. If a scale asks for more steps than the computer can do in a frame, the simulation runs slower than asked, and says so beside the clock, rather than taking longer steps.
+- **Graphs against time** plot the p.d. across the selected component and the current through it since the last reset. The graphs stay on the last component selected when you click a switch or a wire, so a capacitor's curve carries on through a change-over. A dashed line marks one **time constant τ** after the last change to the circuit (a switch worked, a value edited, or the reset): in one τ a charging p.d. covers 63% of the way to its final value and a discharging one falls to 37%. If the circuit has more than one time constant its curves are sums of exponentials; the panel lists them and marks none.
+- Switches can be worked, values changed and wires moved while it runs. The charge on every capacitor is kept through any such change.
+
+### Display
+
+- **Current** (`C`): dots along every wire and lead that carries current. Their speed is proportional to the current: at any moment the fastest dots are on the branch with the most current, and as a capacitor charges they slow in step with it. The speed is scaled to the largest current seen since the last reset, so that milliamps and amps are both visible.
+- **Electron flow** (`E`): the same dots moving the way the electrons do, from the − terminal round to the +. Readings and arrows stay conventional.
+- **Colour by potential** (`P`): each wire and lead is coloured from blue (lowest potential in the circuit) to red (highest). Everything joined by plain wire is one colour; the colour changes only across a component.
+- **Values** (`V`): names and values beside the components, and the meter readings.
+
+### Presets
+
+**Presets** loads a ready-made circuit, paused at t = 0, and says what to check: resistors in series (1.00 A; 4.00 V and 8.00 V), resistors in parallel (3.00 A + 1.00 A = 4.00 A), a potential divider with a variable resistor (4.00 V), a cell with internal resistance (2.00 A, terminal p.d. 10.0 V, and 12.0 V with the switch open), a balanced Wheatstone bridge (exactly 0 through the bridge), and a capacitor charged and discharged through 10 kΩ by a two-way switch (τ = 1.00 s; 6.32 V after 1 s).
+
+### How the circuit is solved
+
+The circuit is solved by **modified nodal analysis**, in SI units. The unknowns are the potential of every node (every set of terminals joined at a point), and the current through every element that fixes a p.d. instead of obeying `I = V/R`: each cell, wire, ammeter and closed switch. The equations are Kirchhoff's current law at every node, and for each of those elements its own law (`V₊ − V₋ = E − Ir` for a cell, `V_a − V_b = 0` for a wire). They are solved exactly, by Gaussian elimination with partial pivoting. Nothing is approximated by a very small or very large resistance, so adding an ammeter in series or a voltmeter in parallel changes no reading anywhere.
+
+Each separate section of the circuit gets its own zero of potential, so a part that is not connected to the rest still solves.
+
+**Capacitors** are stepped in time with the trapezoidal rule. The step is fixed for a given circuit, at 1/100 of its shortest time constant, and does not depend on the frame rate; the time constants are found from the circuit itself (they are printed for a selected capacitor, and the step is shown at the bottom of the page). At a time scale where a step would be longer than half a frame it is halved until it is not, to keep slow circuits smooth. With that step a charging curve is within about 0.001% of `V₀(1 − e^(−t/RC))`. Energy is accounted for step by step, so the energy supplied by the cells equals the energy stored plus the energy dissipated to rounding.
+
+The first instant matters as much as the curve: at t = 0, and immediately after any switch is worked, the circuit is solved with each capacitor holding its present p.d., which gives the starting current exactly (`V/R` for an uncharged capacitor).
+
+### Faults and special cases
+
+- **Short circuit.** A cell with no internal resistance whose terminals are joined by wire has no current that satisfies its equations. A red banner says so and names the cell, the loop is drawn in red, and every reading in that section shows – rather than a number. Other, separate circuits on the page carry on. Give the cell an internal resistance and the current becomes `E/r`; the banner stays, because it is still a short circuit.
+- **Ideal cells that disagree.** Two cells with no internal resistance and different EMFs joined in parallel are reported the same way, naming both.
+- **Open circuit.** A break is a valid circuit: no current flows, the whole EMF appears across the gap, and a note says which cell has no complete path.
+- **Parallel wires.** If two plain wires (or ammeters, or closed switches) join the same two points, the circuit fixes their total current but not how it divides. It is shared as identical conductors would share it, equally, and a note says so. Every other reading is unaffected.
+- **Capacitors joined by plain wire.** Capacitors in parallel share a charging current in proportion to their capacitance. If a switch joins two capacitors at different p.d.s, or a capacitor straight across an ideal cell, with no resistance in the loop, the charge moves in no time: the new p.d.s follow from conservation of charge (two 100 µF capacitors in series across 10 V go at once to 5 V and 500 µC each), a message says it has happened, and there is no curve to plot. The energy that a real circuit would lose in the wires and the spark is simply gone from the totals.
+- **Very small readings.** A current or p.d. smaller than the rounding error of the arithmetic (about 10⁻¹⁵ of the largest p.d. in that section) is shown as exactly 0. A balanced bridge therefore reads 0 A, not 10⁻¹⁷ A.
+
+### Where it stops being exact
+
+- **Every component is ideal.** Wires have no resistance, meters do not disturb the circuit, switches are perfect. Real meters and leads are not.
+- **A lamp is a fixed resistance.** A real filament's resistance rises several-fold as it heats, so a real lamp's current is not proportional to its p.d. Here it is. A lamp above its rated power is drawn fully bright and does not blow.
+- **A cell is a fixed EMF and a fixed internal resistance.** It never runs down, and it can be driven backwards (charged) without complaint.
+- **Nothing overheats, sparks or breaks down**, whatever the current, p.d. or power.
+- **Capacitors do not leak** and have no resistance of their own: an isolated charged capacitor holds its charge for ever.
+- **Changes are instantaneous.** A switch has no bounce and wires have no inductance, which is why charge can move between capacitors in no time.
+- **DC only, and linear only**, for now: no AC sources, inductors, diodes or other non-ohmic components.
+- **The dots are a picture of the current, not of the charge carriers.** Real electrons drift at a fraction of a millimetre per second, and their speed depends on the wire's thickness as well as on the current.
+- A circuit can hold 400 parts at most. Large circuits with very short time constants run slower than the time scale asks, and say so.
+
 ## Right-click menu
 
 Right-click the **ground** (anywhere at or below y = 0 that is not an object) for the **Floor** menu: **Surface friction μ** and **Restitution e**, both 0–1 (defaults 0.5 and 0). The scene walls share the floor's material. Where two surfaces touch, the contact uses the lower friction and the higher restitution of the two, so a bouncy ball still bounces on a dead floor. The floor material is saved with the scene and reset by Clear scene.
@@ -367,6 +460,8 @@ npm run test:ui
 `tests/fieldlab.test.mjs` checks the fields tool against the textbook: inverse-square and 1/r laws, superposition and null points, E = −∇V and B = curl A, Gauss's and Ampère's laws by numerical integration, σ/ε₀ between plates, μ₀nI inside a solenoid, Coulomb's law, the force between parallel wires and BIℓ, field lines tangent to the field, equal flux between magnetic field lines, test charges (½at² in a uniform field, kinetic energy gained equal to qΔV, fall time between plates), and every number quoted in the presets. `tests/fieldlab-smoke.mjs` drives `fields.html` through its controls and runs with `npm run test:ui`.
 
 `tests/orbitlab.test.mjs` checks the orbits tool against the textbook: surface gravity and escape speed of each preset body, orbital elements recovered from a state vector, the change of orbit type with launch speed, low Earth orbit (7.67 km/s, 92.4 min, radius constant over 100 orbits), the geostationary and Moon's orbits, conservation of energy and angular momentum over 100 orbits at eccentricity 0.7 at the highest time warp, timed periods against `2π√(a³/GM)`, the escape speed (zero energy, no return) and just below it (return), `v∞` on a hyperbola, equal areas in equal times, the integrated path against the predicted conic, independence of frame length and time warp, Newton's cannon (landing point, time of flight from Kepler's equation and landing speed), a vertical launch, other central bodies, validation, and every number quoted in the presets. `tests/orbitlab-smoke.mjs` drives `orbits.html` through its controls and runs with `npm run test:ui`.
+
+`tests/circuitlab.test.mjs` checks the circuits tool against the textbook: series and parallel resistors, a cell with internal resistance, two cells feeding a common resistor, a balanced and an unbalanced Wheatstone bridge, ideal meters changing nothing, power supplied equal to power dissipated, RC charging and discharging (initial current, 6.321 V at 1 s, 9.933 V at 5 s, 3.679 V), energy stored and dissipated (½CV² each), capacitors in series and in parallel, charge kept through a switch and conserved when capacitors are joined, several time constants, steps independent of the frame rate, a time-varying EMF, short circuits, conflicting ideal cells, open circuits and floating sections (no NaN in any of them), the grid (junctions, wires following, insertion into a wire), 400 random circuits, and every reading quoted in the presets. Steady values are held to 1 part in 10⁹ and time-dependent ones to 0.5%. `tests/circuitlab-smoke.mjs` drives `circuits.html` through its controls and runs with `npm run test:ui`.
 
 Belts and pulley cables share iterative position and velocity solving, so one connection no longer overwrites a wheel angle already solved by the other. Guided springs use signed extension to remain continuous when an endpoint crosses its anchor.
 
