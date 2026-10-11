@@ -327,9 +327,9 @@ The motion itself is integrated numerically, in SI units, with `G = 6.674 × 10�
 
 ## Electric circuits tool
 
-A separate page for building DC circuits and reading the current, potential difference and power anywhere in them, with capacitors that charge and discharge in time. It is meant for checking a calculation: every reading is the exact solution of Kirchhoff's laws for ideal components, shown to four significant figures. Open it from the drop-down at the left of the top bar.
+A separate page for building DC and AC circuits and reading the current, potential difference and power anywhere in them, with capacitors and inductors that respond in time. It is meant for checking a calculation: every reading is the exact solution of Kirchhoff's laws for ideal components, shown to four significant figures. Open it from the drop-down at the left of the top bar.
 
-The **DC** button at the left of the toolbar is the page's view. There is one so far; an AC view (AC source, inductors, RMS meters) is planned to sit beside it, switched the way the fields tool switches between Electric and Magnetic.
+The **DC** and **AC** buttons at the left of the toolbar switch between the page's two views, the way the fields tool switches between Electric and Magnetic. Each view keeps its own circuit, time scale and presets, so switching away and back loses nothing. DC has the cell; AC has the AC source in its place, reads its meters as RMS values, turns the graphs into an oscilloscope and adds a phasor diagram (see **The AC view** below). Every other component, the inductor included, is in both.
 
 ### Building a circuit
 
@@ -354,6 +354,8 @@ The **DC** button at the left of the toolbar is the page's view. There is one so
 | Lamp | A fixed resistance. Its glow is drawn from its power as a fraction of its rated power. | 0.01 Ω to 1 MΩ; rated power 1 mW to 10 kW |
 | Switch | Open: no current at all. Closed: no resistance at all. Click it to work it, also while running. | |
 | Two-way switch | Joins its common contact to one of two others; click it to change over. | |
+| AC source (AC view) | An EMF `e = V₀ sin(2πft + φ)`, with an optional internal resistance. Set by its RMS voltage or its peak voltage (`V₀ = √2 × V_rms`; changing one changes the other), frequency and starting phase. The terminal marked + is the one that goes positive first. | up to 1000 V peak; 0.01 Hz to 1 MHz |
+| Inductor | `V = L dI/dt`: it opposes any change in its current. Ideal, with no resistance of its own; starts with no current. | 1 nH to 1000 H |
 | Capacitor | `Q = CV`. Uncharged to begin with unless given a **starting p.d.** The plate marked + is the one the p.d. is measured from. | 1 pF to 100 F; starting p.d. up to ±1000 V |
 | Ammeter | Ideal: zero resistance. Goes in series. | |
 | Voltmeter | Ideal: infinite resistance, takes no current. Goes in parallel. | |
@@ -364,7 +366,7 @@ Click a component to see and change its values. The number box is in the unit sh
 ### Readings
 
 - **Meters** show their reading beside them on the circuit, and all of them are listed in the **Meters** panel. A meter has a + terminal: an ammeter reads positive when conventional current enters by it, a voltmeter when it is at the higher potential. Turn a meter round and the sign changes.
-- **Any selected component** shows its current (with an arrow for the direction of conventional current on the screen), the p.d. across it, its power, and the potential at each end. A cell also shows its EMF, terminal p.d. `V = E − Ir`, the power it delivers `VI`, the power lost inside it `I²r`, and the energy it has supplied since the last reset. A resistor or lamp shows the energy it has dissipated. A capacitor shows its charge `Q = CV`, stored energy `½CV²` and time constant.
+- **Any selected component** (DC view) shows its current (with an arrow for the direction of conventional current on the screen), the p.d. across it, its power, and the potential at each end. A cell also shows its EMF, terminal p.d. `V = E − Ir`, the power it delivers `VI`, the power lost inside it `I²r`, and the energy it has supplied since the last reset. A resistor or lamp shows the energy it has dissipated. A capacitor shows its charge `Q = CV`, stored energy `½CV²` and time constant; an inductor its stored energy `½LI²` and time constant `L/R`.
 - **Potentials** are measured from the negative terminal of the first cell in each separate section of the circuit, which is that section's 0 V. (A section with no cell takes one of its own nodes as 0 V.)
 - A reading of **–** means there is no value to give: the component is in a short-circuited loop, or a voltmeter joins two sections that are not connected to each other.
 - Readings are live whether or not the clock is running. In a circuit with no capacitor nothing depends on time, so there is no need to press Run to read it.
@@ -378,6 +380,15 @@ Click a component to see and change its values. The number box is in the unit sh
 - **Graphs against time** plot the p.d. across the selected component and the current through it since the last reset. The graphs stay on the last component selected when you click a switch or a wire, so a capacitor's curve carries on through a change-over. A dashed line marks one **time constant τ** after the last change to the circuit (a switch worked, a value edited, or the reset): in one τ a charging p.d. covers 63% of the way to its final value and a discharging one falls to 37%. If the circuit has more than one time constant its curves are sums of exponentials; the panel lists them and marks none.
 - Switches can be worked, values changed and wires moved while it runs. The charge on every capacitor is kept through any such change.
 
+### The AC view
+
+- **Meters read RMS.** An ammeter or voltmeter shows the RMS value over the last whole cycle of the source, marked `rms`, so it shows `–` until one cycle has run. For a sine wave RMS is peak/√2; the reading is measured from the waveform, not assumed, so it is also right while a circuit is still settling.
+- **Any selected component** shows its RMS current and p.d., whether its current leads or lags its p.d. and by how many degrees, its impedance `V/I`, its mean power, and the values at this instant. A capacitor or inductor also shows its reactance from the formula, `1/(2πfC)` or `2πfL`, to compare. The source shows the circuit's impedance, the mean power it supplies and the power factor `cos φ`.
+- **Oscilloscope.** The graphs show the last three cycles of the p.d. across the selected component and the current through it, one above the other on the same time axis, so a phase difference shows as one trace peaking before the other.
+- **Phasor diagram.** The p.d. across each component is drawn as an arrow: its length is the RMS p.d. (all to one scale) and its angle is its phase, measured from the source's EMF, anticlockwise for ahead. In a series circuit the arrows for R, L and C add, tip to tail, to the supply's, which is why three voltmeter readings do not simply add up. The dashed arrow marked I shows the direction of the current; its length means nothing, since it is not a p.d.
+- **Time scale.** At 50 Hz a cycle lasts 20 ms, so the AC presets run at 0.02×: one cycle a second. The dots move to and fro with the current.
+- **Switching on.** A circuit starts from rest at t = 0, so the first few cycles can include a transient that then dies away (in a series RLC circuit, with time constant 2L/R). With no resistance at all it never dies away: an ideal inductor switched onto a source at a zero of its EMF carries a current that never reverses, `(V₀/ωL)(1 − cos ωt)`. That is correct, and is why the inductor preset starts its source at its peak.
+
 ### Display
 
 - **Current** (`C`): bright dots, each ringed in the page colour so that it stands out from the wire on both themes, along every wire and lead that carries current. They are evenly spaced along each stretch of the circuit between one junction and the next, where the current is the same all the way along, and they fade in and out at the junctions themselves. Their speed is proportional to the current: at any moment the fastest dots are on the branch with the most current (three times the current, three times the speed), and as a capacitor charges they slow in step with it. The speed is scaled to the largest current seen since the last reset, so that milliamps and amps are both visible.
@@ -387,7 +398,9 @@ Click a component to see and change its values. The number box is in the unit sh
 
 ### Presets
 
-**Presets** loads a ready-made circuit, paused at t = 0, and says what to check: resistors in series (1.00 A; 4.00 V and 8.00 V), resistors in parallel (3.00 A + 1.00 A = 4.00 A), a potential divider with a variable resistor (4.00 V), a cell with internal resistance (2.00 A, terminal p.d. 10.0 V, and 12.0 V with the switch open), a balanced Wheatstone bridge (exactly 0 through the bridge), and a capacitor charged and discharged through 10 kΩ by a two-way switch (τ = 1.00 s; 6.32 V after 1 s).
+**Presets** loads a ready-made circuit, paused at t = 0, and says what to check: resistors in series (1.00 A; 4.00 V and 8.00 V), resistors in parallel (3.00 A + 1.00 A = 4.00 A), a potential divider with a variable resistor (4.00 V), a cell with internal resistance (2.00 A, terminal p.d. 10.0 V, and 12.0 V with the switch open), a balanced Wheatstone bridge (exactly 0 through the bridge), a capacitor charged and discharged through 10 kΩ by a two-way switch (τ = 1.00 s; 6.32 V after 1 s), and an inductor's current growing and decaying through 100 Ω (L/R = 5.00 ms; 63.2 mA after 5 ms).
+
+The AC view has its own, all on 10 V RMS: a resistor (100 mA, in phase, 1.00 W), a capacitor (X_C = 318 Ω, 31.4 mA leading by 90°), an inductor (X_L = 157 Ω, 63.7 mA lagging by 90°), a series RLC circuit at 50 Hz (Z = 190 Ω, 52.7 mA leading by 58.2°; 5.27 V, 8.28 V and 16.8 V across R, L and C), and the same circuit at resonance, 71.18 Hz (Z = R, 100 mA, and 22.4 V across each of L and C).
 
 ### How the circuit is solved
 
@@ -396,6 +409,10 @@ The circuit is solved by **modified nodal analysis**, in SI units. The unknowns 
 Each separate section of the circuit gets its own zero of potential, so a part that is not connected to the rest still solves.
 
 **Capacitors** are stepped in time with the trapezoidal rule. The step is fixed for a given circuit, at 1/100 of its shortest time constant, and does not depend on the frame rate; the time constants are found from the circuit itself (they are printed for a selected capacitor, and the step is shown at the bottom of the page). At a time scale where a step would be longer than half a frame it is halved until it is not, to keep slow circuits smooth. With that step a charging curve is within about 0.001% of `V₀(1 − e^(−t/RC))`. Energy is accounted for step by step, so the energy supplied by the cells equals the energy stored plus the energy dissipated to rounding.
+
+**Inductors** are the capacitor's mirror image and are handled the same way: stepped with the trapezoidal rule, with L/R time constants found from the circuit. Where a capacitor holds its p.d. at an instant, an inductor holds its current. A circuit with both capacitors and inductors can oscillate, so no time constant is reported for it; its step is set from a bound on its natural frequencies, and an LC circuit keeps its total energy `½CV² + ½LI²` to rounding.
+
+**AC** is the same time-stepping, not a separate calculation: the source's EMF is followed through each cycle in at least 400 steps (a whole number of them, more if the circuit's own rates need it). RMS values, mean power and phases are then measured over each whole cycle, as a real meter and oscilloscope would. Against the formulas the RMS readings are within about 0.002% and the phase angles within about 0.0002°.
 
 The first instant matters as much as the curve: at t = 0, and immediately after any switch is worked, the circuit is solved with each capacitor holding its present p.d., which gives the starting current exactly (`V/R` for an uncharged capacitor).
 
@@ -406,6 +423,8 @@ The first instant matters as much as the curve: at t = 0, and immediately after 
 - **Open circuit.** A break is a valid circuit: no current flows, the whole EMF appears across the gap, and a note says which cell has no complete path.
 - **Parallel wires.** If two plain wires (or ammeters, or closed switches) join the same two points, the circuit fixes their total current but not how it divides. It is shared as identical conductors would share it, equally, and a note says so. Every other reading is unaffected.
 - **Capacitors joined by plain wire.** Capacitors in parallel share a charging current in proportion to their capacitance. If a switch joins two capacitors at different p.d.s, or a capacitor straight across an ideal cell, with no resistance in the loop, the charge moves in no time: the new p.d.s follow from conservation of charge (two 100 µF capacitors in series across 10 V go at once to 5 V and 500 µC each), a message says it has happened, and there is no curve to plot. The energy that a real circuit would lose in the wires and the spark is simply gone from the totals.
+- **An inductor's current interrupted.** Opening a switch in series with an inductor that is carrying current leaves that current nowhere to go. It stops at once, a message says so, and the energy `½LI²` is gone from the totals: in a real circuit it makes the spark at the switch. If a switch instead forces two inductors with different currents into series, they take a common current at once by conservation of flux linkage `LI` (0.1 H carrying 100 mA joined to an idle 0.3 H: 25 mA in both). A two-way switch that moves an inductor from one path to another does neither: the current carries on smoothly.
+- **A shorted AC source** is a short circuit at every instant, including the moments its EMF passes through zero.
 - **Very small readings.** A current or p.d. smaller than the rounding error of the arithmetic (about 10⁻¹⁵ of the largest p.d. in that section) is shown as exactly 0. A balanced bridge therefore reads 0 A, not 10⁻¹⁷ A.
 
 ### Where it stops being exact
@@ -416,7 +435,9 @@ The first instant matters as much as the curve: at t = 0, and immediately after 
 - **Nothing overheats, sparks or breaks down**, whatever the current, p.d. or power.
 - **Capacitors do not leak** and have no resistance of their own: an isolated charged capacitor holds its charge for ever.
 - **Changes are instantaneous.** A switch has no bounce and wires have no inductance, which is why charge can move between capacitors in no time.
-- **DC only, and linear only**, for now: no AC sources, inductors, diodes or other non-ohmic components.
+- **Inductors have no resistance and no capacitance of their own**, and do not saturate. A real coil has all three.
+- **AC is a pure sine wave from an ideal source**, and RMS readings are over whole cycles of that source. With two sources of different frequencies the readings are taken over the slower one's cycle and are only approximate.
+- **Linear only**: no diodes, transformers or other non-ohmic components.
 - **The dots are a picture of the current, not of the charge carriers.** Real electrons drift at a fraction of a millimetre per second, and their speed depends on the wire's thickness as well as on the current.
 - A circuit can hold 400 parts at most. Large circuits with very short time constants run slower than the time scale asks, and say so.
 
@@ -471,7 +492,7 @@ npm run test:ui
 
 `tests/orbitlab.test.mjs` checks the orbits tool against the textbook: surface gravity and escape speed of each preset body, orbital elements recovered from a state vector, the change of orbit type with launch speed, low Earth orbit (7.67 km/s, 92.4 min, radius constant over 100 orbits), the geostationary and Moon's orbits, conservation of energy and angular momentum over 100 orbits at eccentricity 0.7 at the highest time warp, timed periods against `2π√(a³/GM)`, the escape speed (zero energy, no return) and just below it (return), `v∞` on a hyperbola, equal areas in equal times, the integrated path against the predicted conic, independence of frame length and time warp, Newton's cannon (landing point, time of flight from Kepler's equation and landing speed), a vertical launch, other central bodies, validation, and every number quoted in the presets. `tests/orbitlab-smoke.mjs` drives `orbits.html` through its controls and runs with `npm run test:ui`.
 
-`tests/circuitlab.test.mjs` checks the circuits tool against the textbook: series and parallel resistors, a cell with internal resistance, two cells feeding a common resistor, a balanced and an unbalanced Wheatstone bridge, ideal meters changing nothing, power supplied equal to power dissipated, RC charging and discharging (initial current, 6.321 V at 1 s, 9.933 V at 5 s, 3.679 V), energy stored and dissipated (½CV² each), capacitors in series and in parallel, charge kept through a switch and conserved when capacitors are joined, several time constants, steps independent of the frame rate, a time-varying EMF, short circuits, conflicting ideal cells, open circuits and floating sections (no NaN in any of them), the grid (junctions, wires following, insertion into a wire), 400 random circuits, and every reading quoted in the presets. Steady values are held to 1 part in 10⁹ and time-dependent ones to 0.5%. `tests/circuitlab-smoke.mjs` drives `circuits.html` through its controls and runs with `npm run test:ui`.
+`tests/circuitlab.test.mjs` checks the circuits tool against the textbook: series and parallel resistors, a cell with internal resistance, two cells feeding a common resistor, a balanced and an unbalanced Wheatstone bridge, ideal meters changing nothing, power supplied equal to power dissipated, RC charging and discharging (initial current, 6.321 V at 1 s, 9.933 V at 5 s, 3.679 V), energy stored and dissipated (½CV² each), capacitors in series and in parallel, charge kept through a switch and conserved when capacitors are joined, several time constants, steps independent of the frame rate, a time-varying EMF, short circuits, conflicting ideal cells, open circuits and floating sections (no NaN in any of them), the grid (junctions, wires following, insertion into a wire), 400 random circuits, and every reading quoted in the presets. Steady values are held to 1 part in 10⁹ and time-dependent ones to 0.5%. It also checks inductors and AC against the textbook: RL growth and decay (`L/R`), inductors in series and in parallel, an interrupted inductor current and flux sharing, an LC oscillation at `1/2π√(LC)` with its energy constant, a resistor, capacitor and inductor alone on AC (`V/R`, `V·2πfC`, `V/2πfL`, and 0°, +90°, −90°), and a series RLC circuit at 50 Hz and at resonance (impedance, phase, the p.d. across each component, `I²R` and `VI cos φ`). `tests/circuitlab-smoke.mjs` drives `circuits.html` through its controls, in both views, and runs with `npm run test:ui`.
 
 Belts and pulley cables share iterative position and velocity solving, so one connection no longer overwrites a wheel angle already solved by the other. Guided springs use signed extension to remain continuous when an endpoint crosses its anchor.
 
