@@ -4,6 +4,7 @@
 // follows the theme tweaker live (developer.js listens for scheme changes
 // made in another frame or tab).
 import { setupSite, setupSettingsPanel } from "./shell.js";
+import { renderAllMath } from "./math.js";
 
 setupSite();
 if (document.body.classList.contains("gallery-pane")) {
@@ -31,6 +32,7 @@ if (document.body.classList.contains("gallery-pane")) {
     menu.classList.add("gallery-static");
     document.querySelector(".gallery-nav").append(menu);
   }
+  renderAllMath();
 } else {
   setupSettingsPanel();
   // The frames load after developer mode (?dev) has been remembered, so they

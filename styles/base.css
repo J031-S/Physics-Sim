@@ -1110,3 +1110,26 @@ body.doc-page {
   font-size: 11px;
   opacity: 0.8;
 }
+/* Typeset equations (src/site/math.js): colour from the equation token,
+   size from the surrounding text. */
+.math .katex {
+  color: var(--equation);
+}
+.math-pending {
+  font-family: ui-monospace, monospace;
+  opacity: 0.55;
+}
+.math-error {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+  color: var(--math-error);
+  border: 1px dashed var(--math-error);
+  border-radius: 4px;
+  padding: 0 4px;
+  white-space: pre-wrap;
+}
+/* Scrolling pages follow the GUI size like the simulation panels do. */
+.doc-main,
+.gallery-sheet {
+  zoom: var(--ui-scale);
+}

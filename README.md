@@ -478,6 +478,7 @@ With it on, a **Developer** group appears at the bottom of the Website section o
 - **Layout aids**: outline every element's box, an 8 px spacing grid, the window size and breakpoint in a corner, and a preview of the page at phone (390 px), tablet (768 px), laptop (1366 px) and projector (1024 px) widths.
 - **Checks**: a performance overlay (frames per second, frame time, the page's own work per frame, and simulation steps per frame where the page knows them; the orbits page reports simulated seconds per frame instead), transitions slowed five times, reduced motion, long labels to find text overflow, minitool ids and verified flags, a sample toast and a sample error, the list of equations that failed to render, and **Save canvas PNG**, named after the page, theme and scheme.
 - **Stored preferences**: show every Physium key stored in this browser as JSON, export it, import it, or clear it.
+- **Equations** are typeset with KaTeX 0.16.22, vendored in `vendor/katex/` (no CDN, so they work offline and on school networks); only pages that show equations load it. An equation that cannot be typeset shows its source in red and is listed under Checks.
 - **Component gallery** (`/dev/gallery`): every shared component in the light and the dark theme side by side, following the theme tweaker live.
 
 What the developer options cannot do: a canvas pattern is drawn behind the canvas by CSS, so **Save canvas PNG** does not include it; preset thumbnails take new colours the next time the presets panel opens.

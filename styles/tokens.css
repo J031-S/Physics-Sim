@@ -135,6 +135,8 @@
   --cl-warning-border: #8e463d;
   --cl-warning-box-shadow: #6b2a2330;
   --on-colour: #ffffff;
+  --equation: #354438;
+  --math-error: #b3261e;
   --pattern-page: #6f7f63;
   --pattern-canvas: #6f7f63;
   --dev-outline: #c2187a;
@@ -277,6 +279,8 @@
   --cl-warning-border: #8e463d;
   --cl-warning-box-shadow: #6b2a2330;
   --on-colour: #ffffff;
+  --equation: #ebe5d6;
+  --math-error: #ff8f7d;
   --pattern-page: #bdb4a2;
   --pattern-canvas: #bdb4a2;
   --dev-outline: #ff6fb0;

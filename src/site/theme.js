@@ -988,6 +988,20 @@ export const COLOURS = [
       "Text on coloured buttons and on toasts (Run, Clear, Delete, toast)",
   },
   {
+    name: "equation",
+    group: "Text",
+    light: "#354438",
+    dark: "#ebe5d6",
+    description: "Typeset equations",
+  },
+  {
+    name: "math-error",
+    group: "Status",
+    light: "#b3261e",
+    dark: "#ff8f7d",
+    description: "An equation that could not be typeset: its source text",
+  },
+  {
     name: "pattern-page",
     group: "Patterns",
     light: "#6f7f63",

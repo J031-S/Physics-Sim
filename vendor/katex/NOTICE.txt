@@ -1,5 +1,12 @@
 KaTeX 0.16.22 — https://katex.org — MIT licence (LICENSE in this folder).
 
+Files kept from the npm package, unmodified: dist/katex.min.js,
+dist/katex.min.css and the twenty .woff2 fonts in dist/fonts. The stylesheet
+also names .woff and .ttf versions of each font; every browser the site
+supports uses the .woff2 listed first, so those are left out. Loaded only by
+src/site/math.js, on pages that show equations; nothing is fetched from a
+CDN.
+
 The Physium logo (assets/logo.svg) is the outline of \varphi (U+03C6) taken
 from KaTeX's KaTeX_Math-Italic font, which is distributed under the same MIT
 licence.
