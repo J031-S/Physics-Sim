@@ -965,3 +965,35 @@ test("arrows do not move when the drawn region is moved", () => {
     near(gap, 0, 2e-3, "same arrow");
   }
 });
+
+test("a strong background field still has evenly spaced lines right across the region", () => {
+  // The lines used to be dealt out from one edge until a fixed number ran
+  // out, so a field over about 150 N/C had none in the middle of the region.
+  const bounds = { minX: -18.5, maxX: 18.5, minY: -16.5, maxY: 16.5 },
+    step = 0.07;
+  for (const E of [5, 40, 200, 1000]) {
+    const lab = new FieldLab();
+    lab.setUniform("electric", { x: E, y: 0 });
+    const lines = electricFieldLines(lab, bounds, { step }),
+      ys = lines.map((l) => l[0][1]).sort((a, b) => a - b),
+      gaps = ys.slice(1).map((y, i) => y - ys[i]);
+    // They reach both the bottom and the top of the region…
+    assert.ok(ys[0] < bounds.minY + 1.5 && ys.at(-1) > bounds.maxY - 1.5, `E=${E}: lines from y = ${ys[0]} to ${ys.at(-1)}`);
+    // …one whole number of flux quanta apart (Δψ = E Δy), never crowded.
+    const quantum = 1e-9 / (EPS0 * 8 * 2);
+    for (const gap of gaps) {
+      const n = (E * gap) / quantum;
+      near(n, Math.round(n), 1e-6, `E=${E}: flux between neighbours, in quanta`);
+      assert.ok(gap >= 3 * step - 1e-9, `E=${E}: lines ${gap} m apart`);
+      near(gap, gaps[0], 1e-9, `E=${E}: even spacing`);
+    }
+    // A charge in the same field has lines in the same proportion: q/ε₀
+    // of flux in three dimensions is drawn as q × linesPerNC lines.
+    const scale = Math.round((E * gaps[0]) / quantum);
+    lab.add("charge", { x: 0, y: 0, charge: 4e-9 });
+    const fromCharge = electricFieldLines(lab, bounds, { step }).filter(
+      (l) => Math.hypot(l[0][0], l[0][1]) < 0.2,
+    ).length;
+    assert.equal(fromCharge, Math.max(1, Math.round(32 / scale)), `E=${E}`);
+  }
+});
