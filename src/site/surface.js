@@ -10,13 +10,14 @@ const defaults = new Map([...SIZES, ...CHOICES].map((t) => [t.name, t.value]));
 
 // Groups of elements that share a token.
 export const PARTS = {
-  buttons: "button",
+  // Buttons, not the card-like ones (presets), which take the card radius.
+  buttons: "button:not(.preset), .button-link",
   inputs:
     'input[type="number"], input[type="text"], input[type="search"], select, textarea',
   panels:
     "#settings-panel, #keys-panel, #presets-panel, #clear-confirm, #material-menu, .nav-menu, .category-menu, .dev-window",
   cards:
-    ".camera-controls, #selection, .edit-tools, .tools, .fl-toolbar, .fl-modes, .fl-hint, .fl-display, .cl-panel, .cl-note, .ol-panel, .tool-settings, .vector-legend, .energy-panel, .card",
+    ".camera-controls, #selection, .edit-tools, .tools, .fl-toolbar, .fl-modes, .fl-hint, .fl-display, .cl-panel, .cl-note, .ol-panel, .tool-settings, .vector-legend, .energy-panel, .card, #preset-list .preset",
   toolbars: ".edit-tools, .tools, .fl-toolbar, .cl-warning",
   canvas: "main canvas:not(.preset-preview)",
   headings: "h1, h2, h3, h4, .brand, summary",
@@ -168,7 +169,7 @@ export function surfaceCss(get, { colours, fontRoot }) {
     );
   // Coloured buttons (Run, Clear, the confirm button) keep their colour.
   const plain =
-    'button:not(.active):not([aria-pressed="true"]):not(#pause):not(#clear):not(.danger)';
+    'button:not(.active):not([aria-pressed="true"]):not(#pause):not(#clear):not(.danger):not(.preset)';
   if (get("button-style") === "outlined")
     rule(plain, imp(["background: transparent", "border-color: var(--line)"]));
   if (get("button-style") === "flat")
@@ -272,22 +273,31 @@ export function surfaceCss(get, { colours, fontRoot }) {
         "background: color-mix(in srgb, var(--panel), var(--accent-text) 14%)",
       ]),
     );
+  // Floating: the top bar is lifted off the page and the page runs up
+  // underneath it, so a simulation's canvas fills the whole window. What
+  // sits at the top of a simulation (toolbars, panels) moves down clear of
+  // the bar; a scrolling page starts below it.
   if (get("header-style") === "floating") {
+    const bar = "calc(var(--header-h) * var(--ui-scale) + 8px)";
     rule(
       "header",
       imp([
-        "position: relative",
-        "z-index: 12",
-        "margin: 6px 8px 0",
+        "position: fixed",
+        "z-index: 40",
+        "top: 8px",
+        "left: 8px",
+        "right: 8px",
         "border: 1px solid var(--line)",
-        "border-radius: 12px",
+        `border-radius: ${px("radius-panel")}`,
         "box-shadow: 0 6px 24px var(--shadow)",
       ]),
     );
+    rule("body:not(.doc-page) main", imp(["height: 100dvh"]));
     rule(
-      "main",
-      imp(["height: calc(100dvh - var(--header-h) * var(--ui-scale) - 6px)"]),
+      "body:not(.doc-page) main > :not(canvas)",
+      imp([`margin-top: ${bar}`]),
     );
+    rule(".doc-page main", imp([`padding-top: calc(${bar} + 8px)`]));
   }
 
   // Patterns: the page behind everything, and the canvas behind the scene

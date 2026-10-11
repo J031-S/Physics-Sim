@@ -207,7 +207,7 @@ function setupSwitch() {
 const GROUP = `<summary>Developer</summary>
   <div class="dev-row">
     <button type="button" id="dev-tweaker">Theme tweaker</button>
-    <a class="dev-link" id="dev-gallery">Component gallery</a>
+    <a class="button-link dev-link" id="dev-gallery">Component gallery</a>
   </div>
   <label class="select-row"
     >Scheme

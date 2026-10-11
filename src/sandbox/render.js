@@ -5,6 +5,7 @@
 // box, impulse and connection previews) and panels stay with the page.
 import { color } from "../site/theme.js";
 import { canvasIcon } from "../site/icons.js";
+import { tidyNumber } from "../site/numbers.js";
 import { drawFields } from "../field-view.js";
 import { GRID } from "../physics.js";
 import {
@@ -489,7 +490,7 @@ export function createSceneRenderer(ctx, view) {
         );
         ctx.font = "bold 11px system-ui";
         ctx.fillText(
-          (body.charge > 0 ? "+" : "") + body.charge + " C",
+          (body.charge > 0 ? "+" : "") + tidyNumber(body.charge, 4) + " C",
           p.x + 12,
           p.y + 20,
         );

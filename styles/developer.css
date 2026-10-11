@@ -18,7 +18,7 @@
   font-size: 11px;
 }
 .dev-link {
-  color: var(--accent-text);
+  padding: 4px 8px;
   font-size: 11px;
 }
 .dev-set {

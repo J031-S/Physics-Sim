@@ -117,7 +117,13 @@ test("changed tokens produce override rules", () => {
     "font-numbers": "plex-mono",
     "header-style": "floating",
   });
-  assert.match(out, /button \{ border-radius: 999px !important; \}/);
+  // Presets are cards, so the button radius leaves them alone.
+  assert.match(
+    out,
+    /button:not\(\.preset\), \.button-link \{ border-radius: 999px !important; \}/,
+  );
+  // A floating header leaves the canvas running up behind it.
+  assert.doesNotMatch(out, /main canvas[^{]*\{[^}]*margin-top/);
   assert.match(out, /box-shadow: none !important/);
   assert.match(out, /appearance: none !important/);
   assert.match(out, /data:image\/svg\+xml/);
@@ -126,7 +132,7 @@ test("changed tokens produce override rules", () => {
     /@font-face \{ font-family: "Physium Inter"; src: url\("\/vendor\/fonts\/inter\.woff2"\)/,
   );
   assert.match(out, /font-variant-numeric: tabular-nums/);
-  assert.match(out, /header \{[^}]*margin: 6px 8px 0/);
+  assert.match(out, /header \{[^}]*position: fixed/);
   // No colour literal: patterns use the pattern tokens.
   assert.doesNotMatch(out.replace(/data:[^")]*/g, ""), /#[0-9a-f]{3,8}\b/i);
 });

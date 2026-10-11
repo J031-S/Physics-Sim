@@ -120,10 +120,7 @@
 .mt-back {
   margin: 0 0 10px;
 }
-.mt-back a,
-.mt-links a {
-  color: var(--accent-text);
-}
+
 .mt-topic {
   margin: 0;
   font-size: 13px;
@@ -343,7 +340,8 @@
   margin-top: 18px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: flex-start;
+  gap: 8px;
 }
 .mt-links p {
   margin: 0;

@@ -6,6 +6,7 @@ import { $, isDark, option } from "../site/dom.js";
 import { pageById } from "../site/pages.js";
 import { renderMath, renderAllMath } from "../site/math.js";
 import { onSchemeChange } from "../site/dev-hooks.js";
+import { renderIcons } from "../site/icons.js";
 import { toolById } from "./catalogue.js";
 import { reviewBadges, toolUrl } from "./card.js";
 import {
@@ -32,9 +33,11 @@ const tool = toolById(id),
   main = $("minitool");
 
 if (!tool) {
-  main.innerHTML = `<div class="doc-main"><h1>No such minitool</h1><p>There is no minitool called <code></code>.</p><p><a href="./">See all the minitools</a></p></div>`;
+  main.innerHTML = `<div class="doc-main"><h1>No such minitool</h1><p>There is no minitool called <code></code>.</p><p><a class="button-link" href="./" data-icon="back" data-icon-label="All minitools">All minitools</a></p></div>`;
   main.querySelector("code").textContent = id;
 } else build();
+// The links above are built after setupSite drew the page's icons.
+renderIcons(prefs.iconWeight);
 
 function build() {
   document.title = `Physium · ${tool.title}`;
@@ -69,7 +72,7 @@ function build() {
 
   main.innerHTML = `
     <div class="mt-page">
-      <p class="mt-back"><a href="./">← All minitools</a></p>
+      <p class="mt-back"><a class="button-link" href="./" data-icon="back" data-icon-label="All minitools">All minitools</a></p>
       <div class="mt-head">
         <h1></h1>
         <p class="mt-topic"></p>
@@ -249,24 +252,30 @@ function build() {
     related = tool.related && pageById(tool.related);
   if (related) {
     const a = document.createElement("a");
-    a.className = "mt-open";
+    a.className = "button-link mt-open";
     a.href = pageUrl(related);
-    a.textContent = `Open in the full simulation: ${related.title}`;
+    a.dataset.icon = "open";
+    a.dataset.iconLabel = `Open in the full simulation: ${related.title}`;
+    a.textContent = a.dataset.iconLabel;
     links.append(a);
   }
   if (tool.uses.length) {
-    const p = document.createElement("p");
-    p.textContent = "Built from: ";
-    tool.uses.forEach((use, i) => {
+    const p = document.createElement("p"),
+      row = document.createElement("div");
+    p.textContent = "Built from:";
+    row.className = "button-row";
+    for (const use of tool.uses) {
       const other = toolById(use);
-      if (!other) return;
+      if (!other) continue;
       const a = document.createElement("a");
+      a.className = "button-link";
       a.href = toolUrl(other);
+      a.dataset.icon = "forward";
+      a.dataset.iconLabel = other.title;
       a.textContent = other.title;
-      if (i) p.append(", ");
-      p.append(a);
-    });
-    links.append(p);
+      row.append(a);
+    }
+    links.append(p, row);
   }
   q(".mt-reset").addEventListener("click", () => {
     Object.assign(state, defaults());

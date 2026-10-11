@@ -13,6 +13,7 @@ import {
   VELOCITY_PX,
 } from "./sandbox/render.js";
 import { onSchemeChange, reportFrame } from "./site/dev-hooks.js";
+import { tidyNumber } from "./site/numbers.js";
 // Builds the brand, navigation and Website settings before anything below
 // looks up a control.
 const prefs = setupSite();
@@ -343,7 +344,7 @@ function propertyRow({ id, name, unit, min, max, help, value }) {
   input.min = min;
   input.max = max;
   input.step = "any";
-  input.value = value;
+  input.value = tidyNumber(value);
   input.setAttribute("aria-label", name);
   range.type = "range";
   range.min = min;
@@ -708,7 +709,7 @@ function openMenu(id, x, y) {
         else sim.updateLink(id, { [key]: Number(input.value) });
       } catch (error) {
         toast(error.message);
-        input.value = current[key];
+        input.value = tidyNumber(current[key]);
       }
       range.value = current[key];
     };
@@ -719,7 +720,7 @@ function openMenu(id, x, y) {
       input.onchange();
     };
     addZeroDetent(range, step, (value) => {
-      input.value = String(value);
+      input.value = tidyNumber(value);
       input.onchange();
     });
     form.append(row);
@@ -1187,7 +1188,7 @@ function syncSettings() {
   $("setting-walls").checked = sim.settings.walls;
   $("setting-chargeInteractions").checked = sim.settings.chargeInteractions;
   for (const key of ["coulombConstant", "chargeSoftening"])
-    $("setting-" + key).value = sim.settings[key];
+    $("setting-" + key).value = tidyNumber(sim.settings[key]);
   if (sim.viewport) {
     $("scene-width").value = Number(
       (sim.viewport.maxX - sim.viewport.minX).toFixed(3),
@@ -1198,7 +1199,7 @@ function syncSettings() {
   }
   snapStatus();
   for (const key of settingKeys) {
-    $("setting-" + key).value = sim.settings[key];
+    $("setting-" + key).value = tidyNumber(sim.settings[key]);
     $("range-" + key).value = sim.settings[key];
   }
 }
@@ -1244,7 +1245,7 @@ for (const key of settingKeys) {
     const value = detent(range, Number(range.value));
     sim.updateSettings({ [key]: value });
     range.value = value;
-    input.value = sim.settings[key];
+    input.value = tidyNumber(sim.settings[key]);
   };
 }
 function updateVectorLegend() {
@@ -1503,15 +1504,11 @@ function drawPreview(el, scene, dark) {
     else
       g.ellipse(0, 0, (f.width * k) / 2, (f.height * k) / 2, 0, 0, 2 * Math.PI);
     g.fillStyle =
-      color(
-        f.type === "electric" ? "field-electric" : "field-magnetic",
-        dark,
-      ) + "40";
+      color(f.type === "electric" ? "field-electric" : "field-magnetic", dark) +
+      "40";
     g.fill();
     g.strokeStyle = color(
-      f.type === "electric"
-        ? "field-electric"
-        : "field-magnetic",
+      f.type === "electric" ? "field-electric" : "field-magnetic",
       dark,
     );
     g.stroke();
@@ -2426,12 +2423,7 @@ function draw() {
   }
   if (pending && pointer) {
     ctx.setLineDash([4, 4]);
-    line(
-      screen(pending.point),
-      screen(pointer),
-      color("structure", dark),
-      2,
-    );
+    line(screen(pending.point), screen(pointer), color("structure", dark), 2);
     ctx.setLineDash([]);
   }
   if (sim.sizing) showDimensions();
