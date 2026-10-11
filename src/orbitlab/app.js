@@ -14,6 +14,13 @@ import {
 } from "./model.js";
 import { presets } from "./presets.js";
 import { setupSceneFiles } from "../scene-file.js";
+import {
+  ARROW,
+  SATELLITE,
+  createOrbitRenderer,
+  niceStep,
+  orbitPalette,
+} from "./render.js";
 
 const canvas = $("canvas"),
   ctx = canvas.getContext("2d");
@@ -28,11 +35,7 @@ const TAU = 2 * Math.PI,
     1, 2, 5, 10, 20, 50, 100, 200, 500, 1e3, 2e3, 5e3, 1e4, 2e4, 5e4, 1e5, 2e5,
     5e5, 1e6, 2e6, 5e6, 1e7,
   ],
-  // The launch arrow is this long, in pixels, at the circular orbit speed
-  // for the launch radius; velocity arrows on satellites use the same scale.
-  ARROW = 64,
-  HANDLE = 11,
-  SATELLITE = 5;
+  HANDLE = 11;
 // The next launch, in SI: distance from the centre, speed, and angle of the
 // velocity above the local horizontal.
 const aim = {
@@ -82,11 +85,8 @@ function attempt(fn) {
     return false;
   }
 }
-const screen = (x, y) => [view.x + x * view.scale, view.y - y * view.scale];
-const world = (sx, sy) => ({
-  x: (sx - view.x) / view.scale,
-  y: (view.y - sy) / view.scale,
-});
+const renderer = createOrbitRenderer(ctx, view),
+  { screen, world } = renderer;
 function eventPoint(e) {
   const r = canvas.getBoundingClientRect();
   return { sx: e.clientX - r.left, sy: e.clientY - r.top };
@@ -705,341 +705,15 @@ function zoomAt(sx, sy, factor) {
 
 // ---------------------------------------------------------------- drawing
 
-function palette() {
-  const dark = isDark();
-  return {
-    dark,
-    ink: dark ? "#ebe5d6" : "#354438",
-    soft: dark ? "#bdb4a2" : "#6f7f63",
-    panel: dark ? "#2a2722" : "#fffefa",
-    paper: dark ? "#1c1a16" : "#f2f0e9",
-    gridMinor: dark ? "#2a2721" : "#dce1d4",
-    gridMajor: dark ? "#3d3930" : "#c6cebf",
-    body: dark ? "#5d6b5c" : "#9fb39a",
-    bodyEdge: dark ? "#a9c49d" : "#4f7547",
-    velocity: dark ? "#6fa8ec" : "#497caa",
-    force: dark ? "#ef8a6f" : "#c2410c",
-    kinetic: dark ? "#3987e5" : "#497caa",
-    potential: dark ? "#199e70" : "#6d8f5f",
-    axis: dark ? "#4a453b" : "#dfe4d9",
-    // One colour per satellite, in launch order.
-    satellites: dark
-      ? [
-          "#e0a94a",
-          "#6fa8ec",
-          "#e9826e",
-          "#8fd3a4",
-          "#a891e0",
-          "#6fbfae",
-          "#e58bb0",
-          "#bdb4a2",
-        ]
-      : [
-          "#ae7d24",
-          "#3f76aa",
-          "#c2503c",
-          "#2f7d4f",
-          "#8060ae",
-          "#3f8c7c",
-          "#b0577f",
-          "#6f7f63",
-        ],
-  };
-}
-
-function arrowHead(x, y, angle, size) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(angle);
-  ctx.beginPath();
-  ctx.moveTo(size, 0);
-  ctx.lineTo(-size * 0.7, size * 0.62);
-  ctx.lineTo(-size * 0.7, -size * 0.62);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-// An arrow from (x, y) along the screen direction (dx, dy), `length` pixels
-// long. Returns its tip.
-function arrow(x, y, dx, dy, length, colour, width = 2.2) {
-  const x1 = x + dx * length,
-    y1 = y + dy * length;
-  ctx.strokeStyle = ctx.fillStyle = colour;
-  ctx.lineWidth = width;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x1, y1);
-  ctx.stroke();
-  if (length > 3) arrowHead(x1 + dx * 4, y1 + dy * 4, Math.atan2(dy, dx), 6);
-  return [x1 + dx * 4, y1 + dy * 4];
-}
-function label(text, x, y, c, align = "center") {
-  ctx.font = "600 10.5px system-ui,sans-serif";
-  ctx.textAlign = align;
-  ctx.textBaseline = "middle";
-  ctx.lineWidth = 3;
-  ctx.lineJoin = "round";
-  ctx.strokeStyle = c.paper;
-  ctx.strokeText(text, x, y);
-  ctx.fillStyle = c.ink;
-  ctx.fillText(text, x, y);
-}
-function strokePoints(points) {
-  ctx.beginPath();
-  for (let i = 0; i < points.length; i++) {
-    const [x, y] = screen(points[i][0], points[i][1]);
-    if (i) ctx.lineTo(x, y);
-    else ctx.moveTo(x, y);
-  }
-  ctx.stroke();
-}
-// Round step (1, 2 or 5 × 10ⁿ) giving about `count` intervals over `range`.
-function niceStep(range, count) {
-  const raw = range / count,
-    size = 10 ** Math.floor(Math.log10(raw)),
-    unit = raw / size;
-  return (unit < 1.5 ? 1 : unit < 3.5 ? 2 : unit < 7.5 ? 5 : 10) * size;
-}
-
-function drawGrid(c) {
-  const lo = world(0, view.height),
-    hi = world(view.width, 0),
-    step = niceStep(90 / view.scale, 1);
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = c.gridMinor;
-  ctx.beginPath();
-  for (let x = Math.ceil(lo.x / step) * step; x <= hi.x; x += step) {
-    const sx = Math.round(screen(x, 0)[0]) + 0.5;
-    ctx.moveTo(sx, 0);
-    ctx.lineTo(sx, view.height);
-  }
-  for (let y = Math.ceil(lo.y / step) * step; y <= hi.y; y += step) {
-    const sy = Math.round(screen(0, y)[1]) + 0.5;
-    ctx.moveTo(0, sy);
-    ctx.lineTo(view.width, sy);
-  }
-  ctx.stroke();
-}
-function drawScaleBar(c) {
-  const length = niceStep(80 / view.scale, 1),
-    w = length * view.scale,
-    area = clearArea(),
-    x = Math.round((area.left + area.right) / 2 - w / 2) + 0.5,
-    y = view.height - 30.5;
-  ctx.strokeStyle = ctx.fillStyle = c.soft;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(x, y - 4);
-  ctx.lineTo(x, y);
-  ctx.lineTo(x + w, y);
-  ctx.lineTo(x + w, y - 4);
-  ctx.stroke();
-  ctx.font = "10px ui-monospace,monospace";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillText(joined(distance(length, 3)), x + w / 2, y + 4);
-}
-
-function drawBody(c) {
-  const [x, y] = screen(0, 0),
-    true_ = lab.body.radius * view.scale,
-    r = Math.max(true_, 3);
-  ctx.fillStyle = c.body;
-  ctx.strokeStyle = c.bodyEdge;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, TAU);
-  ctx.fill();
-  ctx.stroke();
-  if (state.show.labels)
-    label(
-      lab.body.name + (true_ < 3 ? " (drawn larger than scale)" : ""),
-      x,
-      true_ > 40 ? y : y + r + 11,
-      c,
-    );
-}
-
-// Velocity and force arrows share one scale across the scene: ARROW pixels
-// for the circular speed, and for the weight, at the launch radius.
-function drawVectors(x, y, vx, vy, r, c, withLabels) {
-  const p = preview(),
-    [sx, sy] = screen(x, y),
-    // Unit vector pointing away from the centre, on screen.
-    d = Math.hypot(x, y) || 1,
-    ox = x / d,
-    oy = -y / d;
-  if (state.show.force) {
-    const size = ARROW * (aim.radius / r) ** 2,
-      length = Math.min(size, 190),
-      tip = arrow(sx, sy, -ox, -oy, length, c.force);
-    if (withLabels && state.show.labels)
-      label(
-        joined(prefixed((lab.mu * lab.satelliteMass) / (r * r), "N", 3)) +
-          (size > length ? " (arrow shortened)" : ""),
-        tip[0] - ox * 16,
-        tip[1] - oy * 16,
-        c,
-      );
-  }
-  if (state.show.velocity) {
-    const v = Math.hypot(vx, vy);
-    if (v > 0) {
-      const length = Math.min((ARROW * v) / p.circularSpeed, 400),
-        tip = arrow(sx, sy, vx / v, -vy / v, length, c.velocity);
-      if (withLabels && state.show.labels)
-        label(
-          joined(speedText(v, 3)),
-          tip[0] + (vx / v) * 14 + ox * 16,
-          tip[1] - (vy / v) * 14 + oy * 16,
-          c,
-        );
-    }
-  }
-}
-
-// The swept areas of Kepler's second law for one satellite: alternate
-// equal-time sectors shaded, each numbered.
-function drawAreas(s, colour, c) {
-  const [ox, oy] = screen(0, 0),
-    sectors = [...s.sweep.sectors];
-  if (s.sweep.current) sectors.push(s.sweep.current);
-  for (const sector of sectors) {
-    const pts = sector.points,
-      open = sector === s.sweep.current;
-    ctx.beginPath();
-    ctx.moveTo(ox, oy);
-    for (let i = 0; i < pts.length; i += 2)
-      ctx.lineTo(...screen(pts[i], pts[i + 1]));
-    if (open) ctx.lineTo(...screen(s.x, s.y));
-    ctx.closePath();
-    ctx.fillStyle = colour;
-    ctx.globalAlpha = sector.index % 2 ? 0.1 : 0.3;
-    ctx.fill();
-    ctx.globalAlpha = 0.55;
-    ctx.strokeStyle = colour;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-    if (open || !state.show.labels) continue;
-    // Number it part-way out along the middle of its arc.
-    const mid = 2 * Math.floor(pts.length / 4),
-      [mx, my] = screen(0.62 * pts[mid], 0.62 * pts[mid + 1]);
-    label(String(sector.index + 1), mx, my, c);
-  }
-}
-
-function drawSatellite(s, c) {
-  const colour = c.satellites[s.colour],
-    [x, y] = screen(s.x, s.y),
-    chosen = s.id === state.selected;
-  if (s.status === "flying")
-    drawVectors(s.x, s.y, s.vx, s.vy, Math.hypot(s.x, s.y), c, chosen);
-  ctx.beginPath();
-  ctx.arc(x, y, SATELLITE, 0, TAU);
-  ctx.fillStyle = s.status === "flying" ? colour : c.panel;
-  ctx.fill();
-  ctx.strokeStyle = colour;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  if (s.status === "impact") {
-    // A cross where it landed.
-    ctx.beginPath();
-    ctx.moveTo(x - 6, y - 6);
-    ctx.lineTo(x + 6, y + 6);
-    ctx.moveTo(x + 6, y - 6);
-    ctx.lineTo(x - 6, y + 6);
-    ctx.stroke();
-  }
-  if (chosen) {
-    ctx.setLineDash([3, 3]);
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(x, y, SATELLITE + 5, 0, TAU);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-  if (state.show.labels && s.status !== "flying")
-    label(s.status === "impact" ? "Impact" : "Escaped", x, y - 16, c);
-}
-
-// The launch that is set up: its point, the local horizontal, the velocity
-// arrow with its drag handle, and the path it would follow.
-function ghostGeometry() {
-  const p = preview(),
-    [x, y] = screen(0, aim.radius),
-    length = (ARROW * aim.speed) / p.circularSpeed;
-  return {
-    x,
-    y,
-    length,
-    tipX: x + Math.cos(aim.angle) * length,
-    tipY: y - Math.sin(aim.angle) * length,
-  };
-}
-function drawGhost(c) {
-  const p = preview(),
-    g = ghostGeometry();
-  if (state.show.prediction) {
-    ctx.strokeStyle = c.ink;
-    ctx.globalAlpha = 0.5;
-    ctx.lineWidth = 1.2;
-    ctx.setLineDash([5, 4]);
-    strokePoints(p.path);
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
-  }
-  // Local horizontal through the launch point, and the altitude below it.
-  ctx.strokeStyle = c.soft;
-  ctx.lineWidth = 1;
-  ctx.setLineDash([2, 3]);
-  ctx.beginPath();
-  ctx.moveTo(g.x - 46, g.y);
-  ctx.lineTo(g.x + 46, g.y);
-  ctx.moveTo(g.x, g.y);
-  ctx.lineTo(...screen(0, lab.body.radius));
-  ctx.stroke();
-  ctx.setLineDash([]);
-  if (Math.abs(aim.angle) > 0.02 && g.length > 24) {
-    ctx.beginPath();
-    ctx.arc(g.x, g.y, 20, 0, -aim.angle, aim.angle > 0);
-    ctx.stroke();
-    if (state.show.labels)
-      label(
-        angleText(aim.angle),
-        g.x + 34 * Math.cos(aim.angle / 2),
-        g.y - 34 * Math.sin(aim.angle / 2),
-        c,
-      );
-  }
-  arrow(
-    g.x,
-    g.y,
-    Math.cos(aim.angle),
-    -Math.sin(aim.angle),
-    g.length,
-    c.velocity,
-    2.6,
-  );
-  // Handle at the tip of the arrow, and the launch point itself.
-  ctx.beginPath();
-  ctx.arc(g.tipX, g.tipY, 5.5, 0, TAU);
-  ctx.fillStyle = c.panel;
-  ctx.fill();
-  ctx.strokeStyle = c.velocity;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(g.x, g.y, SATELLITE, 0, TAU);
-  ctx.fillStyle = c.panel;
-  ctx.fill();
-  ctx.strokeStyle = c.ink;
-  ctx.lineWidth = 1.6;
-  ctx.stroke();
-  if (state.show.labels && !lab.list().length)
-    label(joined(speedText(aim.speed, 3)), g.tipX, g.tipY - 15, c);
-}
+// Canvas colours come from the theme tokens (src/site/theme.js).
+const palette = () => orbitPalette(isDark());
+const ghostGeometry = () =>
+  renderer.launchGeometry({
+    model: lab,
+    aim,
+    preview: preview(),
+    format: {},
+  });
 
 function draw() {
   const r = canvas.getBoundingClientRect(),
@@ -1064,37 +738,17 @@ function draw() {
   const c = palette();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, r.width, r.height);
-  ctx.setLineDash([]);
-  ctx.lineJoin = "round";
-  if (prefs.grid) drawGrid(c);
-  drawBody(c);
-  for (const s of lab.list()) {
-    const colour = c.satellites[s.colour];
-    if (state.show.prediction && paths.has(s.id)) {
-      ctx.strokeStyle = colour;
-      ctx.globalAlpha = 0.4;
-      ctx.lineWidth = 1;
-      strokePoints(paths.get(s.id));
-      ctx.globalAlpha = 1;
-    }
-    if (state.show.areas && s.id === state.selected) drawAreas(s, colour, c);
-    if (state.show.trails) {
-      ctx.strokeStyle = colour;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let i = 0; i < s.trail.length; i++) {
-        const [x, y] = screen(s.trail.get(i, 0), s.trail.get(i, 1));
-        if (i) ctx.lineTo(x, y);
-        else ctx.moveTo(x, y);
-      }
-      // The trail of a closed orbit stops after one turn (it would only
-      // retrace itself); until then it runs up to the satellite.
-      if (Math.abs(s.swept) < s.trailEnd) ctx.lineTo(...screen(s.x, s.y));
-      ctx.stroke();
-    }
-  }
-  drawGhost(c);
-  for (const s of lab.list()) drawSatellite(s, c);
+  renderer.drawScene(lab, {
+    colours: c,
+    grid: prefs.grid,
+    show: state.show,
+    selected: state.selected,
+    aim,
+    preview: preview(),
+    paths,
+    area: clearArea(),
+    format: { joined, distance, prefixed, speedText, angleText },
+  });
   // Where the launch point and the arrow's handle are, in canvas pixels,
   // for tests/orbitlab-smoke.mjs (which cannot see the picture).
   const g = ghostGeometry(),
@@ -1103,7 +757,6 @@ function draw() {
     canvas.dataset.launchPoint = at(g.x, g.y);
   if (canvas.dataset.aimHandle !== at(g.tipX, g.tipY))
     canvas.dataset.aimHandle = at(g.tipX, g.tipY);
-  drawScaleBar(c);
   updatePanels(c);
 }
 

@@ -80,3 +80,25 @@ test("color() follows the theme and developer overrides", () => {
   assert.equal(color("ink", true), "#ebe5d6");
   assert.throws(() => color("no-such-token"));
 });
+
+test("no colour literals in the page scripts outside theme.js", async () => {
+  const files = [];
+  const walk = async (dir) => {
+    for (const entry of await readdir(new URL(dir, root), {
+      withFileTypes: true,
+    }))
+      if (entry.isDirectory()) await walk(dir + entry.name + "/");
+      else if (entry.name.endsWith(".js")) files.push(dir + entry.name);
+  };
+  await walk("src/");
+  // rgb(…) built from numbers in code (e.g. a colour mix) is not a literal.
+  const literal = /#[0-9a-fA-F]{3,8}\b|rgba?\(\s*\d/;
+  for (const file of files) {
+    if (file === "src/site/theme.js") continue;
+    (await read(file))
+      .split("\n")
+      .forEach((line, i) =>
+        assert.ok(!literal.test(line), `${file}:${i + 1}: ${line.trim()}`),
+      );
+  }
+});
