@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Physics Sim · Electric circuits</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="fields.css" />
+    <link rel="stylesheet" href="circuits.css" />
+  </head>
+  <body class="circuit-lab">
+    <header>
+      <a class="brand" href="./"><span>φ</span> Physics Sim</a>
+      <nav class="site-nav" aria-label="Simulations">
+        <button
+          id="nav-toggle"
+          class="nav-toggle"
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-controls="nav-menu"
+          title="Switch simulation"
+        >
+          Electric circuits
+        </button>
+        <div id="nav-menu" class="nav-menu" hidden>
+          <a href="./"
+            ><strong>Mechanics sandbox</strong
+            ><small>Kinematics, forces, springs and pulleys</small></a
+          >
+          <a href="fields.html"
+            ><strong>Electric &amp; magnetic fields</strong
+            ><small>Charges, currents and their field lines</small></a
+          >
+          <a href="orbits.html"
+            ><strong>Orbits &amp; gravitation</strong
+            ><small>Satellites, escape speed and Kepler's laws</small></a
+          >
+          <a href="circuits.html" aria-current="page"
+            ><strong>Electric circuits</strong
+            ><small>Build circuits; read current, p.d. and power</small></a
+          >
+        </div>
+      </nav>
+      <div class="playback">
+        <button
+          id="settings-toggle"
+          title="Settings"
+          aria-expanded="false"
+          aria-controls="settings-panel"
+        >
+          Settings</button
+        ><button
+          id="shortcuts"
+          title="Keyboard shortcuts (?)"
+          aria-expanded="false"
+          aria-controls="keys-panel"
+        >
+          Keys ?</button
+        ><span class="header-divider" aria-hidden="true"></span
+        ><button
+          id="reset"
+          title="Reset: time back to zero and every capacitor back to its starting p.d. The circuit is kept. (0)"
+        >
+          Reset</button
+        ><button id="pause" title="Run (Space)">Run</button
+        ><button id="step" title="Advance one frame of simulated time (.)">
+          Step</button
+        ><select
+          id="warp"
+          title="Time scale: simulated seconds per real second ([ and ])"
+          aria-label="Time scale"
+        ></select
+        ><span class="header-divider" aria-hidden="true"></span
+        ><button
+          id="presets-toggle"
+          title="Ready-made circuits"
+          aria-expanded="false"
+          aria-controls="presets-panel"
+        >
+          Presets</button
+        ><button id="save-scene" title="Save circuit to a file">Save scene</button
+        ><button id="load-scene" title="Load a saved circuit file">
+          Load scene</button
+        ><input
+          id="scene-file"
+          type="file"
+          accept="application/json,.json"
+          hidden
+        /><button
+          id="clear"
+          title="Clear this circuit"
+          aria-expanded="false"
+          aria-controls="clear-confirm"
+        >
+          Clear scene
+        </button>
+      </div>
+    </header>
+    <main>
+      <canvas
+        id="canvas"
+        tabindex="0"
+        aria-label="Circuit. Choose a component in the toolbar, then click the grid to place it. Drag from one terminal to another to join them with wire. The meter readings are also listed in the Meters panel."
+      ></canvas>
+      <div class="fl-top cl-top">
+        <div class="edit-tools" role="toolbar" aria-label="Edit tools">
+          <button
+            data-tool="grab"
+            aria-pressed="true"
+            title="Grab: move components, drag from a terminal to wire (G)"
+          >
+            Grab</button
+          ><button
+            data-tool="pan"
+            aria-pressed="false"
+            title="Pan the view (H)"
+          >
+            Pan
+          </button>
+        </div>
+        <div class="fl-centre">
+          <div
+            class="fl-toolbar"
+            role="toolbar"
+            aria-label="Circuit type and components"
+          >
+            <div class="fl-modes" role="group" aria-label="Circuit type">
+              <button
+                id="mode-dc"
+                data-mode="dc"
+                aria-pressed="true"
+                title="Direct-current circuits"
+              >
+                DC</button
+              ><button
+                id="mode-ac"
+                data-mode="ac"
+                aria-pressed="false"
+                title="Alternating-current circuits"
+              >
+                AC
+              </button>
+            </div>
+            <span class="cluster-divider" aria-hidden="true"></span>
+            <button
+              data-add="source"
+              data-for="ac"
+              aria-pressed="false"
+              title="AC source: a sine-wave EMF of set RMS voltage and frequency (1)"
+              hidden
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="6.5" class="glyph-line" />
+                <path d="M2 12h3.5M18.5 12H22" class="glyph-line" />
+                <path
+                  d="M8.4 12c1.2-3.6 2.4-3.6 3.6 0s2.4 3.6 3.6 0"
+                  class="glyph-line"
+                />
+              </svg>
+              <span>AC source</span></button
+            ><button
+              data-add="cell"
+              data-for="dc"
+              aria-pressed="false"
+              title="Cell or battery: an EMF, with an optional internal resistance (1)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12h8M14 12h8" class="glyph-line" />
+                <path d="M10 5v14" class="glyph-line" />
+                <path d="M14 9v6" class="glyph-thick" />
+              </svg>
+              <span>Cell</span></button
+            ><button
+              data-add="resistor"
+              data-for="dc ac"
+              aria-pressed="false"
+              title="Resistor (2)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12h4M18 12h4M6 9h12v6H6z" class="glyph-line" />
+              </svg>
+              <span>Resistor</span></button
+            ><button
+              data-add="variable"
+              data-for="dc ac"
+              aria-pressed="false"
+              title="Variable resistor (3)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12h4M18 12h4M6 9h12v6H6z" class="glyph-line" />
+                <path d="M6 19L18 5M18 5h-4M18 5v4" class="glyph-line" />
+              </svg>
+              <span>Variable</span></button
+            ><button
+              data-add="lamp"
+              data-for="dc ac"
+              aria-pressed="false"
+              title="Lamp: a fixed resistance that glows with its power (4)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="6" class="glyph-line" />
+                <path
+                  d="M2 12h4M18 12h4M7.8 7.8l8.4 8.4M16.2 7.8l-8.4 8.4"
+                  class="glyph-line"
+                />
+              </svg>
+              <span>Lamp</span></button
+            ><button
+              data-add="switch"
+              data-for="dc ac"
+              aria-pressed="false"
+              title="Switch: click it to open or close it (5)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12h5M17 12h5M7 12l9-5" class="glyph-line" />
+                <circle cx="7" cy="12" r="1.4" class="glyph-dot" />
+                <circle cx="17" cy="12" r="1.4" class="glyph-dot" />
+              </svg>
+              <span>Switch</span></button
+            ><button
+              data-add="switch2"
+              data-for="dc ac"
+              aria-pressed="false"
+              title="Two-way switch: joins its common contact to one of two others (6)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M2 12h5M17 7h5M17 17h5M7 12l9.5-4.6"
+                  class="glyph-line"
+                />
+                <circle cx="7" cy="12" r="1.4" class="glyph-dot" />
+                <circle cx="17" cy="7" r="1.4" class="glyph-dot" />
+                <circle cx="17" cy="17" r="1.4" class="glyph-dot" />
+              </svg>
+              <span>Two-way</span></button
+            ><button
+              data-add="capacitor"
+              data-for="dc ac"
+              aria-pressed="false"
+              title="Capacitor (7)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12h8M14 12h8M10 6v12M14 6v12" class="glyph-line" />
+              </svg>
+              <span>Capacitor</span></button
+            ><button
+              data-add="inductor"
+              data-for="dc ac"
+              aria-pressed="false"
+              title="Inductor: opposes any change in its current (L)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M2 13h3a2 2 0 0 1 3.5 0a2 2 0 0 1 3.5 0a2 2 0 0 1 3.5 0a2 2 0 0 1 3.5 0h3"
+                  class="glyph-line"
+                />
+              </svg>
+              <span>Inductor</span></button
+            ><button
+              data-add="ammeter"
+              data-for="dc ac"
+              aria-pressed="false"
+              title="Ammeter: ideal, no resistance. Put it in series (8)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="6.5" class="glyph-line" />
+                <path d="M2 12h3.5M18.5 12H22" class="glyph-line" />
+                <path d="M9.6 15l2.4-6.4 2.4 6.4M10.5 13h3" class="glyph-line" />
+              </svg>
+              <span>Ammeter</span></button
+            ><button
+              data-add="voltmeter"
+              data-for="dc ac"
+              aria-pressed="false"
+              title="Voltmeter: ideal, takes no current. Put it in parallel (9)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="6.5" class="glyph-line" />
+                <path d="M2 12h3.5M18.5 12H22" class="glyph-line" />
+                <path d="M9.6 9l2.4 6.4L14.4 9" class="glyph-line" />
+              </svg>
+              <span>Voltmeter</span></button
+            ><button
+              data-add="wire"
+              data-for="dc ac"
+              aria-pressed="false"
+              title="Wire: ideal, no resistance. Drag from one grid point to another (W)"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 17h8V7h8" class="glyph-line" />
+                <circle cx="4" cy="17" r="1.6" class="glyph-dot" />
+                <circle cx="20" cy="7" r="1.6" class="glyph-dot" />
+              </svg>
+              <span>Wire</span>
+            </button>
+          </div>
+          <div id="tool-settings" class="fl-hint">
+            <strong id="tool-name">Grab</strong>
+            <span id="tool-help"></span>
+          </div>
+          <div id="warning" class="cl-warning" role="alert" hidden>
+            <strong id="warning-title"></strong>
+            <span id="warning-text"></span>
+          </div>
+          <div id="circuit-note" class="cl-note" role="status" hidden></div>
+        </div>
+        <div class="cl-side">
+          <details id="display-panel" class="cl-panel" open>
+            <summary>Display</summary>
+            <label
+              class="fl-check"
+              title="Moving dots show the current; their speed is proportional to it (C)"
+              ><input id="show-current" type="checkbox" checked /> Current
+              <span class="cl-dot" aria-hidden="true"></span
+            ></label>
+            <label
+              class="fl-check cl-indent"
+              title="Show the dots moving the way the electrons do, from − round to +, instead of conventional current (E)"
+              ><input id="electron-flow" type="checkbox" /> Electron flow
+              <small id="flow-note">conventional: + to −</small></label
+            >
+            <label
+              class="fl-check"
+              title="Colour each wire by its potential: everything joined by plain wire is the same colour (P)"
+              ><input id="show-potential" type="checkbox" /> Colour by
+              potential</label
+            >
+            <div id="potential-legend" class="fl-legend" hidden>
+              <span class="cl-ramp" aria-hidden="true"></span>
+              <span id="potential-legend-text"></span>
+            </div>
+            <label
+              class="fl-check"
+              title="Names, values and meter readings beside the components (V)"
+              ><input id="show-labels" type="checkbox" checked /> Values</label
+            >
+          </details>
+          <div
+            id="selection"
+            class="selection cl-panel"
+            role="region"
+            aria-label="Selected component"
+            hidden
+          >
+            <div class="selection-header">
+              <strong id="selected-name"></strong
+              ><span class="header-actions"
+                ><button
+                  id="rotate"
+                  title="Turn a quarter-turn (R)"
+                  aria-label="Turn a quarter-turn"
+                >
+                  <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M19 12a7 7 0 1 1-2.2-5.1M19 4v4h-4"
+                      class="glyph-line"
+                    />
+                  </svg></button
+                ><button
+                  id="delete"
+                  title="Delete this component (Delete)"
+                  data-icon="delete"
+                  data-icon-label="Delete"
+                  data-icon-only="true"
+                >
+                  Delete
+                </button></span
+              >
+            </div>
+            <form id="component-form" class="fl-form"></form>
+            <div
+              id="reading-grid"
+              class="cl-readings"
+              role="group"
+              aria-label="Readings for the selected component"
+            ></div>
+            <p id="component-note" class="fl-note"></p>
+          </div>
+          <details id="meters-panel" class="cl-panel" open>
+            <summary
+              title="A meter reads positive when its + terminal is the one the current enters by (ammeter) or the one at the higher potential (voltmeter)."
+            >
+              Meters
+            </summary>
+            <div id="meter-list" class="cl-readings"></div>
+            <p id="meter-note" class="fl-note"></p>
+          </details>
+          <details id="graph-panel" class="cl-panel" open>
+            <summary>
+              <span id="graph-title">Graphs against time</span>
+              <small id="graph-subject"></small>
+            </summary>
+            <canvas
+              id="voltage-graph"
+              class="cl-graph"
+              role="img"
+              aria-label="Potential difference across the selected component against time"
+            ></canvas>
+            <canvas
+              id="current-graph"
+              class="cl-graph"
+              role="img"
+              aria-label="Current through the selected component against time"
+            ></canvas>
+            <p id="graph-note" class="fl-note"></p>
+          </details>
+          <details id="phasor-panel" class="cl-panel" data-for="ac" open hidden>
+            <summary>Phasor diagram</summary>
+            <canvas
+              id="phasor-diagram"
+              class="cl-phasors"
+              role="img"
+              aria-label="Phasor diagram: the RMS p.d. across each component as an arrow at its phase angle"
+            ></canvas>
+            <p id="phasor-note" class="fl-note"></p>
+          </details>
+        </div>
+      </div>
+      <div class="camera-controls" role="toolbar" aria-label="View">
+        <button id="zoom-out" title="Zoom out (−)">−</button
+        ><span id="zoom-level">100%</span
+        ><button id="zoom-in" title="Zoom in (+)">+</button
+        ><button id="fit-scene" title="Fit the circuit in view (F)">
+          Fit scene
+        </button>
+      </div>
+      <div class="status">
+        <span id="scene-status"></span><span id="time"></span>
+      </div>
+      <div id="toast" role="status" aria-live="polite"></div>
+    </main>
+    <section id="settings-panel" hidden aria-labelledby="settings-title">
+      <div class="menu-header">
+        <strong id="settings-title">Settings</strong
+        ><button id="close-settings" aria-label="Close settings">×</button>
+      </div>
+      <p>Changes apply immediately.</p>
+      <details class="settings-section" open>
+        <summary>Website</summary>
+        <label class="select-row"
+          >Theme
+          <select id="ui-theme">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="system">System</option>
+          </select></label
+        >
+        <div class="prop-row">
+          <label for="ui-size">GUI size</label
+          ><input
+            id="ui-size"
+            type="range"
+            min="80"
+            max="140"
+            step="5"
+            value="100"
+          /><span class="prop-value"
+            ><output id="ui-size-value" for="ui-size">100%</output></span
+          >
+        </div>
+        <label class="setting-toggle"
+          ><input id="ui-grid" type="checkbox" checked /> Show grid</label
+        >
+        <small
+          >Website preferences are remembered on this browser and shared with
+          the other simulations.</small
+        >
+      </details>
+    </section>
+    <section
+      id="clear-confirm"
+      role="alertdialog"
+      aria-labelledby="clear-confirm-title"
+      aria-describedby="clear-confirm-text"
+      hidden
+    >
+      <strong id="clear-confirm-title">Clear this circuit?</strong>
+      <p id="clear-confirm-text">
+        Every component and wire is removed and the clock is set to zero.
+      </p>
+      <div class="button-row">
+        <button id="clear-no">Cancel</button
+        ><button id="clear-yes" class="danger">Clear scene</button>
+      </div>
+    </section>
+    <section id="presets-panel" hidden aria-labelledby="presets-title">
+      <div class="menu-header">
+        <strong id="presets-title">Presets</strong
+        ><button id="close-presets" aria-label="Close presets">×</button>
+      </div>
+      <p>
+        Ready-made circuits. Loading one replaces the circuit on screen and
+        waits: the readings are live at once, and Run starts the clock. Each
+        says what to check against your own calculation.
+      </p>
+      <div id="preset-list"></div>
+    </section>
+    <section id="keys-panel" hidden aria-label="Keyboard shortcuts">
+      <div class="menu-header">
+        <strong>Keyboard &amp; mouse</strong
+        ><button id="close-keys" aria-label="Close shortcuts">×</button>
+      </div>
+      <dl>
+        <dt>Click or drag from the toolbar</dt>
+        <dd>
+          Choose a component, then click the grid to place it; or drag it
+          straight from the toolbar. Dropped on a wire, it is put in series.
+        </dd>
+        <dt>Drag from a terminal</dt>
+        <dd>
+          Draws a wire to wherever you let go. A wire that ends on another wire
+          joins it there. With the Wire tool, start from any grid point.
+        </dd>
+        <dt>Click a component</dt>
+        <dd>
+          Selects it: its values, current, p.d. and power appear on the right,
+          and its graph is drawn. Clicking a switch also opens or closes it.
+        </dd>
+        <dt>Drag a component</dt>
+        <dd>Moves it; the wires on its terminals follow.</dd>
+        <dt>R · Delete</dt>
+        <dd>Turn the selected component a quarter-turn · delete it</dd>
+        <dt>Arrow keys</dt>
+        <dd>Move the selected component one grid square.</dd>
+        <dt>Space · . · 0</dt>
+        <dd>
+          Run or pause · advance one frame while paused · reset the clock and
+          the capacitors
+        </dd>
+        <dt>[ · ]</dt>
+        <dd>Slower · faster time scale</dd>
+        <dt>1 – 9 · L · W</dt>
+        <dd>
+          Cell (AC source in the AC view), resistor, variable resistor, lamp,
+          switch, two-way switch, capacitor, ammeter, voltmeter · inductor ·
+          wire
+        </dd>
+        <dt>C · E · P · V</dt>
+        <dd>
+          Toggle current dots · electron flow · colour by potential · values
+        </dd>
+        <dt>G · H · F · + · −</dt>
+        <dd>Grab · Pan · fit the circuit in view · zoom in · zoom out</dd>
+        <dt>Escape</dt>
+        <dd>Back to Grab; closes any open panel</dd>
+      </dl>
+      <p>
+        Every component is ideal. Wires, ammeters and closed switches have no
+        resistance at all; voltmeters and open switches pass no current at all.
+        A cell is an EMF with an optional internal resistance. In the AC view
+        the meters read RMS values over the last whole cycle, and the graphs
+        are an oscilloscope showing the last three cycles. A lamp is a fixed
+        resistance, whatever its brightness. Current is conventional (from +
+        round to −) unless Electron flow is on.
+      </p>
+    </section>
+    <script type="module" src="src/circuitlab/app.js"></script>
+  </body>
+</html>

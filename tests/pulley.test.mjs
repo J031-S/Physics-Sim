@@ -44,8 +44,8 @@ test("spring Atwood setup accepts a horizontal endpoint and preserves all creati
 });
 test("spring Atwood acceleration and oscillation agree with its effective inertia", () => {
   const { s, a, w, b, id } = apparatus();
-  const I = s.objects.get(w).freeInertia / 10000,
-    r = 0.5,
+  const r = 0.5,
+    I = 0.5 * s.objects.get(w).mass * r * r, // uniform disc
     m = 2 + I / (r * r),
     omega = Math.sqrt(20 / m);
   run(s, 0.5);

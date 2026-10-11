@@ -1,7 +1,10 @@
-import { setPlaybackIcon } from "./icons.js";
+import { canvasIcon, renderIcons, setPlaybackIcon } from "./icons.js";
 import { Sandbox, DT, GRID, snap } from "./physics.js";
+import { presets } from "./presets.js";
 import { setupPreferences } from "./preferences.js";
 import { drawFields, FieldDrag } from "./field-view.js";
+import { setupNav } from "./nav.js";
+setupNav();
 let fieldDrag = null,
   impulseDrag = null,
   panDrag = null;
@@ -31,13 +34,18 @@ let sim = new Sandbox(),
   last = 0,
   menuId = null,
   menuPoint = null,
+  // exportScene() snapshot that Reset restores: the scene as loaded from a
+  // preset or file, or a hand-built scene as it was at its first Run.
+  startScene = null,
   toastTimer;
 sim.updateSettings({ walls: true });
 const prefs = setupPreferences($);
+prefs.onchange = () => showDimensions();
 const view = { scale: 65, x: 0, y: 0, width: 0, height: 0 };
 function toast(message) {
   $("toast").textContent = message;
   $("toast").classList.add("show");
+  placeToast();
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => $("toast").classList.remove("show"), 3000);
 }
@@ -63,10 +71,22 @@ function chooseTool(next) {
     b.classList.toggle("active", b.dataset.tool === tool);
     b.setAttribute("aria-pressed", b.dataset.tool === tool);
   }
-  $("hint").textContent = {
+  closeCategories();
+  for (const group of document.querySelectorAll(".tool-category")) {
+    const toggle = group.querySelector(".category-toggle"),
+      current = group.querySelector(`[data-tool="${tool}"]`);
+    toggle.classList.toggle("active", !!current);
+    if (current) toggle.dataset.icon = tool;
+    toggle.title = current
+      ? `${group.dataset.label}: ${current.dataset.iconLabel} active`
+      : group.dataset.label;
+  }
+  renderIcons(prefs.iconSet);
+  // One hint per tool, shown in the tool-options strip under the toolbar.
+  $("tool-help").textContent = {
     select:
       "Drag a box to select · Shift-box adds · drag a selected body to move its assembly · Z toggles snapping",
-    grab: "Drag to move · Shift moves · Ctrl rotates · R resizes · Alt refits · Z snaps · ? shortcuts",
+    grab: "Drag to move · Shift moves · Ctrl rotates · R resizes · Alt refits · Z snaps · pause to move locked objects",
     resize:
       "Drag a body or field to resize around its centre. Z toggles dimension snapping. G returns to Grab.",
     belt: "Click two balls to wrap a belt around them. Their centres will be pinned. Escape cancels.",
@@ -82,7 +102,7 @@ function chooseTool(next) {
     ball: "Click to add a ball. Z toggles grid snapping.",
     block: "Click to add a block. Z toggles grid snapping.",
     wedge:
-      "Click to add a pinned ramp. Pause + Shift-drag to move; Ctrl rotates; R changes width and height. Right-click for friction.",
+      "Click to add a ramp with both locks on. Pause, then drag to move it or Ctrl-drag to rotate it; R changes width and height. Right-click for friction.",
     spring:
       "Click two objects, or an empty anchor point and an object. Escape cancels.",
     rod: "Click two objects, or an empty anchor point and an object. Escape cancels.",
@@ -90,11 +110,12 @@ function chooseTool(next) {
   $("tool-name").textContent = tool[0].toUpperCase() + tool.slice(1);
   $("select-options").hidden = tool !== "select";
   $("impulse-options").hidden = tool !== "impulse";
-  $("tool-help").hidden = ["select", "impulse"].includes(tool);
-  $("tool-help").textContent = $("hint").textContent;
+  // Impulse options already explain the drag.
+  $("tool-help").hidden = tool === "impulse";
   canvas.style.cursor = ["grab", "pan"].includes(tool) ? "grab" : "crosshair";
 }
 function select(id) {
+  if (id !== selected) graphSamples.length = 0;
   selectionSet = new Set(id ? [id] : []);
   selected = id;
   const o = sim.objects.get(id),
@@ -134,6 +155,9 @@ function select(id) {
     $(id).parentElement.hidden = !o;
     $(id).checked = !!o?.[key];
   }
+  $("lock-caption").hidden = !o;
+  const row = document.querySelector(".selection-row");
+  row.hidden = ![...row.children].some((c) => !c.hidden);
 }
 function selectMany(ids) {
   const list = [...new Set(ids)].filter(
@@ -201,7 +225,13 @@ function showDimensions() {
     $("dimensions").textContent =
       o.shape === "ball"
         ? `Ø ${(o.radius * 2).toFixed(2)} m`
-        : `${o.width.toFixed(2)} × ${o.height.toFixed(2)} m${o.shape === "wedge" ? " · slope " + ((Math.atan2(o.height, o.width) * 180) / Math.PI).toFixed(1) + "°" : ""}`;
+        : `${o.width.toFixed(2)} × ${o.height.toFixed(2)} m${o.shape === "wedge" ? " · slope " + formatAngle(Math.atan2(o.height, o.width)) + " · " + formatAngle(Math.atan2(o.width, o.height)) : ""}`;
+}
+// Angles are held in radians; the Website setting chooses how they are shown.
+function formatAngle(radians) {
+  return prefs.angleUnit === "radians"
+    ? radians.toFixed(3) + " rad"
+    : ((radians * 180) / Math.PI).toFixed(1) + "°";
 }
 function linkPath(l) {
   if (l.type === "belt") return sim.mechanisms.beltGeometry(l).path;
@@ -235,7 +265,7 @@ function closeMenu(focus = false) {
 }
 function positionMenu() {
   const box = $("material-menu").getBoundingClientRect(),
-    w = box.width || 285,
+    w = box.width || 330,
     h = box.height || 420;
   $("material-menu").style.left =
     Math.max(10, Math.min(menuPoint.x, window.innerWidth - w - 10)) /
@@ -246,218 +276,323 @@ function positionMenu() {
       (prefs.size / 100) +
     "px";
 }
+// Sliders centred on zero (min = −max) snap to exactly zero within 2.5% of
+// their span, marked by a centre tick. Arrow keys nudge by exact steps so the
+// detent never traps keyboard users.
+function centred(range) {
+  return Number(range.max) > 0 && Number(range.min) === -Number(range.max);
+}
+function detent(range, value) {
+  return centred(range) && Math.abs(value) <= 0.025 * (range.max - range.min)
+    ? 0
+    : value;
+}
+function addZeroDetent(range, step, nudge) {
+  if (!centred(range)) return;
+  const wrap = document.createElement("div"),
+    tick = document.createElement("span");
+  wrap.className = "zero-slider";
+  tick.className = "zero-tick";
+  tick.setAttribute("aria-hidden", "true");
+  range.replaceWith(wrap);
+  wrap.append(tick, range);
+  range.addEventListener("keydown", (e) => {
+    const keys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+    if (!keys.includes(e.key)) return;
+    e.preventDefault();
+    const delta = ["ArrowRight", "ArrowUp"].includes(e.key) ? step : -step;
+    nudge(
+      Math.max(
+        Number(range.min),
+        Math.min(
+          Number(range.max),
+          Number((Number(range.value) + delta).toFixed(6)),
+        ),
+      ),
+    );
+  });
+}
+// One compact row: label (help as tooltip and description), slider, number
+// input with its unit.
+function propertyRow({ id, name, unit, min, max, help, value }) {
+  const row = document.createElement("div"),
+    label = document.createElement("label"),
+    range = document.createElement("input"),
+    input = document.createElement("input"),
+    box = document.createElement("span"),
+    units = document.createElement("span"),
+    info = document.createElement("span");
+  row.className = "prop-row";
+  label.htmlFor = id;
+  label.textContent = name;
+  info.id = id + "-help";
+  info.className = "sr-only";
+  info.textContent = help;
+  if (help) label.title = help;
+  input.type = "number";
+  input.id = id;
+  input.min = min;
+  input.max = max;
+  input.step = "any";
+  input.value = value;
+  input.setAttribute("aria-label", name);
+  range.type = "range";
+  range.min = min;
+  range.max = max;
+  range.step = "any";
+  range.value = value;
+  range.setAttribute("aria-label", name + " slider");
+  for (const control of [input, range])
+    if (help) control.setAttribute("aria-describedby", info.id);
+  units.className = "unit";
+  units.textContent = unit;
+  box.className = "prop-value";
+  box.append(input, units);
+  row.append(label, range, box, info);
+  return { row, input, range };
+}
+// Menu id for the ground (and walls), which is not a selectable object.
+const FLOOR = "floor";
 function openMenu(id, x, y) {
   const o = sim.objects.get(id),
     l = sim.links.get(id),
-    f = sim.fields.regions.get(id);
-  if (!o && !l && !f) return;
+    f = sim.fields.regions.get(id),
+    floor = id === FLOOR;
+  if (!o && !l && !f && !floor) return;
   menuId = id;
   menuPoint = { x, y };
-  select(id);
-  $("menu-title").textContent = f
-    ? f.type === "electric"
-      ? "Electric field"
-      : "Magnetic field"
-    : o
-      ? (o.shape === "ball"
-          ? "Ball"
-          : o.shape === "wedge"
-            ? "Wedge"
-            : "Block") + " · material constants"
-      : l.type === "spring"
-        ? "Spring constants"
-        : l.type === "rod"
-          ? "Rod constant"
-          : l.type === "belt"
-            ? "Belt"
-            : "Pulley cable";
-  $("menu-note").textContent = f
-    ? "Uniform field inside this region; overlaps add. B is perpendicular to the screen: positive out, negative in. Electric direction follows the region angle."
-    : l?.type === "belt"
-      ? "Ideal no-slip belt. Crossed / drive controls are in the selected-item panel. Wheel mass and damping are edited on each ball."
-      : l?.type === "pulley"
-        ? "Taut cable with freely angled ends. Wheel mass and radius determine inertia. Alt-drag refits length; select the wheel to unlock its axle."
-        : "Changes apply while the simulation runs.";
-  const fields = f
+  select(floor ? null : id);
+  $("menu-title").textContent = floor
+    ? "Floor"
+    : f
+      ? f.type === "electric"
+        ? "Electric field"
+        : "Magnetic field"
+      : o
+        ? (o.shape === "ball"
+            ? "Ball"
+            : o.shape === "wedge"
+              ? "Wedge"
+              : "Block") + " · material constants"
+        : l.type === "spring"
+          ? "Spring constants"
+          : l.type === "rod"
+            ? "Rod constant"
+            : l.type === "belt"
+              ? "Belt"
+              : "Pulley cable";
+  $("menu-note").textContent = floor
+    ? "The scene walls share the floor's material. Where two surfaces touch, the contact uses the lower friction and the higher restitution of the two."
+    : f
+      ? "Uniform field inside this region; overlaps add. B is perpendicular to the screen: positive out, negative in. Electric direction follows the region angle."
+      : l?.type === "belt"
+        ? "Ideal no-slip belt. Crossed / drive controls are in the selected-item panel. Wheel mass and damping are edited on each ball."
+        : l?.type === "pulley"
+          ? "Taut cable with freely angled ends. Wheel mass and radius determine inertia. Alt-drag refits length; select the wheel to unlock its axle."
+          : o?.shape === "ball"
+            ? "A ball is modelled as a uniform disc (I = ½mr²), so it rolls down a slope with acceleration (2/3) g sin θ, not the (5/7) g sin θ of a solid sphere. Changes apply while the simulation runs."
+            : "Changes apply while the simulation runs.";
+  const fields = floor
     ? [
         [
-          "strength",
-          "Strength",
-          f.type === "electric" ? "N/C" : "T",
-          -100,
-          100,
-          0.1,
-          "Negative reverses the field direction.",
-        ],
-        [
-          "width",
-          f.shape === "circle" ? "Diameter" : "Width",
-          "m",
-          0.1,
-          50,
-          0.1,
-          "Resize with R + drag; Z snaps dimensions.",
-        ],
-        ...(f.shape === "circle"
-          ? []
-          : [
-              [
-                "height",
-                "Height",
-                "m",
-                0.1,
-                50,
-                0.1,
-                "Height of the field region.",
-              ],
-            ]),
-        [
-          "angle",
-          "Angle",
-          "°",
-          -180,
-          180,
+          "friction",
+          "Surface friction",
+          "μ",
+          0,
           1,
-          "Counterclockwise from right. Ctrl-drag to rotate.",
+          0.05,
+          "Friction coefficient of the floor and walls.",
         ],
         [
-          "gradientX",
-          "Gradient origin X",
-          "m",
-          -50,
-          50,
-          0.1,
-          "Offset from the region centre in world axes.",
-        ],
-        [
-          "gradientY",
-          "Gradient origin Y",
-          "m",
-          -50,
-          50,
-          0.1,
-          "Offset from the region centre in world axes.",
-        ],
-        [
-          "gradientAngle",
-          "Gradient angle",
-          "°",
-          -180,
-          180,
+          "restitution",
+          "Restitution",
+          "e",
+          0,
           1,
-          "Independent of the region angle.",
-        ],
-        [
-          "gradientScaleX",
-          "Gradient X scale",
-          "m",
           0.05,
-          100,
-          0.1,
-          "Reference distance for falloff; circular profiles use this scale.",
-        ],
-        [
-          "gradientScaleY",
-          "Gradient Y scale",
-          "m",
-          0.05,
-          100,
-          0.1,
-          "Second axis for ellipse and box profiles.",
+          "Bounciness of the floor and walls. 0: no bounce · 1: ideally elastic.",
         ],
       ]
-    : o
+    : f
       ? [
-          ["mass", "Mass", "kg", 0.05, 100, 0.1, "Inertial mass."],
           [
-            "charge",
-            "Charge",
-            "C",
+            "strength",
+            "Strength",
+            f.type === "electric" ? "N/C" : "T",
             -100,
             100,
             0.1,
-            "Signed point charge at the centre. Zero is neutral.",
+            "Negative reverses the field direction.",
           ],
           [
-            "friction",
-            "Surface friction",
-            "μ",
-            0,
-            1,
-            0.05,
-            "Contact friction, not internal material hysteresis.",
-          ],
-          [
-            "restitution",
-            "Restitution",
-            "e",
-            0,
-            1,
-            0.05,
-            "0: no bounce · 1: ideally elastic contact.",
-          ],
-          [
-            "linearDamping",
-            "Linear damping",
-            "s⁻¹",
-            0,
-            20,
+            "width",
+            f.shape === "circle" ? "Diameter" : "Width",
+            "m",
             0.1,
-            "Velocity decays as exp(−damping × time).",
+            50,
+            0.1,
+            "Resize with R + drag; Z snaps dimensions.",
+          ],
+          ...(f.shape === "circle"
+            ? []
+            : [
+                [
+                  "height",
+                  "Height",
+                  "m",
+                  0.1,
+                  50,
+                  0.1,
+                  "Height of the field region.",
+                ],
+              ]),
+          [
+            "angle",
+            "Angle",
+            "°",
+            -180,
+            180,
+            1,
+            "Counterclockwise from right. Ctrl-drag to rotate.",
           ],
           [
-            "angularDamping",
-            "Angular damping",
-            "s⁻¹",
-            0,
-            20,
+            "gradientX",
+            "Gradient origin X",
+            "m",
+            -50,
+            50,
             0.1,
-            "Spin damping is independent of linear damping.",
+            "Offset from the region centre in world axes.",
+          ],
+          [
+            "gradientY",
+            "Gradient origin Y",
+            "m",
+            -50,
+            50,
+            0.1,
+            "Offset from the region centre in world axes.",
+          ],
+          [
+            "gradientAngle",
+            "Gradient angle",
+            "°",
+            -180,
+            180,
+            1,
+            "Independent of the region angle.",
+          ],
+          [
+            "gradientScaleX",
+            "Gradient X scale",
+            "m",
+            0.05,
+            100,
+            0.1,
+            "Reference distance for falloff; circular profiles use this scale.",
+          ],
+          [
+            "gradientScaleY",
+            "Gradient Y scale",
+            "m",
+            0.05,
+            100,
+            0.1,
+            "Second axis for ellipse and box profiles.",
           ],
         ]
-      : l.type === "spring"
+      : o
         ? [
+            ["mass", "Mass", "kg", 0.05, 100, 0.1, "Inertial mass."],
             [
-              "k",
-              "Spring stiffness",
-              "N/m",
-              0.1,
+              "charge",
+              "Charge",
+              "C",
+              -100,
               100,
               0.1,
-              "Hooke’s law: F = −k × extension.",
+              "Signed point charge at the centre. Zero is neutral.",
             ],
             [
-              "damping",
-              "Spring damping",
-              "N·s/m",
+              "friction",
+              "Surface friction",
+              "μ",
               0,
-              5,
-              0.1,
-              "Damps relative motion along the spring.",
+              1,
+              0.05,
+              "Contact friction, not internal material hysteresis.",
             ],
             [
-              "length",
-              "Rest length",
-              "m",
+              "restitution",
+              "Restitution",
+              "e",
+              0,
+              1,
               0.05,
-              50,
+              "0: no bounce · 1: ideally elastic contact.",
+            ],
+            [
+              "linearDamping",
+              "Linear damping",
+              "s⁻¹",
+              0,
+              20,
               0.1,
-              "Unstretched length.",
+              "Velocity decays as exp(−damping × time).",
+            ],
+            [
+              "angularDamping",
+              "Angular damping",
+              "s⁻¹",
+              0,
+              20,
+              0.1,
+              "Spin damping is independent of linear damping.",
             ],
           ]
-        : ["belt", "pulley"].includes(l.type)
-          ? []
-          : [
+        : l.type === "spring"
+          ? [
+              [
+                "k",
+                "Spring stiffness",
+                "N/m",
+                0.1,
+                100,
+                0.1,
+                "Hooke’s law: F = −k × extension.",
+              ],
+              [
+                "damping",
+                "Spring damping",
+                "N·s/m",
+                0,
+                5,
+                0.1,
+                "Damps relative motion along the spring.",
+              ],
               [
                 "length",
-                "Length",
+                "Rest length",
                 "m",
                 0.05,
                 50,
                 0.1,
-                "The distance held by the rod.",
+                "Unstretched length.",
               ],
-            ];
+            ]
+          : ["belt", "pulley"].includes(l.type)
+            ? []
+            : [
+                [
+                  "length",
+                  "Length",
+                  "m",
+                  0.05,
+                  50,
+                  0.1,
+                  "The distance held by the rod.",
+                ],
+              ];
   const form = $("constants");
   form.replaceChildren();
   form.onsubmit = (e) => e.preventDefault();
@@ -509,6 +644,7 @@ function openMenu(id, x, y) {
     for (const [key, name, options] of controls) {
       const label = document.createElement("label"),
         control = document.createElement("select");
+      label.className = "select-row";
       label.textContent = name;
       control.setAttribute("aria-label", name);
       for (const [value, text] of options) {
@@ -529,30 +665,23 @@ function openMenu(id, x, y) {
       "Strength is the peak. Gradient origin/axes are independent of the boundary. Linear: max(0, 1−d); inverse: 1/√(1+d²); inverse-square: 1/(1+d²); exponential: exp(−d). Scales define d. Axial falloff starts at the origin and decreases along +axis.";
   }
   for (const [key, name, unit, min, max, step, help] of fields) {
-    const label = document.createElement("label");
-    label.append(document.createTextNode(name));
-    const units = document.createElement("span");
-    units.textContent = unit;
-    label.append(units);
-    const input = document.createElement("input");
-    input.type = "number";
-    input.min = min;
-    input.max = max;
-    input.step = "any";
-    input.value = (o || l || f)[key];
-    input.setAttribute("aria-label", name);
+    const { row, input, range } = propertyRow({
+      id: "constant-" + key,
+      name,
+      unit,
+      min,
+      max,
+      help,
+      value: (floor ? sim.floorMaterial : o || l || f)[key],
+    });
     input.dataset.constant = key;
-    const range = document.createElement("input");
-    range.type = "range";
-    range.min = min;
-    range.max = max;
-    range.step = "any";
-    range.value = input.value;
     range.dataset.slider = key;
-    range.setAttribute("aria-label", name + " slider");
     input.onchange = () => {
-      const current =
-        sim.objects.get(id) || sim.links.get(id) || sim.fields.regions.get(id);
+      const current = floor
+        ? sim.floorMaterial
+        : sim.objects.get(id) ||
+          sim.links.get(id) ||
+          sim.fields.regions.get(id);
       if (!current) {
         closeMenu();
         return;
@@ -562,7 +691,8 @@ function openMenu(id, x, y) {
           throw new Error(
             `Enter ${name.toLowerCase()} between ${min} and ${max}.`,
           );
-        if (f) {
+        if (floor) sim.updateFloor({ [key]: Number(input.value) });
+        else if (f) {
           sim.fields.update(id, { [key]: Number(input.value) });
           showDimensions();
         } else if (o) sim.updateConstants(id, { [key]: Number(input.value) });
@@ -574,14 +704,16 @@ function openMenu(id, x, y) {
       range.value = current[key];
     };
     range.oninput = () => {
-      input.value = String(Number(Number(range.value).toFixed(3)));
+      input.value = String(
+        Number(detent(range, Number(range.value)).toFixed(3)),
+      );
       input.onchange();
     };
-    label.append(input, range);
-    const info = document.createElement("small");
-    info.textContent = help;
-    label.append(info);
-    form.append(label);
+    addZeroDetent(range, step, (value) => {
+      input.value = String(value);
+      input.onchange();
+    });
+    form.append(row);
   }
   $("material-menu").hidden = false;
   positionMenu();
@@ -600,14 +732,58 @@ $("material-menu").addEventListener("keydown", (e) => {
   }
 });
 $("material-menu").addEventListener("contextmenu", (e) => e.preventDefault());
+// A press outside an open panel closes it: the constants menu and category
+// drop-downs on any outside press, Settings and Keys on a press on the scene.
+// A left or middle scene press that closed something is swallowed (through
+// its pointerup) so it does not also place an object or start a drag. A
+// right press is not: its context menu opens the menu for whatever is under
+// the pointer, replacing the one it closed.
+let swallowed = null;
 document.addEventListener(
   "pointerdown",
   (e) => {
+    swallowed = null;
+    let closed = false;
     if (!$("material-menu").hidden && !$("material-menu").contains(e.target)) {
       if ($("material-menu").contains(document.activeElement))
         document.activeElement.blur();
       closeMenu();
+      closed = true;
     }
+    for (const group of document.querySelectorAll(".tool-category"))
+      if (
+        !group.querySelector(".category-menu").hidden &&
+        !group.contains(e.target)
+      ) {
+        closeCategories();
+        closed = true;
+      }
+    if (e.target === canvas)
+      for (const [panel, close] of [
+        ["settings-panel", closeSettings],
+        ["keys-panel", () => ($("keys-panel").hidden = true)],
+        ["presets-panel", closePresets],
+        ["clear-confirm", closeClearConfirm],
+      ])
+        if (!$(panel).hidden) {
+          close();
+          closed = true;
+        }
+    if (closed && e.target === canvas && e.button !== 2) {
+      e.stopPropagation();
+      e.preventDefault();
+      canvas.focus();
+      swallowed = e.pointerId;
+    }
+  },
+  true,
+);
+document.addEventListener(
+  "pointerup",
+  (e) => {
+    if (swallowed === null || e.pointerId !== swallowed) return;
+    e.stopPropagation();
+    swallowed = null;
   },
   true,
 );
@@ -630,6 +806,7 @@ function snapStatus() {
     : "Snap off · Z toggles 0.5 m / 15°";
   $("snap-status").classList.toggle("snapping", on);
   $("setting-snapping").checked = on;
+  $("snap-toggle").checked = on;
 }
 function updateInteraction() {
   if (!pointer) return;
@@ -750,7 +927,10 @@ canvas.addEventListener("pointerdown", (e) => {
     select(id || linkAt(pointer) || null);
     if (id) {
       if (resizeHeld || tool === "resize") sim.beginResize(id, pointer);
-      else sim.beginGrab(id, pointer, performance.now(), grabOptions());
+      else {
+        refusalShown = false;
+        sim.beginGrab(id, pointer, performance.now(), grabOptions());
+      }
     }
     return;
   }
@@ -829,7 +1009,30 @@ canvas.addEventListener("pointermove", (e) => {
   syncModifiers(e);
   if (marquee) marquee.end = { ...pointer };
   updateInteraction();
+  refusedDragToast();
 });
+// While running, a drag that only asks for locked motion does nothing: a
+// fully locked object, Shift-move of a pinned one, Ctrl-rotate of a
+// rotation-locked one. Say why, once per drag.
+let refusalShown = false;
+function refusedDragToast() {
+  const g = sim.grab,
+    o = g && sim.objects.get(g.id);
+  if (!o || !running || refusalShown) return;
+  if (
+    Math.hypot(pointer.x - g.startPoint.x, pointer.y - g.startPoint.y) *
+      view.scale <
+    4
+  )
+    return;
+  const refused =
+    (o.lockPosition && o.lockRotation) ||
+    (shift && o.lockPosition) ||
+    (ctrl && !shift && o.lockRotation);
+  if (!refused) return;
+  refusalShown = true;
+  toast("Pause to move a locked object");
+}
 canvas.addEventListener("pointerup", (e) => {
   if (panDrag) {
     panDrag = null;
@@ -892,7 +1095,8 @@ function cancelDrag() {
 }
 canvas.addEventListener("contextmenu", (e) => {
   const p = locate(e),
-    id = sim.hit(p) || linkAt(p) || sim.fields.hit(p);
+    // The ground: anywhere at or below y = 0 that is not an object.
+    id = sim.hit(p) || linkAt(p) || sim.fields.hit(p) || (p.y <= 0 && FLOOR);
   if (!id) {
     closeMenu();
     return;
@@ -1023,33 +1227,49 @@ for (const key of settingKeys) {
     }
     syncSettings();
   };
-  range.onkeydown = (e) => {
-    // Keyboard nudges use exact values and must be able to leave the detent.
-    if (
-      key !== "gravity" ||
-      !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)
-    )
-      return;
-    e.preventDefault();
-    const delta = ["ArrowRight", "ArrowUp"].includes(e.key) ? 0.1 : -0.1;
-    sim.updateSettings({
-      gravity: Math.max(
-        -50,
-        Math.min(50, Number((sim.settings.gravity + delta).toFixed(2))),
-      ),
-    });
+  addZeroDetent(range, 0.1, (value) => {
+    sim.updateSettings({ [key]: value });
     syncSettings();
-  };
+  });
   range.oninput = () => {
-    const value =
-      key === "gravity" && Math.abs(Number(range.value)) <= 2.5
-        ? 0
-        : Number(range.value);
+    const value = detent(range, Number(range.value));
     sim.updateSettings({ [key]: value });
     range.value = value;
     input.value = sim.settings[key];
   };
 }
+function updateVectorLegend() {
+  const v = $("vectors").checked,
+    f = $("force-vectors").checked;
+  $("vector-legend").hidden = !v && !f;
+  $("legend-velocity").hidden = !v;
+  $("legend-force").hidden = !f;
+  $("force-scale-label").hidden = !f;
+  $("legend-velocity-scale").textContent = `${VELOCITY_PX} px per m/s`;
+  $("legend-force-scale").textContent = `${fixed(forceScale())} px per N`;
+}
+$("vectors").onchange = updateVectorLegend;
+$("force-vectors").onchange = updateVectorLegend;
+$("force-scale").oninput = () => {
+  const value = typedForceScale();
+  if (value !== null) forceScaleValue = value;
+  updateVectorLegend();
+};
+$("force-scale").onchange = () => {
+  const value = typedForceScale();
+  if (value === null) {
+    if ($("force-scale").value.trim() !== "")
+      toast("Enter an arrow scale between 0.1 and 100 px/N.");
+    // Restore the previous valid value rather than clamping.
+    $("force-scale").value = fixed(forceScaleValue);
+  } else forceScaleValue = value;
+  updateVectorLegend();
+};
+$("snap-toggle").onchange = (e) => {
+  sim.updateSettings({ snapping: e.target.checked });
+  snapStatus();
+  updateInteraction();
+};
 for (const key of ["snapping", "walls", "chargeInteractions"])
   $("setting-" + key).onchange = (e) => {
     sim.updateSettings({ [key]: e.target.checked });
@@ -1090,18 +1310,372 @@ function removeSelected() {
   }
 }
 $("delete").onclick = removeSelected;
-$("pause").onclick = () => {
-  cancelDrag();
-  running = !running;
+function setRunning(next) {
+  // A hand-built scene's starting point is its state at the first Run.
+  if (next && !running && !startScene) {
+    startScene = sim.exportScene();
+    $("reset").disabled = false;
+  }
+  running = next;
   accumulator = 0;
   setPlaybackIcon(running, prefs.iconSet);
+  $("step").disabled = running;
+}
+// One fixed 1/120 s step while paused.
+function stepPaused() {
+  if (running) return;
+  cancelDrag();
+  if (!startScene) {
+    // A hand-built scene's reset point is its state before it first moves.
+    startScene = sim.exportScene();
+    $("reset").disabled = false;
+  }
+  stepOnce();
+}
+$("step").onclick = stepPaused;
+$("speed").onchange = () => {
+  accumulator = 0;
   canvas.focus();
 };
+$("pause").onclick = () => {
+  cancelDrag();
+  setRunning(!running);
+  canvas.focus();
+};
+function fitScene() {
+  cancelDrag();
+  const v = sim.viewport;
+  if (!v) return;
+  // Fit inside the area not covered by the edit bar, the toolbars above and
+  // the view cluster below.
+  const c = canvas.getBoundingClientRect(),
+    rect = (sel) => document.querySelector(sel).getBoundingClientRect(),
+    edge = (r, k) => (r.width ? r[k] : null),
+    left = (edge(rect(".edit-tools"), "right") ?? c.left) - c.left + 12,
+    top =
+      (edge($("tool-settings").getBoundingClientRect(), "bottom") ??
+        c.top + 20) -
+      c.top +
+      12,
+    canvasBottom = c.top + c.height,
+    bottom =
+      canvasBottom -
+      (edge(rect(".camera-controls"), "top") ?? canvasBottom) +
+      12,
+    right = 20,
+    w = Math.max(50, view.width - left - right),
+    h = Math.max(50, view.height - top - bottom);
+  view.scale = Math.max(
+    0.1,
+    Math.min(400, w / (v.maxX - v.minX), h / (v.maxY - v.minY)),
+  );
+  view.x = left + w / 2 - ((v.minX + v.maxX) / 2) * view.scale;
+  view.y = top + h / 2 + ((v.minY + v.maxY) / 2) * view.scale;
+}
+// Swap in a loaded scene (preset, file or Reset) exactly as Clear does, and
+// start paused so students can read the description first.
+function replaceScene(next, { fit = true } = {}) {
+  cancelDrag();
+  sim.dispose();
+  sim = next;
+  forceHistory.clear();
+  graphSamples.length = 0;
+  selected = null;
+  pending = null;
+  select(null);
+  closeMenu();
+  chooseTool("grab");
+  setRunning(false);
+  syncSettings();
+  if (fit) fitScene();
+  startScene = sim.exportScene();
+  $("reset").disabled = false;
+}
+$("reset").onclick = () => {
+  if (!startScene) return;
+  replaceScene(Sandbox.fromScene(startScene), { fit: false });
+  canvas.focus();
+};
+function closePresets() {
+  $("presets-panel").hidden = true;
+  $("presets-toggle").setAttribute("aria-expanded", "false");
+}
+$("presets-toggle").onclick = () => {
+  const open = $("presets-panel").hidden;
+  $("presets-panel").hidden = !open;
+  $("presets-toggle").setAttribute("aria-expanded", String(open));
+  if (open) {
+    drawPresetPreviews();
+    $("preset-list").querySelector("button")?.focus();
+  }
+};
+// Thumbnails of each preset's starting scene, drawn from the preset itself
+// (built in a throwaway sandbox), so they can never drift from the scene.
+// Redrawn only when the theme changes.
+let previewTheme = null;
+function drawPresetPreviews() {
+  const dark = document.documentElement.dataset.theme === "dark";
+  if (previewTheme === dark) return;
+  previewTheme = dark;
+  for (const preset of presets) {
+    const el = document.querySelector(
+      `[data-preset="${preset.id}"] .preset-preview`,
+    );
+    const scene = new Sandbox();
+    try {
+      preset.setup(scene);
+      drawPreview(el, scene, dark);
+    } catch {
+      // A preview is decoration; the preset itself reports its own errors.
+    } finally {
+      scene.dispose();
+    }
+  }
+}
+function drawPreview(el, scene, dark) {
+  const g = el.getContext("2d"),
+    dpr = window.devicePixelRatio || 1,
+    w = 112,
+    h = 72;
+  if (!g?.setTransform) return;
+  el.width = w * dpr;
+  el.height = h * dpr;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const v = scene.viewport || { minX: -8, maxX: 8, minY: 0, maxY: 9 },
+    // Frame the experiment itself (bodies, connections, fields) and the
+    // floor below it, rather than the whole scene, so small bodies show.
+    points = [{ x: 0, y: -0.3 }];
+  for (const o of scene.objects.values())
+    for (const p of o.body.vertices)
+      points.push({ x: p.x / 100, y: -p.y / 100 });
+  for (const l of scene.links.values())
+    points.push(scene.endpoint(l, "a"), scene.endpoint(l, "b"));
+  for (const f of scene.fields.regions.values()) {
+    const r = Math.hypot(f.width, f.height) / 2;
+    points.push({ x: f.x - r, y: f.y - r }, { x: f.x + r, y: f.y + r });
+  }
+  const xs = points.map((p) => p.x),
+    ys = points.map((p) => p.y),
+    cx = (Math.min(...xs) + Math.max(...xs)) / 2,
+    cy = (Math.min(...ys) + Math.max(...ys)) / 2,
+    spanX = Math.max(3, Math.max(...xs) - Math.min(...xs)) * 1.25,
+    spanY = Math.max(2, Math.max(...ys) - Math.min(...ys)) * 1.25,
+    k = Math.min(w / spanX, h / spanY),
+    ox = w / 2 - cx * k,
+    oy = h / 2 + cy * k,
+    at = (p) => ({ x: ox + p.x * k, y: oy - p.y * k });
+  g.fillStyle = dark ? "#1c1a16" : "#f2f0e9";
+  g.fillRect(0, 0, w, h);
+  g.fillStyle = dark ? "#25332a" : "#e0e3d8";
+  g.fillRect(0, oy, w, h - oy);
+  g.strokeStyle = "#7f9076";
+  g.lineWidth = 1;
+  if (scene.settings.walls) {
+    const a = at({ x: v.minX, y: v.maxY });
+    g.strokeRect(a.x, a.y, (v.maxX - v.minX) * k, (v.maxY - v.minY) * k);
+  }
+  g.beginPath();
+  g.moveTo(0, oy);
+  g.lineTo(w, oy);
+  g.stroke();
+  for (const f of scene.fields.regions.values()) {
+    const c = at(f);
+    g.save();
+    g.translate(c.x, c.y);
+    g.rotate((-f.angle * Math.PI) / 180);
+    g.beginPath();
+    if (f.shape === "rectangle")
+      g.rect(
+        (-f.width * k) / 2,
+        (-f.height * k) / 2,
+        f.width * k,
+        f.height * k,
+      );
+    else
+      g.ellipse(0, 0, (f.width * k) / 2, (f.height * k) / 2, 0, 0, 2 * Math.PI);
+    g.fillStyle = f.type === "electric" ? "#dea73940" : "#9874cb40";
+    g.fill();
+    g.strokeStyle = f.type === "electric" ? "#c8902c" : "#9474c8";
+    g.stroke();
+    g.restore();
+  }
+  for (const l of scene.links.values()) {
+    const path =
+      l.type === "belt"
+        ? scene.mechanisms.beltGeometry(l).path
+        : l.type === "pulley"
+          ? scene.mechanisms.pulleyPath(l)
+          : [scene.endpoint(l, "a"), scene.endpoint(l, "b")];
+    g.beginPath();
+    path
+      .map(at)
+      .forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)));
+    g.strokeStyle = dark ? "#a9b89b" : "#6f7f63";
+    g.lineWidth = l.type === "rod" ? 1.5 : 1;
+    g.stroke();
+  }
+  for (const o of scene.objects.values()) {
+    g.beginPath();
+    o.body.vertices.forEach((p, i) => {
+      const q = at({ x: p.x / 100, y: -p.y / 100 });
+      i ? g.lineTo(q.x, q.y) : g.moveTo(q.x, q.y);
+    });
+    g.closePath();
+    g.fillStyle =
+      o.shape === "ball"
+        ? "#dba66b"
+        : o.shape === "wedge"
+          ? "#a2b889"
+          : "#8ca6bc";
+    g.fill();
+    g.strokeStyle = o.shape === "ball" ? "#a77943" : "#658199";
+    g.lineWidth = 0.75;
+    g.stroke();
+    // Initial velocity, so moving starts (projectile, collisions) read.
+    const s = scene.state(o.id),
+      speed = Math.hypot(s.vx, s.vy);
+    if (speed > 0.05) {
+      const p = at(s),
+        len = Math.min(18, 3 + speed * 2.5),
+        e = { x: p.x + (s.vx / speed) * len, y: p.y - (s.vy / speed) * len },
+        a = Math.atan2(e.y - p.y, e.x - p.x);
+      g.strokeStyle = dark ? "#6fa8ec" : "#497caa";
+      g.lineWidth = 1.2;
+      g.beginPath();
+      g.moveTo(p.x, p.y);
+      g.lineTo(e.x, e.y);
+      for (const t of [-0.5, 0.5]) {
+        g.moveTo(e.x, e.y);
+        g.lineTo(e.x - 4 * Math.cos(a + t), e.y - 4 * Math.sin(a + t));
+      }
+      g.stroke();
+    }
+  }
+}
+$("close-presets").onclick = () => {
+  closePresets();
+  canvas.focus();
+};
+$("presets-panel").addEventListener("keydown", (e) => {
+  e.stopPropagation();
+  if (e.key === "Escape") {
+    closePresets();
+    $("presets-toggle").focus();
+  }
+});
+{
+  const groups = Map.groupBy
+    ? Map.groupBy(presets, (p) => p.group)
+    : presets.reduce(
+        (m, p) => m.set(p.group, [...(m.get(p.group) || []), p]),
+        new Map(),
+      );
+  for (const [group, list] of groups) {
+    const heading = document.createElement("h3");
+    heading.textContent = group;
+    $("preset-list").append(heading);
+    for (const preset of list) {
+      const button = document.createElement("button"),
+        title = document.createElement("strong"),
+        description = document.createElement("span"),
+        expect = document.createElement("span");
+      button.className = "preset";
+      button.dataset.preset = preset.id;
+      title.textContent = preset.title;
+      description.textContent = preset.description;
+      expect.className = "preset-expect";
+      expect.textContent = "What to look for: " + preset.expect;
+      const preview = document.createElement("canvas"),
+        text = document.createElement("span");
+      preview.className = "preset-preview";
+      preview.setAttribute("aria-hidden", "true");
+      text.className = "preset-text";
+      text.append(title, description, expect);
+      button.append(preview, text);
+      button.onclick = () => {
+        const next = new Sandbox();
+        try {
+          preset.setup(next);
+        } catch (error) {
+          next.dispose();
+          toast(error.message);
+          return;
+        }
+        closePresets();
+        replaceScene(next);
+        toast(preset.title + " loaded · press Run to start");
+        canvas.focus();
+      };
+      $("preset-list").append(button);
+    }
+  }
+}
+$("save-scene").onclick = () => {
+  const blob = new Blob([JSON.stringify(sim.exportScene(), null, 2)], {
+      type: "application/json",
+    }),
+    link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "physics-sim-scene.json";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Some browsers start reading the blob after click() returns.
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+};
+$("load-scene").onclick = () => $("scene-file").click();
+$("scene-file").onchange = async () => {
+  const file = $("scene-file").files[0];
+  $("scene-file").value = "";
+  if (!file) return;
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch {
+    toast("This file is not a Physics Sim scene.");
+    return;
+  }
+  let next;
+  try {
+    next = Sandbox.fromScene(data);
+  } catch (error) {
+    // The current scene is untouched.
+    toast(error.message);
+    return;
+  }
+  replaceScene(next);
+  toast("Scene loaded · press Run to start");
+};
+function closeClearConfirm() {
+  $("clear-confirm").hidden = true;
+  $("clear").setAttribute("aria-expanded", "false");
+}
 $("clear").onclick = () => {
-  const settings = { ...sim.settings };
+  const open = $("clear-confirm").hidden;
+  $("clear-confirm").hidden = !open;
+  $("clear").setAttribute("aria-expanded", String(open));
+  if (open) $("clear-no").focus();
+};
+$("clear-no").onclick = () => {
+  closeClearConfirm();
+  $("clear").focus();
+};
+$("clear-confirm").addEventListener("keydown", (e) => {
+  e.stopPropagation();
+  if (e.key === "Escape") $("clear-no").click();
+});
+// Clear starts over: an empty scene with default settings and floor, as on
+// page load. Only the snapping editing aid is kept.
+$("clear-yes").onclick = () => {
+  closeClearConfirm();
+  const snapping = sim.settings.snapping;
   sim.dispose();
   sim = new Sandbox();
-  sim.updateSettings({ ...settings, walls: true });
+  forceHistory.clear();
+  graphSamples.length = 0;
+  sim.updateSettings({ walls: true, snapping });
+  syncSettings();
+  canvas.focus();
   view.width = 0;
   view.height = 0;
   selected = null;
@@ -1110,7 +1684,50 @@ $("clear").onclick = () => {
   closeMenu();
   chooseTool("grab");
   accumulator = 0;
+  startScene = null;
+  $("reset").disabled = true;
 };
+function closeCategories(except) {
+  for (const group of document.querySelectorAll(".tool-category")) {
+    if (group === except) continue;
+    group.querySelector(".category-menu").hidden = true;
+    group
+      .querySelector(".category-toggle")
+      .setAttribute("aria-expanded", "false");
+  }
+}
+for (const group of document.querySelectorAll(".tool-category")) {
+  const toggle = group.querySelector(".category-toggle"),
+    menu = group.querySelector(".category-menu"),
+    items = [...menu.querySelectorAll("[data-tool]")];
+  toggle.onclick = () => {
+    closeCategories(group);
+    menu.hidden = !menu.hidden;
+    toggle.setAttribute("aria-expanded", String(!menu.hidden));
+    if (!menu.hidden)
+      (items.find((b) => b.dataset.tool === tool) || items[0]).focus();
+  };
+  group.addEventListener("keydown", (e) => {
+    if (menu.hidden) return;
+    if (e.key === "Escape") {
+      // Closing the drop-down should not also cancel the active tool.
+      e.stopPropagation();
+      closeCategories();
+      toggle.focus();
+    } else if (["ArrowDown", "ArrowUp"].includes(e.key)) {
+      e.preventDefault();
+      const i = items.indexOf(document.activeElement),
+        step = e.key === "ArrowDown" ? 1 : -1;
+      items[(i + step + items.length) % items.length].focus();
+    }
+  });
+  group.addEventListener("focusout", (e) => {
+    if (e.relatedTarget && !group.contains(e.relatedTarget)) {
+      menu.hidden = true;
+      toggle.setAttribute("aria-expanded", "false");
+    }
+  });
+}
 for (const b of document.querySelectorAll("[data-tool]"))
   b.onclick = () => {
     sim.endGrab(false);
@@ -1118,6 +1735,14 @@ for (const b of document.querySelectorAll("[data-tool]"))
     canvas.focus();
   };
 function typing(e) {
+  // Tool shortcuts keep working while focus is on a toolbar button or an
+  // open drop-down; Space and Enter still activate the focused button.
+  if (
+    e.target.closest?.(".tools, .edit-tools") &&
+    e.target.tagName === "BUTTON" &&
+    ![" ", "Enter"].includes(e.key)
+  )
+    return false;
   return (
     ["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A"].includes(e.target.tagName) ||
     e.target.isContentEditable ||
@@ -1125,6 +1750,13 @@ function typing(e) {
   );
 }
 document.addEventListener("keydown", (e) => {
+  // Escape closes the constants menu even after focus has left it (Enter in
+  // a field blurs it, for example).
+  if (e.key === "Escape" && !$("material-menu").hidden) {
+    e.preventDefault();
+    closeMenu(true);
+    return;
+  }
   if (typing(e) || !$("material-menu").hidden) return;
   const key = e.key.toLowerCase();
   // Browser reload remains native, even if Ctrl is already controlling a drag.
@@ -1161,6 +1793,8 @@ document.addEventListener("keydown", (e) => {
     closeMenu();
     $("keys-panel").hidden = true;
     closeSettings();
+    closePresets();
+    closeClearConfirm();
   }
   if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.code === "Space" || e.key === " ") {
@@ -1188,8 +1822,18 @@ document.addEventListener("keydown", (e) => {
     cancelDrag();
     chooseTool(keys[key]);
   }
+  if (e.key === ".") {
+    e.preventDefault();
+    stepPaused();
+  }
   if (key === "v") {
     $("vectors").checked = !$("vectors").checked;
+    updateVectorLegend();
+    e.preventDefault();
+  }
+  if (key === "f") {
+    $("force-vectors").checked = !$("force-vectors").checked;
+    updateVectorLegend();
     e.preventDefault();
   }
   if (e.key === "?") {
@@ -1218,9 +1862,18 @@ document.addEventListener("visibilitychange", () => {
   last = 0;
   accumulator = 0;
 });
+// Switch the header to icon-only buttons when its full labels do not fit.
+function fitHeader() {
+  const header = document.querySelector("header");
+  document.body.classList.remove("compact-header");
+  if (header.scrollWidth > header.clientWidth)
+    document.body.classList.add("compact-header");
+}
 window.addEventListener("resize", () => {
   if (menuId) positionMenu();
+  fitHeader();
 });
+$("ui-size").addEventListener("input", fitHeader);
 function impulseVector() {
   const gain = Number($("impulse-gain").value);
   const factor = Number.isFinite(gain)
@@ -1261,21 +1914,7 @@ canvas.addEventListener(
 );
 $("zoom-in").onclick = () => zoom(1.25);
 $("zoom-out").onclick = () => zoom(0.8);
-$("fit-scene").onclick = () => {
-  cancelDrag();
-  const v = sim.viewport;
-  if (!v) return;
-  view.scale = Math.max(
-    0.1,
-    Math.min(
-      400,
-      (view.width - 40) / (v.maxX - v.minX),
-      (view.height - 40) / (v.maxY - v.minY),
-    ),
-  );
-  view.x = view.width / 2 - ((v.minX + v.maxX) / 2) * view.scale;
-  view.y = view.height / 2 + ((v.minY + v.maxY) / 2) * view.scale;
-};
+$("fit-scene").onclick = fitScene;
 $("apply-scene").onclick = () => {
   try {
     sim.setSceneSize(
@@ -1310,6 +1949,572 @@ function line(a, b, colour, width = 1) {
   ctx.lineWidth = width;
   ctx.stroke();
 }
+// Lock indicator at a body's centre (or beside a body too small on screen),
+// sized in screen pixels so it does not grow with zoom. It uses the same icons
+// as the Lock toggles in the selected-item panel, so it follows the icon set.
+function lockGlyph(o, p, dark, size) {
+  const names = [
+      ...(o.lockPosition ? ["lockPosition"] : []),
+      ...(o.lockRotation ? ["lockRotation"] : []),
+    ],
+    icons = names.map((n) => canvasIcon(prefs.iconSet, n)).filter(Boolean),
+    px = 14,
+    gap = 3,
+    w = icons.length * px + (icons.length - 1) * gap + 8,
+    h = px + 6,
+    offset = size < 14 ? size * Math.SQRT1_2 + w / 2 + 2 : 0;
+  if (!icons.length) return;
+  ctx.save();
+  ctx.translate(Math.round(p.x + offset), Math.round(p.y - (offset && h)));
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(-w / 2, -h / 2, w, h, h / 2);
+  else ctx.rect(-w / 2, -h / 2, w, h);
+  ctx.fillStyle = dark ? "#2a2722dd" : "#fffefadd";
+  ctx.fill();
+  ctx.lineWidth = 0.75;
+  ctx.strokeStyle = dark ? "#768d70" : "#b6c9ad";
+  ctx.stroke();
+  const ink = dark ? "#cfdec8" : "#3a5140";
+  icons.forEach((icon, i) => {
+    ctx.save();
+    ctx.translate(-w / 2 + 4 + i * (px + gap), -px / 2);
+    ctx.scale(px / icon.size, px / icon.size);
+    ctx.fillStyle = ctx.strokeStyle = ink;
+    ctx.lineWidth = 2;
+    ctx.lineCap = ctx.lineJoin = "round";
+    for (const path of icon.paths)
+      if (icon.filled) ctx.fill(path);
+      else ctx.stroke(path);
+    ctx.restore();
+  });
+  ctx.restore();
+}
+// Vector arrows use linear scales in screen pixels, so lengths compare
+// directly. Velocity: fixed px per m/s. Net force: px per newton set in the
+// view cluster, averaged over the last few steps because a collision is a
+// single-step spike; long force arrows are capped and marked with a break.
+const VELOCITY_PX = 12,
+  // Velocity arrows; the dark theme gets a lighter blue for contrast.
+  VELOCITY_COLOUR = { light: "#497caa", dark: "#6fa8ec" },
+  FORCE_CAP = 180,
+  FORCE_STEPS = 6,
+  forceHistory = new Map();
+// Last valid px/N value: an empty or out-of-range entry never takes effect.
+let forceScaleValue = 4;
+function forceScale() {
+  return forceScaleValue;
+}
+function typedForceScale() {
+  const text = $("force-scale").value.trim(),
+    value = Number(text);
+  return text !== "" && Number.isFinite(value) && value >= 0.1 && value <= 100
+    ? value
+    : null;
+}
+function fixed(value) {
+  return Number(value.toPrecision(3)).toString();
+}
+function recordForces() {
+  for (const o of sim.objects.values()) {
+    const list = forceHistory.get(o.id) || [];
+    list.push(sim.netForce(o.id));
+    if (list.length > FORCE_STEPS) list.shift();
+    forceHistory.set(o.id, list);
+  }
+  for (const id of forceHistory.keys())
+    if (!sim.objects.has(id)) forceHistory.delete(id);
+}
+function averageForce(id) {
+  const list = forceHistory.get(id);
+  if (!list?.length) return { x: 0, y: 0 };
+  return {
+    x: list.reduce((t, f) => t + f.x, 0) / list.length,
+    y: list.reduce((t, f) => t + f.y, 0) / list.length,
+  };
+}
+function stepOnce() {
+  sim.step();
+  recordForces();
+}
+// Arrow from screen point p along world-space (dx, dy) pixels (y up).
+function arrow(p, dx, dy, colour, label, cap = 600) {
+  const length = Math.hypot(dx, dy),
+    capped = length > cap,
+    k = capped ? cap / length : 1,
+    end = { x: p.x + dx * k, y: p.y - dy * k },
+    a = Math.atan2(end.y - p.y, end.x - p.x);
+  line(p, end, colour, 2);
+  for (const turn of [-0.45, 0.45])
+    line(
+      end,
+      {
+        x: end.x - 7 * Math.cos(a + turn),
+        y: end.y - 7 * Math.sin(a + turn),
+      },
+      colour,
+      2,
+    );
+  if (capped)
+    // Two short slashes across the shaft: drawn shorter than true length.
+    for (const at of [0.62, 0.68]) {
+      const c = { x: p.x + (end.x - p.x) * at, y: p.y + (end.y - p.y) * at },
+        n = { x: -Math.sin(a), y: Math.cos(a) };
+      line(
+        {
+          x: c.x + 5 * n.x - 2 * Math.cos(a),
+          y: c.y + 5 * n.y - 2 * Math.sin(a),
+        },
+        {
+          x: c.x - 5 * n.x + 2 * Math.cos(a),
+          y: c.y - 5 * n.y + 2 * Math.sin(a),
+        },
+        colour,
+        1.5,
+      );
+    }
+  if (label) {
+    ctx.fillStyle = colour;
+    ctx.font = "10px ui-monospace, monospace";
+    ctx.fillText(label, end.x + 7, end.y - 6);
+  }
+}
+// Graph of one quantity of the selected body against simulation time. One
+// sample per rendered frame, keeping the last 20 s of sim.time, so pausing
+// freezes the graph. Every quantity is stored so switching shows history.
+const GRAPH_SPAN = 20,
+  GRAPH_UNITS = {
+    x: "m",
+    y: "m",
+    vx: "m/s",
+    vy: "m/s",
+    speed: "m/s",
+    kinetic: "J",
+    electric: "J",
+    total: "J",
+    conserved: "J",
+  },
+  graphSamples = [];
+function sampleGraph() {
+  const o = sim.objects.get(selected);
+  if (!o || selectionSet.size > 1) return;
+  const t = sim.time,
+    last = graphSamples.at(-1);
+  if (last && t === last.t) return;
+  // Time went backwards (Reset or a loaded scene): start again.
+  if (last && t < last.t) graphSamples.length = 0;
+  const s = sim.state(o.id),
+    m = sim.measure(o.id),
+    e = sim.energy();
+  graphSamples.push({
+    t,
+    x: s.x,
+    y: s.y,
+    vx: s.vx,
+    vy: s.vy,
+    speed: m.speed,
+    kinetic: m.kinetic,
+    electric: m.electric,
+    total: e.total,
+    conserved: e.total - e.fieldWork,
+  });
+  while (graphSamples[0].t < t - GRAPH_SPAN) graphSamples.shift();
+}
+// Round step (1, 2 or 5 × 10ⁿ) giving about `count` intervals over `range`.
+function niceStep(range, count) {
+  const raw = range / count,
+    power = 10 ** Math.floor(Math.log10(raw)),
+    unit = raw / power;
+  return (unit < 1.5 ? 1 : unit < 3.5 ? 2 : unit < 7.5 ? 5 : 10) * power;
+}
+function drawGraph(dark) {
+  const panel = $("graph-panel");
+  if (panel.hidden || !panel.open) return;
+  const c = $("graph-canvas"),
+    g = c.getContext("2d"),
+    dpr = window.devicePixelRatio || 1,
+    w = c.clientWidth || 300,
+    h = c.clientHeight || 130;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
+    c.width = Math.round(w * dpr);
+    c.height = Math.round(h * dpr);
+  }
+  const key = $("graph-quantity").value,
+    unit = GRAPH_UNITS[key],
+    ink = dark ? "#ebe5d6" : "#354438",
+    grid = dark ? "#4a453b" : "#dfe4d9",
+    trace = dark ? "#8fb6e0" : "#3d6f9f",
+    left = 44,
+    right = 8,
+    top = 16,
+    bottom = 20;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  g.font = "9px ui-monospace, monospace";
+  g.fillStyle = ink;
+  g.fillText(`${$("graph-quantity").selectedOptions[0].text}`, left, 10);
+  g.textAlign = "right";
+  g.fillText("t (s)", w - right, h - 2);
+  g.textAlign = "left";
+  if (graphSamples.length < 2) {
+    g.fillText("Run the simulation to plot.", left, h / 2);
+    return;
+  }
+  const t1 = graphSamples.at(-1).t,
+    t0 = Math.max(graphSamples[0].t, t1 - GRAPH_SPAN),
+    tEnd = t0 + GRAPH_SPAN;
+  let lo = Infinity,
+    hi = -Infinity;
+  for (const p of graphSamples) {
+    lo = Math.min(lo, p[key]);
+    hi = Math.max(hi, p[key]);
+  }
+  // Automatic vertical scale with a little headroom. The range is at least
+  // 10% of the values' size, so a nearly constant quantity (total energy,
+  // say) reads as flat instead of magnifying rounding-level wobble.
+  const minRange = Math.max(0.1 * Math.max(Math.abs(lo), Math.abs(hi)), 1e-3);
+  if (hi - lo < minRange) {
+    const mid = (hi + lo) / 2;
+    lo = mid - minRange / 2;
+    hi = mid + minRange / 2;
+  }
+  const pad = (hi - lo) * 0.08;
+  lo -= pad;
+  hi += pad;
+  const X = (t) => left + ((t - t0) / (tEnd - t0)) * (w - left - right),
+    Y = (v) => top + ((hi - v) / (hi - lo)) * (h - top - bottom);
+  g.strokeStyle = grid;
+  g.lineWidth = 1;
+  const yStep = niceStep(hi - lo, 3);
+  g.textAlign = "right";
+  for (let v = Math.ceil(lo / yStep) * yStep; v <= hi; v += yStep) {
+    g.beginPath();
+    g.moveTo(left, Math.round(Y(v)) + 0.5);
+    g.lineTo(w - right, Math.round(Y(v)) + 0.5);
+    g.stroke();
+    g.fillText(
+      (Math.abs(v) < yStep / 1e6 ? 0 : v).toFixed(
+        Math.max(0, -Math.floor(Math.log10(yStep))),
+      ),
+      left - 4,
+      Y(v) + 3,
+    );
+  }
+  g.textAlign = "center";
+  for (let t = Math.ceil(t0 / 5) * 5; t <= tEnd; t += 5) {
+    g.beginPath();
+    g.moveTo(Math.round(X(t)) + 0.5, top);
+    g.lineTo(Math.round(X(t)) + 0.5, h - bottom);
+    g.stroke();
+    if (X(t) < w - right - 24) g.fillText(String(t), X(t), h - 6);
+  }
+  g.textAlign = "left";
+  g.fillText(unit, 4, top + 2);
+  g.strokeStyle = ink;
+  g.strokeRect(
+    left + 0.5,
+    top + 0.5,
+    w - left - right - 1,
+    h - top - bottom - 1,
+  );
+  g.beginPath();
+  graphSamples.forEach((p, i) =>
+    i ? g.lineTo(X(p.t), Y(p[key])) : g.moveTo(X(p.t), Y(p[key])),
+  );
+  g.strokeStyle = trace;
+  g.lineWidth = 1.5;
+  g.stroke();
+}
+// Three significant figures, keeping trailing zeros so a value's width does
+// not jump; tiny values read as zero.
+function sig3(value) {
+  if (!Number.isFinite(value)) return "—";
+  if (Math.abs(value) < 5e-4) return "0.00";
+  const text = value.toPrecision(3);
+  return text.includes("e") ? Number(text).toFixed(0) : text;
+}
+// Rows of the selected-body readout: label, values, unit.
+const READOUT_ROWS = [
+  ["position", "Position x, y", 2, "m"],
+  ["velocity", "Velocity vx, vy", 2, "m/s"],
+  ["speed", "Speed", 1, "m/s"],
+  ["acceleration", "Acceleration ax, ay", 2, "m/s²"],
+  ["momentum", "Momentum px, py", 2, "kg·m/s"],
+  ["kinetic", "Kinetic energy", 1, "J"],
+  ["gravitational", "Gravitational PE", 1, "J"],
+  ["electric", "Electric PE", 1, "J"],
+];
+{
+  const grid = $("readout-grid");
+  for (const [key, label, count, unit] of READOUT_ROWS) {
+    const name = document.createElement("span"),
+      cells = [name];
+    name.textContent = label;
+    for (let i = 0; i < 2; i++) {
+      const value = document.createElement("span");
+      value.className = "num";
+      if (i < count) value.id = `readout-${key}-${i}`;
+      cells.push(value);
+    }
+    const units = document.createElement("span");
+    units.className = "unit";
+    units.textContent = unit;
+    cells.push(units);
+    for (const cell of cells) cell.dataset.row = key;
+    grid.append(...cells);
+  }
+}
+function updateReadouts() {
+  const o = sim.objects.get(selected),
+    // Electric rows only appear once the scene has a charged body.
+    charged = [...sim.objects.values()].some((b) => b.charge);
+  for (const el of document.querySelectorAll(
+    '[data-row="electric"], .electric-row, .electric-option',
+  ))
+    el.hidden = !charged;
+  if ($("graph-quantity").selectedOptions[0]?.hidden)
+    $("graph-quantity").value = "total";
+  $("readout").hidden = !o || selectionSet.size > 1;
+  $("graph-panel").hidden = $("readout").hidden;
+  if (o && $("readout").open) {
+    const s = sim.state(o.id),
+      m = sim.measure(o.id),
+      // Same 6-step average as the net force arrow, so the two agree.
+      f = averageForce(o.id),
+      values = {
+        position: [s.x, s.y],
+        velocity: [s.vx, s.vy],
+        speed: [m.speed],
+        acceleration: [f.x / o.mass, f.y / o.mass],
+        momentum: [m.momentum.x, m.momentum.y],
+        kinetic: [m.kinetic],
+        gravitational: [m.gravitational],
+        electric: [m.electric],
+      };
+    for (const [key, list] of Object.entries(values))
+      list.forEach((v, i) => ($(`readout-${key}-${i}`).textContent = sig3(v)));
+  }
+  const empty = !sim.objects.size && !sim.links.size;
+  $("energy-panel").hidden = empty;
+  if (empty || !$("energy-panel").open) return;
+  const e = sim.energy(),
+    parts = ["kinetic", "gravitational", "elastic", "electric"],
+    sum = parts.reduce((t, k) => t + Math.abs(e[k]), 0);
+  $("energy-total").textContent = `${sig3(e.total)} J`;
+  // Field regions are not conservative: the energy they have supplied is
+  // reported separately, and total − supplied is the conserved quantity.
+  $("field-work").hidden = Math.abs(e.fieldWork) < 1e-9;
+  $("energy-field-work").textContent = sig3(e.fieldWork);
+  $("energy-conserved").textContent = sig3(e.total - e.fieldWork);
+  for (const k of parts) {
+    $("energy-" + k).textContent = sig3(e[k]);
+    const bar = $("bar-" + k);
+    bar.style.width = sum > 1e-9 ? (100 * Math.abs(e[k])) / sum + "%" : "0";
+    // Negative potential energy (below the floor, or gravity reversed).
+    bar.classList.toggle("negative", e[k] < 0);
+  }
+}
+// Keep the floating panels from covering each other. The top toolbar and the
+// tool-options strip are centred in the free space between the edit bar and
+// the energy box; if they do not fit there, the energy box drops below them.
+// Positions are set in CSS px, which the panels' GUI-size zoom multiplies.
+function layoutOverlays() {
+  const zoom = prefs.size / 100,
+    main = canvas.getBoundingClientRect(),
+    toolbar = document.querySelector(".tools"),
+    options = $("tool-settings"),
+    energy = $("energy-panel"),
+    edit = document.querySelector(".edit-tools").getBoundingClientRect(),
+    bar = toolbar.getBoundingClientRect();
+  options.style.top = toolbar.offsetTop + toolbar.offsetHeight + 8 + "px";
+  if (!bar.width) return; // no layout (e.g. the DOM test)
+  const left = edit.right - main.left + 8;
+  let right = main.width - 8;
+  energy.style.top = "";
+  const box = energy.hidden ? null : energy.getBoundingClientRect(),
+    beside = box && box.left - main.left - 8 - left >= bar.width;
+  if (beside) right = box.left - main.left - 8;
+  const centre = (left + right) / 2;
+  toolbar.style.left = centre / zoom + "px";
+  options.style.left = centre / zoom + "px";
+  options.style.maxWidth = Math.max(200, right - left) / zoom + "px";
+  if (box && !beside) {
+    const below = Math.max(
+      bar.bottom,
+      options.hidden ? 0 : options.getBoundingClientRect().bottom,
+    );
+    energy.style.top = (below - main.top + 8) / zoom + "px";
+  }
+}
+// Toasts sit low in the middle of the scene; raise one above any bottom
+// panel it would otherwise cover.
+function placeToast() {
+  const el = $("toast"),
+    main = canvas.getBoundingClientRect();
+  el.style.bottom = "";
+  for (let pass = 0; pass < 3; pass++) {
+    const t = el.getBoundingClientRect();
+    if (!t.width) return;
+    let bottom = null;
+    for (const other of [
+      document.querySelector(".camera-controls"),
+      $("vector-legend"),
+      $("selection"),
+    ]) {
+      if (other.hidden) continue;
+      const o = other.getBoundingClientRect();
+      if (
+        o.left < t.right &&
+        o.right > t.left &&
+        o.top < t.bottom &&
+        o.bottom > t.top
+      )
+        bottom = Math.max(bottom ?? 0, main.top + main.height - o.top + 8);
+    }
+    if (bottom === null) return;
+    el.style.bottom = bottom + "px";
+  }
+}
+// Ruler markings rotate with the body, so spin is visible on any shape. Tick
+// lengths and spacing are fixed in metres, so a large body is marked exactly
+// like a small one (ticks still scale with zoom, like the body itself).
+const TICK = { gap: 0.025, minor: 0.075, mid: 0.1, major: 0.13 },
+  RULER_INK = "#fff7e9";
+function distanceToSegment(p, a, b) {
+  const dx = b.x - a.x,
+    dy = b.y - a.y,
+    t = Math.max(
+      0,
+      Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)),
+    );
+  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+}
+function drawRuler(o, s) {
+  if (o.shape === "ball") {
+    // Degree ticks: the finest of these steps whose arc spacing is at least
+    // 0.065 m (10° on the default 0.4 m radius) and 5 px on screen. Long
+    // ticks every 30°, medium every 10°.
+    const outer = o.radius - Math.min(TICK.gap, o.radius * 0.1),
+      room = Math.min(1, (o.radius * 0.45) / TICK.major),
+      step =
+        [1, 2, 5, 10, 15, 30, 90].find((d) => {
+          const arc = (o.radius * d * Math.PI) / 180;
+          return arc >= 0.065 && arc * view.scale >= 5;
+        }) ?? 90;
+    for (let degrees = 0; degrees < 360; degrees += step) {
+      const angle = s.angle + (degrees * Math.PI) / 180,
+        level =
+          degrees % 30 === 0 ? "major" : degrees % 10 === 0 ? "mid" : "minor",
+        inner = outer - (TICK[level] - TICK.gap) * room,
+        c = Math.cos(angle),
+        si = Math.sin(angle);
+      line(
+        screen({ x: s.x + inner * c, y: s.y + inner * si }),
+        screen({ x: s.x + outer * c, y: s.y + outer * si }),
+        RULER_INK,
+        level === "major" ? 2 : 1,
+      );
+    }
+    return;
+  }
+  // Straight edges carry length ticks: 0.1 m apart with long ones every
+  // 0.5 m, coarser when zoomed out so ticks never merge.
+  const minor = [0.1, 0.5, 1, 5].find((m) => m * view.scale >= 5) ?? 10,
+    every = minor === 0.5 ? 2 : 5,
+    corners = o.body.vertices.map((v) => ({ x: v.x / 100, y: -v.y / 100 })),
+    edges = corners.map((a, i) => [a, corners[(i + 1) % corners.length]]);
+  ctx.save();
+  ctx.clip(); // the body outline is still the current path
+  edges.forEach(([a, b], i) => {
+    const length = Math.hypot(b.x - a.x, b.y - a.y),
+      ux = (b.x - a.x) / length,
+      uy = (b.y - a.y) / length,
+      // Inward normal: towards the centre of mass.
+      side = (s.x - a.x) * -uy + (s.y - a.y) * ux > 0 ? 1 : -1,
+      nx = -uy * side,
+      ny = ux * side;
+    for (let k = 1; k * minor < length - 1e-6; k++) {
+      const major = k % every === 0,
+        x = a.x + ux * k * minor,
+        y = a.y + uy * k * minor,
+        to = major ? TICK.major : TICK.minor,
+        tip = { x: x + nx * to, y: y + ny * to };
+      // Near a corner a tick would run into the next edge's ticks; leave the
+      // corner clear instead (both edges skip, so corners stay symmetric).
+      if (
+        edges.some(
+          (e, j) =>
+            j !== i &&
+            Math.min(
+              distanceToSegment(tip, ...e),
+              distanceToSegment({ x, y }, ...e),
+            ) <
+              TICK.major + TICK.gap,
+        )
+      )
+        continue;
+      line(
+        screen({ x: x + nx * TICK.gap, y: y + ny * TICK.gap }),
+        screen(tip),
+        RULER_INK,
+        major ? 2 : 1,
+      );
+    }
+  });
+  ctx.restore();
+}
+// A wedge shows the size of both acute corners: a small arc at each, with the
+// angle written inside the corner where it fits and just outside it where the
+// corner is too narrow. Skipped only when the wedge is tiny on screen.
+function drawWedgeAngles(o, dark) {
+  const corners = o.body.vertices.map((v) =>
+      screen({ x: v.x / 100, y: -v.y / 100 }),
+    ),
+    inside = dark ? "#1d2a1f" : "#2f4630",
+    outside = dark ? "#cfd8c8" : "#46553e";
+  ctx.save();
+  ctx.font = "600 10px ui-monospace, monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 1.25;
+  corners.forEach((c, i) => {
+    const a = corners[(i + 1) % 3],
+      b = corners[(i + 2) % 3],
+      toA = Math.atan2(a.y - c.y, a.x - c.x),
+      toB = Math.atan2(b.y - c.y, b.x - c.x);
+    let sweep = toB - toA;
+    if (sweep > Math.PI) sweep -= 2 * Math.PI;
+    if (sweep < -Math.PI) sweep += 2 * Math.PI;
+    const angle = Math.abs(sweep);
+    if (angle > Math.PI / 2 - 1e-3) return; // the right angle
+    const reach = Math.min(
+      Math.hypot(a.x - c.x, a.y - c.y),
+      Math.hypot(b.x - c.x, b.y - c.y),
+    );
+    if (reach < 36) return;
+    const label = formatAngle(angle),
+      width = ctx.measureText(label)?.width || label.length * 6,
+      // The label must clear both edges whichever way the wedge is turned,
+      // so fit the circle around it into the corner.
+      clearance = Math.hypot(width / 2, 6) + 2,
+      radius = Math.min(26, reach * 0.3),
+      fit = Math.max(radius + clearance, clearance / Math.sin(angle / 2)),
+      // Kept in the corner's own half of the edge, clear of the lock badge.
+      fits = fit < reach * 0.45,
+      distance = fits ? fit : -(clearance + 4),
+      middle = toA + sweep / 2;
+    ctx.strokeStyle = inside;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, radius, toA, toB, sweep < 0);
+    ctx.stroke();
+    ctx.fillStyle = fits ? inside : outside;
+    ctx.fillText(
+      label,
+      c.x + distance * Math.cos(middle),
+      c.y + distance * Math.sin(middle),
+    );
+  });
+  ctx.restore();
+}
 function draw() {
   const r = canvas.getBoundingClientRect(),
     dpr = window.devicePixelRatio || 1;
@@ -1343,9 +2548,7 @@ function draw() {
       maxY: view.y / view.scale,
     });
   $("zoom-level").textContent = Math.round((view.scale / 65) * 100) + "%";
-  const toolbar = document.querySelector(".tools");
-  $("tool-settings").style.top =
-    toolbar.offsetTop + toolbar.offsetHeight + 8 + "px";
+  layoutOverlays();
   const dark = document.documentElement.dataset.theme === "dark";
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, r.width, r.height);
@@ -1363,7 +2566,7 @@ function draw() {
       line(
         screen({ x, y: min.y }),
         screen({ x, y: max.y }),
-        major ? (dark ? "#3c5042" : "#c6cebf") : dark ? "#2c3931" : "#dce1d4",
+        major ? (dark ? "#3d3930" : "#c6cebf") : dark ? "#2a2721" : "#dce1d4",
         major ? 1 : 0.75,
       );
     }
@@ -1377,7 +2580,7 @@ function draw() {
       line(
         screen({ x: min.x, y }),
         screen({ x: max.x, y }),
-        major ? (dark ? "#3c5042" : "#c6cebf") : dark ? "#2c3931" : "#dce1d4",
+        major ? (dark ? "#3d3930" : "#c6cebf") : dark ? "#2a2721" : "#dce1d4",
         major ? 1 : 0.75,
       );
     }
@@ -1405,7 +2608,15 @@ function draw() {
     x += labelStep
   )
     ctx.fillText(x + " m", screen({ x, y: 0 }).x + 4, view.y + 16);
-  drawFields(ctx, sim.fields, screen, view.scale, highlighted, { min, max });
+  drawFields(
+    ctx,
+    sim.fields,
+    screen,
+    view.scale,
+    highlighted,
+    { min, max },
+    dark,
+  );
   for (const l of sim.links.values()) {
     if (["belt", "pulley"].includes(l.type)) {
       const path = linkPath(l).map(screen);
@@ -1441,12 +2652,16 @@ function draw() {
         );
       }
     ctx.lineTo(b.x, b.y);
-    ctx.strokeStyle = highlighted(l.id) ? "#566b91" : "#879579";
+    ctx.strokeStyle = highlighted(l.id)
+      ? dark
+        ? "#8fa8d8"
+        : "#566b91"
+      : "#879579";
     ctx.lineWidth = l.type === "rod" ? 3 : 1.8;
     ctx.stroke();
     if (l.type === "spring" && l.lockAngle) {
       ctx.font = "10px system-ui";
-      ctx.fillStyle = "#46553e";
+      ctx.fillStyle = dark ? "#a9c49d" : "#46553e";
       ctx.fillText("axis locked", (a.x + b.x) / 2 + 8, (a.y + b.y) / 2 - 12);
     }
     for (const [id, p] of [
@@ -1456,7 +2671,7 @@ function draw() {
       if (!id) {
         ctx.beginPath();
         ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = "#65775c";
+        ctx.fillStyle = dark ? "#a9c49d" : "#65775c";
         ctx.fill();
       }
   }
@@ -1484,30 +2699,17 @@ function draw() {
         : "#658199";
     ctx.lineWidth = highlighted(o.id) ? 2.5 : 1.5;
     ctx.stroke();
-    // Degree ticks rotate with the body; a longer zero mark gives a clear reference.
-    if (o.shape === "ball") {
-      for (let degrees = 0; degrees < 360; degrees += 10) {
-        const angle = s.angle + (degrees * Math.PI) / 180;
-        const outer = o.radius * 0.95,
-          inner =
-            o.radius *
-            (degrees === 0 ? 0.64 : degrees % 30 === 0 ? 0.74 : 0.85);
-        line(
-          screen({
-            x: s.x + inner * Math.cos(angle),
-            y: s.y + inner * Math.sin(angle),
-          }),
-          screen({
-            x: s.x + outer * Math.cos(angle),
-            y: s.y + outer * Math.sin(angle),
-          }),
-          degrees === 0 ? "#775126" : "#fff7e9",
-          degrees % 30 === 0 ? 2 : 1,
-        );
-      }
-    }
+    drawRuler(o, s);
+    if (o.shape === "wedge") drawWedgeAngles(o, dark);
     if (o.charge) {
-      ctx.fillStyle = o.charge > 0 ? "#bd5948" : "#467cb8";
+      ctx.fillStyle =
+        o.charge > 0
+          ? dark
+            ? "#f08a78"
+            : "#bd5948"
+          : dark
+            ? "#7fb2f0"
+            : "#467cb8";
       ctx.font = "bold 11px system-ui";
       ctx.fillText(
         (o.charge > 0 ? "+" : "") + o.charge + " C",
@@ -1515,48 +2717,39 @@ function draw() {
         p.y + 20,
       );
     }
-    if (o.lockPosition) {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = "#3a5140";
-      ctx.fill();
-    }
-    if (o.lockRotation) {
-      ctx.font = "10px system-ui";
-      ctx.fillStyle = "#46553e";
-      ctx.fillText("↻ ×", p.x + 12, p.y - 12);
-    }
+    if (o.lockPosition || o.lockRotation)
+      lockGlyph(
+        o,
+        p,
+        dark,
+        (o.shape === "ball" ? o.radius : Math.min(o.width, o.height) / 2) *
+          view.scale,
+      );
     if ($("vectors").checked) {
       const speed = Math.hypot(s.vx, s.vy);
-      if (speed > 0.03) {
-        const factor = Math.min(14, 130 / speed),
-          end = { x: p.x + s.vx * factor, y: p.y - s.vy * factor },
-          a = Math.atan2(end.y - p.y, end.x - p.x);
-        line(p, end, "#497caa", 2);
-        line(
-          end,
-          {
-            x: end.x - 7 * Math.cos(a - 0.45),
-            y: end.y - 7 * Math.sin(a - 0.45),
-          },
-          "#497caa",
-          2,
+      if (speed * VELOCITY_PX >= 3)
+        arrow(
+          p,
+          s.vx * VELOCITY_PX,
+          s.vy * VELOCITY_PX,
+          VELOCITY_COLOUR[dark ? "dark" : "light"],
+          highlighted(o.id) && fixed(speed) + " m/s",
         );
-        line(
-          end,
-          {
-            x: end.x - 7 * Math.cos(a + 0.45),
-            y: end.y - 7 * Math.sin(a + 0.45),
-          },
-          "#497caa",
-          2,
+    }
+    if ($("force-vectors").checked) {
+      const f = averageForce(o.id),
+        size = Math.hypot(f.x, f.y),
+        length = size * forceScale();
+      // A body at rest has zero net force and draws nothing.
+      if (length >= 3)
+        arrow(
+          p,
+          f.x * forceScale(),
+          f.y * forceScale(),
+          dark ? "#ef8a6f" : "#c2410c",
+          o.id === selected && fixed(size) + " N",
+          FORCE_CAP,
         );
-        if (highlighted(o.id)) {
-          ctx.fillStyle = "#497caa";
-          ctx.font = "10px monospace";
-          ctx.fillText(speed.toFixed(1) + " m/s", end.x + 7, end.y - 6);
-        }
-      }
     }
   }
   if (sim.grab) {
@@ -1599,14 +2792,15 @@ function draw() {
         };
       const end = screen({ x: o.x + delta.x, y: o.y + delta.y }),
         a = Math.atan2(end.y - start.y, end.x - start.x);
-      line(start, end, "#c16145", 3);
+      const impulseColour = dark ? "#e9826e" : "#c16145";
+      line(start, end, impulseColour, 3);
       line(
         end,
         {
           x: end.x - 10 * Math.cos(a - 0.45),
           y: end.y - 10 * Math.sin(a - 0.45),
         },
-        "#c16145",
+        impulseColour,
         3,
       );
       line(
@@ -1615,11 +2809,11 @@ function draw() {
           x: end.x - 10 * Math.cos(a + 0.45),
           y: end.y - 10 * Math.sin(a + 0.45),
         },
-        "#c16145",
+        impulseColour,
         3,
       );
       const v = impulseVector();
-      ctx.fillStyle = "#c16145";
+      ctx.fillStyle = impulseColour;
       ctx.font = "12px system-ui";
       ctx.fillText(
         Math.hypot(v.x, v.y).toFixed(2) +
@@ -1635,15 +2829,21 @@ function draw() {
     ctx.setLineDash([]);
   }
   if (sim.sizing) showDimensions();
-  $("time").textContent = sim.time.toFixed(2) + " s";
+  const speed = $("speed").value;
+  $("time").textContent =
+    sim.time.toFixed(2) + " s" + (speed === "1" ? "" : ` · ${speed}×`);
+  updateReadouts();
+  sampleGraph();
+  drawGraph(dark);
 }
 function frame(now) {
   const elapsed = last ? Math.min((now - last) / 1000, 0.05) : 0;
   last = now;
   if (running) {
-    accumulator += elapsed;
+    // Slow motion: less simulated time per real second, same fixed step.
+    accumulator += elapsed * Number($("speed").value);
     while (accumulator >= DT) {
-      sim.step();
+      stepOnce();
       accumulator -= DT;
     }
   }
@@ -1669,5 +2869,7 @@ for (const [key, t] of Object.entries({
     `${t[0].toUpperCase() + t.slice(1)} (${key})`;
 chooseTool("grab");
 snapStatus();
+updateVectorLegend();
+fitHeader();
 draw();
 requestAnimationFrame(frame);

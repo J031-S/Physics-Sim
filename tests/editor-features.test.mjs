@@ -76,7 +76,6 @@ test("group translation moves world rod constraint points and prevents floor pen
   s.moveGroup({ x: 2, y: -10 }, true);
   near(s.state(a).y, 0.5);
   near(s.links.get(l).aPoint.y, 2.5);
-  near(s.links.get(l).constraint.pointA.y, -250);
   s.endGroup();
   run(s, 0.2);
   assert.ok(s.state(a).y > 0.35);

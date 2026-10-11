@@ -23,23 +23,38 @@ export function prepareIcons() {
     const key = button.dataset.tool;
     button.dataset.icon = key;
     button.dataset.iconLabel = key[0].toUpperCase() + key.slice(1);
+    if (button.closest(".edit-tools")) button.dataset.iconOnly = "true";
+  }
+  // Category toggles show the icon of their active (or first) tool.
+  for (const group of document.querySelectorAll(".tool-category")) {
+    const toggle = group.querySelector(".category-toggle");
+    toggle.dataset.icon = group.querySelector("[data-tool]").dataset.tool;
+    toggle.dataset.iconLabel = group.dataset.label;
   }
   const controls = {
-    "settings-toggle": ["settings", "Settings"],
-    shortcuts: ["keys", "Keys"],
-    pause: ["pause", "Pause"],
+    "settings-toggle": ["settings", "Settings", true],
+    shortcuts: ["keys", "Keyboard shortcuts", true],
+    pause: ["pause", "Pause", true],
     clear: ["clear", "Clear scene"],
-    delete: ["delete", "Delete"],
-    "resize-object": ["resize", "Resize (R)"],
+    reset: ["reset", "Reset", true],
+    step: ["step", "Step", true],
+    "presets-toggle": ["presets", "Presets"],
+    "save-scene": ["save", "Save scene", true],
+    "load-scene": ["load", "Load scene", true],
+    "close-presets": ["close", "Close presets", true],
+    delete: ["delete", "Delete", true],
+    "resize-object": ["resize", "Resize (R)", true],
     "zoom-in": ["zoomIn", "Zoom in", true],
     "zoom-out": ["zoomOut", "Zoom out", true],
-    "fit-scene": ["fit", "Fit scene"],
+    "fit-scene": ["fit", "Fit scene", true],
     "close-menu": ["close", "Close material constants", true],
     "close-settings": ["close", "Close simulation settings", true],
     "close-keys": ["close", "Close shortcuts", true],
   };
   for (const [id, [icon, label, only]] of Object.entries(controls)) {
     const button = document.getElementById(id);
+    // Each page has its own subset of these controls.
+    if (!button) continue;
     button.dataset.icon = icon;
     button.dataset.iconLabel = label;
     if (only) button.dataset.iconOnly = "true";
@@ -50,4 +65,26 @@ export function setPlaybackIcon(running, set) {
   button.dataset.icon = running ? "pause" : "play";
   button.dataset.iconLabel = running ? "Pause" : "Run";
   renderIcons(set);
+}
+// Canvas version of an icon: its SVG path data as Path2D objects, filled for
+// sets drawn with fill (Material) and stroked at width 2 for outline sets.
+const canvasIcons = new Map();
+export function canvasIcon(set, name) {
+  const key = set + ":" + name;
+  if (!canvasIcons.has(key)) {
+    const icon = (iconSets[set] || iconSets.material)[name];
+    canvasIcons.set(
+      key,
+      icon && typeof Path2D === "function"
+        ? {
+            paths: [...icon.body.matchAll(/\sd="([^"]+)"/g)].map(
+              (m) => new Path2D(m[1]),
+            ),
+            filled: /fill="currentColor"/.test(icon.body),
+            size: icon.width,
+          }
+        : null,
+    );
+  }
+  return canvasIcons.get(key);
 }

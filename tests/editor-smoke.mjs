@@ -2,6 +2,7 @@ import { Window } from "happy-dom";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import Matter from "../vendor/matter.js";
+import { presets } from "../src/presets.js";
 const window = new Window({ url: "http://localhost:3000" });
 window.document.write(
   await readFile(new URL("../index.html", import.meta.url), "utf8"),
@@ -38,6 +39,10 @@ const frames = (n) => {
   }
 };
 const tool = (name) => document.querySelector(`[data-tool=${name}]`).click();
+const clearScene = () => {
+  $("clear").click();
+  $("clear-yes").click();
+};
 const pointer = (
   type,
   x,
@@ -92,15 +97,43 @@ assert.deepEqual(
     "magnetic",
   ],
 );
-assert.equal(document.querySelector("#graph"), null);
+assert.ok($("graph-canvas"), "graph panel exists");
 assert.equal(document.querySelector("#properties"), null);
 assert.equal($("pause").textContent, "Pause");
 tool("ball");
 click(500, 250);
 assert.equal($("selection").hidden, false);
 assert.equal($("selected-name").textContent, "Ball");
+// Compact panel: icon buttons in the header, lock toggles on one row.
+assert.ok($("delete").closest(".selection-header"));
+assert.equal($("delete").dataset.iconOnly, "true");
+assert.equal($("lock-position").parentElement.hidden, false);
+assert.equal($("lock-caption").hidden, false);
+assert.equal(document.querySelector(".selection-row").hidden, false);
 assert.equal(menu(500, 250).defaultPrevented, true);
 assert.equal($("material-menu").hidden, false);
+// Compact rows: label, slider and number on one row; help as a description.
+{
+  const mass = $("constants").querySelector('[data-constant="mass"]'),
+    row = mass.closest(".prop-row");
+  assert.ok(row.querySelector('[data-slider="mass"]'));
+  assert.equal(row.querySelector("label").htmlFor, mass.id);
+  assert.equal(row.querySelector("label").title, "Inertial mass.");
+  assert.equal(
+    document.getElementById(mass.getAttribute("aria-describedby")).textContent,
+    "Inertial mass.",
+  );
+  assert.equal($("constants").querySelector("small"), null);
+  const charge = $("constants").querySelector('[data-slider="charge"]');
+  assert.ok(charge.closest(".zero-slider"));
+  assert.equal(row.querySelector(".zero-slider"), null);
+  charge.value = "3";
+  charge.dispatchEvent(new window.Event("input"));
+  assert.equal(
+    $("constants").querySelector('[data-constant="charge"]').value,
+    "0",
+  );
+}
 assert.deepEqual(
   [...$("constants").querySelectorAll("input[type=number]")].map(
     (i) => i.dataset.constant,
@@ -171,7 +204,7 @@ assert.equal(
 $("close-menu").click();
 $("delete").click();
 assert.equal($("selection").hidden, true);
-$("clear").click();
+clearScene();
 assert.equal($("time").textContent === "NaN", false);
 assert.equal($("selection").hidden, true);
 assert.equal(menu(500, 250).defaultPrevented, false);
@@ -206,7 +239,50 @@ const key = (k, type = "keydown", extra = {}) =>
       ...extra,
     }),
   );
-$("clear").click();
+// Edit tools on the left bar; other categories behind drop-downs.
+assert.deepEqual(
+  [...document.querySelectorAll(".edit-tools [data-tool]")].map(
+    (b) => b.dataset.tool,
+  ),
+  ["grab", "select", "impulse", "pan"],
+);
+for (const b of document.querySelectorAll("[data-tool]"))
+  assert.ok(["true", "false"].includes(b.getAttribute("aria-pressed")));
+$("category-bodies").click();
+assert.equal($("menu-bodies").hidden, false);
+assert.equal($("category-bodies").getAttribute("aria-expanded"), "true");
+$("category-fields").click();
+assert.equal($("menu-bodies").hidden, true, "one drop-down at a time");
+assert.equal($("menu-fields").hidden, false);
+document.querySelector('[data-tool="magnetic"]').click();
+assert.equal($("menu-fields").hidden, true, "choosing a tool closes it");
+assert.ok($("category-fields").classList.contains("active"));
+assert.equal($("category-fields").dataset.icon, "magnetic");
+assert.equal(
+  document.querySelector('[data-tool="magnetic"]').getAttribute("aria-pressed"),
+  "true",
+);
+$("category-connections").click();
+document.activeElement.dispatchEvent(
+  new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+);
+assert.equal($("menu-connections").hidden, true);
+assert.ok(
+  $("category-fields").classList.contains("active"),
+  "Escape keeps tool",
+);
+$("category-connections").click();
+document.activeElement.dispatchEvent(
+  new window.KeyboardEvent("keydown", { key: "s", bubbles: true }),
+);
+assert.ok(
+  $("category-connections").classList.contains("active"),
+  "shortcuts work while a drop-down is open",
+);
+assert.equal($("menu-connections").hidden, true);
+assert.ok(!$("category-fields").classList.contains("active"));
+key("g");
+clearScene();
 canvas.focus();
 key(" ");
 assert.equal($("pause").textContent, "Pause");
@@ -251,7 +327,7 @@ mass.dispatchEvent(
 );
 assert.equal($("pause").textContent, "Run");
 $("close-menu").click();
-$("clear").click();
+clearScene();
 canvas.focus();
 key("b");
 click(350, 350);
@@ -273,7 +349,7 @@ key(" ");
 key("Delete");
 assert.equal($("selection").hidden, true);
 // Resize a wheel and create a guided pulley through three actual clicks.
-$("clear").click();
+clearScene();
 key("b");
 click(500, 180);
 key("r");
@@ -293,7 +369,7 @@ assert.equal($("selected-name").textContent, "Pulley");
 frames(1);
 // Build the reference layout: spring-guided horizontal block, angled cable,
 // wheel, hanging block. Existing spring connections must remain acceptable.
-$("clear").click();
+clearScene();
 canvas.focus();
 key("n");
 click(300, 260);
@@ -334,7 +410,7 @@ key(" ");
 frames(10);
 key(" ");
 // Marquee selects only enclosed/intersecting bodies; group movement and deletion.
-$("clear").click();
+clearScene();
 canvas.focus();
 key("b");
 click(300, 300);
@@ -385,10 +461,13 @@ assert.equal($("range-airResistance").value, "2");
 $("setting-gravity").value = "-500";
 $("setting-gravity").dispatchEvent(new window.Event("change"));
 assert.equal($("setting-gravity").value, "0");
-$("clear").click();
+// Clear restores default settings as well as emptying the scene.
+clearScene();
 $("settings-toggle").click();
 $("settings-toggle").click();
-assert.equal($("setting-airResistance").value, "2");
+assert.equal($("setting-airResistance").value, "0");
+$("setting-airResistance").value = "2";
+$("setting-airResistance").dispatchEvent(new window.Event("change"));
 $("reset-settings").click();
 assert.equal($("setting-gravity").value, "9.81");
 assert.equal($("setting-airResistance").value, "0");
@@ -401,6 +480,16 @@ key("z", "keydown", { repeat: true });
 assert.equal($("setting-snapping").checked, true);
 key("z", "keydown", { ctrlKey: true });
 assert.equal($("setting-snapping").checked, false);
+assert.equal($("snap-toggle").checked, false);
+// The view-cluster snapping toggle drives the same setting as Z.
+$("snap-toggle").checked = true;
+$("snap-toggle").dispatchEvent(new window.Event("change"));
+assert.equal($("setting-snapping").checked, true);
+assert.match($("snap-status").textContent, /SNAP ON/);
+key("z");
+assert.equal($("snap-toggle").checked, false);
+assert.ok($("vectors").closest(".camera-controls"));
+assert.ok($("force-vectors").closest(".camera-controls"));
 const reload = new window.KeyboardEvent("keydown", {
   key: "r",
   ctrlKey: true,
@@ -427,7 +516,7 @@ assert.match($("snap-status").textContent, /SNAP ON/);
 $("reset-settings").click();
 $("close-settings").click();
 // Shift manually repositions a paused pin; Ctrl rotates without translating.
-$("clear").click();
+clearScene();
 canvas.focus();
 key("b");
 click(400, 350);
@@ -456,11 +545,12 @@ menu(500, 350);
 assert.ok($("constants").querySelector('[aria-label="Mass"]'));
 $("close-menu").click();
 // Fields can be edited, moved, rotated, resized and removed without pausing.
-$("clear").click();
+clearScene();
 canvas.focus();
 key("e");
 click(500, 300);
 assert.equal($("selected-name").textContent, "Electric field");
+assert.equal(document.querySelector(".selection-row").hidden, true);
 menu(500, 300);
 const change = (node, value, event = "change") => {
   node.value = value;
@@ -516,14 +606,41 @@ $("close-menu").click();
 frames(1);
 $("settings-toggle").click();
 change($("range-electricX"), "3", "input");
-assert.equal($("setting-electricX").value, "3");
+assert.equal($("setting-electricX").value, "0", "centred sliders snap to 0");
+change($("range-electricX"), "8", "input");
+assert.equal($("setting-electricX").value, "8");
 change($("setting-magneticZ"), "-2");
 assert.equal($("range-magneticZ").value, "-2");
 change($("range-gravity"), "2.4", "input");
 assert.equal($("setting-gravity").value, "0");
 change($("range-gravity"), "-2.4", "input");
 assert.equal($("setting-gravity").value, "0");
-assert.ok(document.querySelector(".zero-tick"));
+// Every slider centred on zero gets the tick; others do not.
+for (const key of ["gravity", "electricX", "electricY", "magneticZ"])
+  assert.ok($("range-" + key).closest(".zero-slider"), key);
+assert.equal($("range-airResistance").closest(".zero-slider"), null);
+// Arrow keys leave the detent in exact steps.
+change($("range-magneticZ"), "0", "input");
+$("range-magneticZ").dispatchEvent(
+  new window.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+);
+assert.equal($("setting-magneticZ").value, "0.1");
+change($("range-magneticZ"), "0", "input");
+{
+  const sections = [...document.querySelectorAll(".settings-section")];
+  assert.deepEqual(
+    sections.map((d) => d.querySelector("summary").textContent),
+    ["Simulation", "Fields", "Charge interactions", "Scene", "Website"],
+  );
+  assert.deepEqual(
+    sections.map((d) => d.open),
+    [true, false, false, false, false],
+  );
+  assert.ok(
+    $("range-gravity").closest(".prop-row").contains($("setting-gravity")),
+  );
+  assert.match($("help-gravity").textContent, /Positive pulls down/);
+}
 $("range-gravity").dispatchEvent(
   new window.KeyboardEvent("keydown", {
     key: "ArrowRight",
@@ -537,7 +654,7 @@ assert.equal($("setting-electricX").value, "0");
 assert.equal($("setting-magneticZ").value, "0");
 $("close-settings").click();
 // Gradient controls, mixed selection, impulse options, camera and website preferences.
-$("clear").click();
+clearScene();
 frames(1);
 canvas.focus();
 if ($("pause").textContent.includes("Pause")) key(" ");
@@ -626,7 +743,7 @@ $("fit-scene").click();
 frames(1);
 assert.ok(Number.parseInt($("zoom-level").textContent) > 0);
 // Each new scene fits initial screen bounds but retains website preferences.
-$("clear").click();
+clearScene();
 frames(1);
 $("settings-toggle").click();
 assert.equal($("setting-walls").checked, true);
@@ -636,7 +753,7 @@ change($("ui-theme"), "light");
 change($("ui-size"), "100", "input");
 $("close-settings").click();
 // Wedge creation and live icon previews retain controls, simulation and labels.
-$("clear").click();
+clearScene();
 frames(1);
 canvas.focus();
 if ($("pause").textContent === "Pause") key(" ");
@@ -645,7 +762,7 @@ click(500, 300);
 assert.equal($("selected-name").textContent, "Wedge");
 assert.equal($("lock-position").checked, true);
 assert.equal($("lock-rotation").checked, true);
-assert.match($("dimensions").textContent, /slope 26.6/);
+assert.match($("dimensions").textContent, /slope 26.6° · 63.4°/);
 menu(500, 300);
 assert.match($("menu-title").textContent, /Wedge/);
 change(
@@ -687,6 +804,431 @@ frames(2);
 key(" ");
 assert.equal($("pause").dataset.icon, "play");
 assert.equal($("selected-name").textContent, "Wedge");
+// A scene press closes open panels without placing anything.
+for (const open of [
+  () => $("settings-toggle").click(),
+  () => $("shortcuts").click(),
+  () => $("category-bodies").click(),
+]) {
+  clearScene();
+  key("b");
+  open();
+  click(500, 250);
+  assert.equal($("settings-panel").hidden, true);
+  assert.equal($("keys-panel").hidden, true);
+  assert.equal($("menu-bodies").hidden, true);
+  assert.equal($("selection").hidden, true, "closing press placed nothing");
+  click(500, 250);
+  assert.equal($("selected-name").textContent, "Ball", "next press places");
+}
+// Presets, Reset, Save and Load.
+{
+  $("presets-toggle").click();
+  assert.equal($("presets-panel").hidden, false);
+  assert.equal(
+    $("preset-list").querySelectorAll("button.preset").length,
+    presets.length,
+  );
+  assert.deepEqual(
+    [...$("preset-list").querySelectorAll("h3")].map((h) => h.textContent),
+    [...new Set(presets.map((p) => p.group))],
+  );
+  assert.match(
+    document.querySelector('[data-preset="free-fall"]').textContent,
+    /What to look for: All three reach the floor/,
+  );
+  document.querySelector('[data-preset="free-fall"]').click();
+  assert.equal($("presets-panel").hidden, true);
+  assert.equal($("pause").textContent, "Run", "presets load paused");
+  assert.equal($("reset").disabled, false);
+  frames(3);
+  assert.equal($("time").textContent, "0.00 s");
+  key(" ");
+  frames(60);
+  assert.notEqual($("time").textContent, "0.00 s");
+  key(" ");
+  $("reset").click();
+  frames(1);
+  assert.equal($("time").textContent, "0.00 s", "Reset restores the start");
+  assert.equal($("pause").textContent, "Run");
+  // Save goes through a Blob download.
+  let saved;
+  const createObjectURL = URL.createObjectURL;
+  URL.createObjectURL = (blob) => ((saved = blob), "blob:test");
+  $("save-scene").click();
+  URL.createObjectURL = createObjectURL;
+  const sceneText = await saved.text();
+  assert.equal(JSON.parse(sceneText).format, "physics-sim-scene");
+  assert.equal(JSON.parse(sceneText).bodies.length, 3);
+  // A bad file shows a readable message and leaves the scene alone.
+  const load = async (text) => {
+    Object.defineProperty($("scene-file"), "files", {
+      configurable: true,
+      value: [new File([text], "scene.json", { type: "application/json" })],
+    });
+    $("scene-file").dispatchEvent(new window.Event("change"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  };
+  key(" ");
+  frames(30);
+  key(" ");
+  const before = $("time").textContent;
+  await load("not json");
+  assert.equal($("toast").textContent, "This file is not a Physics Sim scene.");
+  await load(JSON.stringify({ format: "something-else" }));
+  assert.equal($("toast").textContent, "This file is not a Physics Sim scene.");
+  frames(1);
+  assert.equal($("time").textContent, before, "bad file left scene untouched");
+  await load(sceneText);
+  assert.match($("toast").textContent, /Scene loaded/);
+  frames(1);
+  assert.equal($("time").textContent, "0.00 s");
+  // The panel closes on a scene press and on Escape.
+  $("presets-toggle").click();
+  click(500, 250);
+  assert.equal($("presets-panel").hidden, true);
+  $("presets-toggle").click();
+  $("preset-list")
+    .querySelector("button")
+    .dispatchEvent(
+      new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+  assert.equal($("presets-panel").hidden, true);
+  // Reset returns to the scene as loaded, not to the last Run.
+  key(" ");
+  frames(30);
+  key(" ");
+  key(" ");
+  frames(30);
+  key(" ");
+  $("reset").click();
+  frames(1);
+  assert.equal($("time").textContent, "0.00 s");
+  // Clear asks first; Cancel keeps the scene.
+  document.querySelector('[data-preset="cyclotron"]').click();
+  $("clear").click();
+  assert.equal($("clear-confirm").hidden, false);
+  $("clear-no").click();
+  assert.equal($("clear-confirm").hidden, true);
+  assert.equal($("reset").disabled, false, "cancel kept the scene");
+  // Clear forgets the reset point and restores default settings.
+  assert.equal($("setting-gravity").value, "0");
+  clearScene();
+  assert.equal($("reset").disabled, true);
+  assert.equal($("setting-gravity").value, "9.81");
+  assert.equal($("setting-walls").checked, true);
+}
+// Net force arrows: a freely falling 1 kg ball is labelled m·g = 9.81 N.
+{
+  clearScene();
+  if ($("pause").textContent === "Run") key(" ");
+  key("b");
+  click(500, 150);
+  assert.equal($("selected-name").textContent, "Ball");
+  for (const id of ["vectors", "force-vectors"]) {
+    $(id).checked = false;
+    $(id).dispatchEvent(new window.Event("change"));
+  }
+  assert.equal($("vector-legend").hidden, true);
+  key("f");
+  assert.equal($("force-vectors").checked, true);
+  assert.equal($("vector-legend").hidden, false);
+  assert.equal($("legend-velocity").hidden, true);
+  assert.equal($("force-scale-label").hidden, false);
+  const labels = [];
+  ctx.fillText = (text) => labels.push(text);
+  frames(8);
+  assert.ok(labels.includes("9.81 N"), labels.join(", "));
+  key("v");
+  labels.length = 0;
+  frames(1);
+  assert.ok(labels.some((t) => / m\/s$/.test(t)));
+  assert.equal($("legend-velocity").hidden, false);
+  key("f");
+  key("v");
+  assert.equal($("vector-legend").hidden, true);
+  delete ctx.fillText;
+}
+// Right-clicking the ground opens the floor material menu.
+{
+  clearScene();
+  frames(1);
+  assert.equal(menu(500, 680).defaultPrevented, true);
+  assert.equal($("menu-title").textContent, "Floor");
+  assert.match($("menu-note").textContent, /walls share/);
+  assert.match(
+    $("menu-note").textContent,
+    /lower friction.*higher restitution/,
+  );
+  assert.equal($("selection").hidden, true, "the floor is not selected");
+  const friction = $("constants").querySelector('[data-constant="friction"]'),
+    restitution = $("constants").querySelector('[data-constant="restitution"]');
+  assert.equal(friction.value, "0.5");
+  assert.equal(restitution.value, "0");
+  change(friction, "0.2");
+  change(restitution, "0.9");
+  $("close-menu").click();
+  menu(300, 690);
+  assert.equal(
+    $("constants").querySelector('[data-constant="friction"]').value,
+    "0.2",
+  );
+  assert.equal(
+    $("constants").querySelector('[data-constant="restitution"]').value,
+    "0.9",
+  );
+  // Out-of-range input is rejected and the old value restored.
+  change($("constants").querySelector('[data-constant="friction"]'), "3");
+  assert.equal(
+    $("constants").querySelector('[data-constant="friction"]').value,
+    "0.2",
+  );
+  $("close-menu").click();
+  // Above the ground with nothing there, no menu opens.
+  assert.equal(menu(500, 300).defaultPrevented, false);
+}
+// Readouts for the selected body and scene energy totals.
+{
+  clearScene();
+  frames(1);
+  assert.equal($("energy-panel").hidden, true, "hidden for an empty scene");
+  if ($("pause").textContent === "Run") key(" ");
+  key("b");
+  click(500, 150);
+  frames(10);
+  assert.equal($("readout").hidden, false);
+  assert.equal($("energy-panel").hidden, false);
+  // A free-falling ball: ax = 0, ay = −g, and the units are shown.
+  assert.equal($("readout-acceleration-0").textContent, "0.00");
+  assert.equal($("readout-acceleration-1").textContent, "-9.81");
+  assert.match($("readout-grid").textContent, /m\/s²/);
+  assert.ok(Number($("readout-velocity-1").textContent) < 0);
+  const ke = Number($("readout-kinetic-0").textContent),
+    pe = Number($("readout-gravitational-0").textContent);
+  assert.ok(
+    // Each shown value is rounded to three significant figures.
+    Math.abs(Number($("energy-total").textContent.split(" ")[0]) - (ke + pe)) <
+      0.1,
+  );
+  assert.equal($("energy-elastic").textContent, "0.00");
+  // Values keep three significant figures.
+  for (const id of ["readout-position-0", "readout-speed-0"])
+    assert.match($(id).textContent, /^-?(\d\.\d\d|\d\d\.\d|\d{3,}|0\.\d+)$/);
+  // Nothing selected: the body readout hides, the scene totals stay.
+  key("Escape");
+  click(900, 100);
+  frames(1);
+  assert.equal($("readout").hidden, true);
+  assert.equal($("energy-panel").hidden, false);
+}
+// Graph of the selected body: samples sim time, freezes when paused,
+// clears when the selection changes.
+{
+  clearScene();
+  if ($("pause").textContent === "Run") key(" ");
+  key("b");
+  click(500, 150);
+  $("graph-panel").open = true;
+  change($("graph-quantity"), "vy");
+  const labels = [];
+  ctx.fillText = (text) => labels.push(text);
+  frames(30);
+  labels.length = 0;
+  frames(1);
+  assert.equal($("graph-panel").hidden, false);
+  assert.ok(labels.includes("Velocity vy (m/s)"));
+  assert.ok(labels.includes("m/s"));
+  assert.ok(labels.includes("t (s)"));
+  assert.ok(!labels.includes("Run the simulation to plot."));
+  // Paused: the graph keeps its data.
+  key(" ");
+  labels.length = 0;
+  frames(5);
+  assert.ok(!labels.includes("Run the simulation to plot."));
+  // A new selection starts an empty graph.
+  key("b");
+  click(300, 150);
+  labels.length = 0;
+  frames(2);
+  assert.ok(labels.includes("Run the simulation to plot."));
+  delete ctx.fillText;
+  key(" ");
+  $("graph-panel").open = false;
+}
+// Electric energy: rows appear only with a charged body; field-region work
+// is reported separately and total − supplied stays constant.
+{
+  clearScene();
+  key("b");
+  click(500, 150);
+  frames(1);
+  for (const el of document.querySelectorAll(
+    '[data-row="electric"], .electric-row, .electric-option',
+  ))
+    assert.equal(el.hidden, true, "mechanics scenes hide electric rows");
+  assert.equal($("field-work").hidden, true);
+  $("presets-toggle").click();
+  document.querySelector('[data-preset="velocity-selector"]').click();
+  frames(1);
+  assert.equal($("energy-electric").hidden, false);
+  assert.equal($("field-work").hidden, true, "no work done yet");
+  const start = Number($("energy-total").textContent.split(" ")[0]);
+  key(" ");
+  frames(60);
+  key(" ");
+  frames(1);
+  assert.equal($("field-work").hidden, false);
+  assert.notEqual($("energy-field-work").textContent, "0.00");
+  assert.ok(
+    Math.abs(Number($("energy-conserved").textContent) - start) < 0.05,
+    `${$("energy-conserved").textContent} vs ${start}`,
+  );
+  $("presets-toggle").click();
+  document.querySelector('[data-preset="coulomb-orbit"]').click();
+  frames(1);
+  assert.ok(Number($("energy-electric").textContent) < 0, "attraction");
+  assert.equal(document.querySelector(".electric-option").hidden, false);
+  assert.equal(document.querySelector('[data-row="electric"]').hidden, false);
+}
+// Right-clicking another object while the constants menu is open opens that
+// object's menu directly (the right press is not swallowed).
+{
+  clearScene();
+  key("b");
+  click(400, 150);
+  key("n");
+  click(650, 150);
+  const rightClick = (x, y) => {
+    canvas.dispatchEvent(
+      new window.PointerEvent("pointerdown", {
+        clientX: x,
+        clientY: y,
+        button: 2,
+        pointerId: 1,
+        bubbles: true,
+      }),
+    );
+    canvas.dispatchEvent(
+      new window.PointerEvent("pointerup", {
+        clientX: x,
+        clientY: y,
+        button: 2,
+        pointerId: 1,
+        bubbles: true,
+      }),
+    );
+    return menu(x, y);
+  };
+  rightClick(400, 150);
+  assert.match($("menu-title").textContent, /^Ball/);
+  rightClick(650, 150);
+  assert.equal($("material-menu").hidden, false);
+  assert.match($("menu-title").textContent, /^Block/);
+  rightClick(500, 680);
+  assert.equal($("menu-title").textContent, "Floor");
+  $("close-menu").click();
+}
+// Clearing or mistyping the force arrow scale keeps the last valid value.
+{
+  change($("force-scale"), "6", "input");
+  change($("force-scale"), "6");
+  assert.match($("legend-force-scale").textContent, /^6 px per N/);
+  change($("force-scale"), "", "input");
+  change($("force-scale"), "");
+  assert.equal($("force-scale").value, "6");
+  assert.match($("legend-force-scale").textContent, /^6 px per N/);
+  change($("force-scale"), "500");
+  assert.equal($("force-scale").value, "6");
+  assert.match($("toast").textContent, /between 0\.1 and 100/);
+  change($("force-scale"), "4");
+}
+// Escape closes the constants menu after Enter has blurred its field.
+{
+  clearScene();
+  key("b");
+  click(500, 150);
+  menu(500, 150);
+  const mass = $("constants").querySelector('[data-constant="mass"]');
+  mass.focus();
+  mass.value = "2";
+  mass.dispatchEvent(
+    new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+  );
+  assert.notEqual(document.activeElement, mass, "Enter blurs the field");
+  document.body.dispatchEvent(
+    new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+  );
+  assert.equal($("material-menu").hidden, true);
+}
+// One hint per tool, in the options strip.
+{
+  assert.equal($("hint"), null);
+  key("q");
+  assert.equal($("tool-help").hidden, false);
+  assert.match($("tool-help").textContent, /Drag a box to select/);
+  key("i");
+  assert.equal($("tool-help").hidden, true, "impulse options explain it");
+  key("g");
+}
+// Time controls: Step while paused, and slow motion.
+{
+  clearScene();
+  if ($("pause").textContent === "Pause") key(" ");
+  frames(1);
+  assert.equal($("time").textContent, "0.00 s");
+  assert.equal($("step").disabled, false);
+  for (let i = 0; i < 12; i++) key(".");
+  frames(1);
+  assert.equal($("time").textContent, "0.10 s", "12 steps of 1/120 s");
+  $("step").click();
+  frames(3);
+  assert.equal($("time").textContent, "0.11 s", "paused: only Step advances");
+  change($("speed"), "0.5");
+  key(" ");
+  assert.equal($("step").disabled, true);
+  key(".");
+  frames(60);
+  // One real second at half speed is half a simulated second.
+  const t = Number.parseFloat($("time").textContent);
+  assert.ok(Math.abs(t - 0.11 - 0.5) < 0.02, $("time").textContent);
+  assert.match($("time").textContent, / · 0\.5×$/);
+  change($("speed"), "1");
+  frames(1);
+  assert.match($("time").textContent, /^\d+\.\d\d s$/);
+}
+// Small corrections: disc note, lock hints and the refused-drag message.
+{
+  clearScene();
+  if ($("pause").textContent === "Run") key(" ");
+  key("b");
+  click(500, 150);
+  menu(500, 150);
+  assert.match($("menu-note").textContent, /uniform disc/);
+  assert.match($("menu-note").textContent, /\(2\/3\) g sin θ/);
+  $("close-menu").click();
+  key("w");
+  assert.doesNotMatch($("tool-help").textContent, /Shift-drag/);
+  key("g");
+  key("n");
+  click(700, 150);
+  for (const id of ["lock-position", "lock-rotation"]) {
+    $(id).checked = true;
+    $(id).dispatchEvent(new window.Event("change"));
+  }
+  $("toast").textContent = "";
+  pointer("pointerdown", 700, 150);
+  pointer("pointermove", 760, 150);
+  pointer("pointerup", 760, 150);
+  assert.equal($("toast").textContent, "Pause to move a locked object");
+  // Paused, the same drag is allowed and says nothing.
+  key(" ");
+  $("toast").textContent = "";
+  pointer("pointerdown", 700, 150);
+  pointer("pointermove", 760, 150);
+  pointer("pointerup", 760, 150);
+  assert.equal($("toast").textContent, "");
+  key(" ");
+}
 console.log(
   "PASS: gradients, mixed field/body selection, impulse controls, camera-independent bounds, persistent appearance preferences, creation, live constants, locks, drag/throw, snapping, keyboard focus/repeat handling, resizing, spring guide, belt drive/crossing, pulley creation, spring–Atwood composition, angled cable drag, movable axle, box selection, group movement/deletion, paired sliders, live settings and defaults.",
 );

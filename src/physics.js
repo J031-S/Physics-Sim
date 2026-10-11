@@ -1,8 +1,10 @@
 import { Fields } from "./fields.js";
 import { GroupMove } from "./group-move.js";
 import { Mechanisms } from "./mechanisms.js";
+import { solveRestingContacts } from "./contacts.js";
+import { checkFormat } from "./scene-format.js";
 // The sandbox exposes SI units; Matter uses px, ms and 60 Hz-normalised velocity.
-const { Engine, Bodies, Body, Composite, Constraint, Query } =
+const { Engine, Bodies, Body, Composite, Query } =
   globalThis.Matter;
 export const SCALE = 100;
 export const DT = 1 / 120;
@@ -41,12 +43,13 @@ export class Sandbox {
     this.grab = null;
     this.sizing = null;
     this.mechanisms = new Mechanisms(this);
+    this.floorMaterial = { friction: 0.5, restitution: 0 };
     this.floor = Bodies.rectangle(
       0,
       -(-0.25) * SCALE,
       2000 * SCALE,
       0.5 * SCALE,
-      { isStatic: true, friction: 0.5, restitution: 0 },
+      { isStatic: true, ...this.floorMaterial },
     );
     Composite.add(this.engine.world, this.floor);
     const filter = (pairs) => {
@@ -88,6 +91,22 @@ export class Sandbox {
     Object.assign(this.settings, patch);
     if (patch.walls !== undefined) this.syncWalls();
   }
+  // The floor and the scene walls share one surface material. A contact uses
+  // the lower friction and the higher restitution of its two bodies.
+  updateFloor(patch) {
+    const ranges = { friction: [0, 1], restitution: [0, 1] };
+    for (const [key, v] of Object.entries(patch))
+      if (
+        !ranges[key] ||
+        !Number.isFinite(v) ||
+        v < ranges[key][0] ||
+        v > ranges[key][1]
+      )
+        throw new Error("Invalid floor " + key + ".");
+    Object.assign(this.floorMaterial, patch);
+    for (const body of [this.floor, ...this.walls])
+      Object.assign(body, this.floorMaterial);
+  }
   setViewport(bounds) {
     if (
       this.viewport &&
@@ -105,7 +124,7 @@ export class Sandbox {
     if (!this.settings.walls || !this.viewport) return;
     const { minX, maxX, minY, maxY } = this.viewport,
       t = 0.5,
-      options = { isStatic: true, friction: 0.5, restitution: 0 };
+      options = { isStatic: true, ...this.floorMaterial };
     for (const [x, y, w, h] of [
       [minX - t / 2, (minY + maxY) / 2, t, maxY - minY + 2 * t],
       [maxX + t / 2, (minY + maxY) / 2, t, maxY - minY + 2 * t],
@@ -145,6 +164,16 @@ export class Sandbox {
   }
   endGroup() {
     this.group = null;
+  }
+  // Matter multiplies every polygon inertia by an internal stability factor of
+  // 4. Use the textbook value about the centre of mass instead (engine units).
+  momentOfInertia(o) {
+    const k =
+      o.shape === "ball"
+        ? (o.radius * o.radius) / 2
+        : (o.width * o.width + o.height * o.height) /
+          (o.shape === "wedge" ? 18 : 12);
+    return o.mass * k * SCALE * SCALE;
   }
   add(shape, point) {
     if (!["ball", "block", "wedge"].includes(shape))
@@ -193,6 +222,10 @@ export class Sandbox {
               options,
             );
     Body.setMass(body, 1);
+    // Matter assumes a 60 Hz step until a body's first update and rescales its
+    // velocity then. Start at our step so position − positionPrev is always
+    // one step's displacement, which the contact and rod solvers rely on.
+    body.deltaTime = DT * 1000;
     const id = "body-" + ++this.serial,
       object = {
         id,
@@ -213,6 +246,8 @@ export class Sandbox {
         angleAnchor: body.angle,
         freeInertia: body.inertia,
       };
+    object.freeInertia = this.momentOfInertia(object);
+    Body.setInertia(body, object.freeInertia);
     this.objects.set(id, object);
     Composite.add(this.engine.world, body);
     if (shape === "wedge") {
@@ -275,40 +310,81 @@ export class Sandbox {
         damping: 0.3,
         lockAngle: false,
         axis: { x: (pb.x - pa.x) / length, y: (pb.y - pa.y) / length },
-        constraint: null,
-        attached: false,
       };
-    if (type === "rod")
-      link.constraint = Constraint.create({
-        bodyA: a ? this.objects.get(a).body : undefined,
-        bodyB: b ? this.objects.get(b).body : undefined,
-        pointA: a ? { x: 0, y: 0 } : toEngine(pa),
-        pointB: b ? { x: 0, y: 0 } : toEngine(pb),
-        length: length * SCALE,
-        stiffness: 1,
-        damping: 0,
-      });
     this.links.set(id, link);
-    this.syncRods();
     return id;
   }
-  syncRods() {
-    for (const l of this.links.values())
-      if (l.constraint) {
-        // Matter's distance solver divides by summed inverse mass. Two pinned
-        // endpoints have no translational degree of freedom: do not solve them.
-        const movable =
-          (l.a && !this.objects.get(l.a).lockPosition) ||
-          (l.b && !this.objects.get(l.b).lockPosition);
-        if (movable && !l.attached) {
-          Composite.add(this.engine.world, l.constraint);
-          l.attached = true;
-        }
-        if (!movable && l.attached) {
-          Composite.remove(this.engine.world, l.constraint);
-          l.attached = false;
-        }
+  // Rods as exact length constraints (SHAKE on the engine's leapfrog step).
+  //
+  // Each rod gets an impulse along its direction at the START of the step,
+  // sized so that the length is exact once positions have advanced. Pulling
+  // along the old direction, rather than projecting the new position back
+  // onto the circle as Matter's constraint does, makes the step time-symmetric:
+  // uniform circular motion is reproduced exactly and a pendulum keeps its
+  // energy instead of losing a fraction proportional to (ω·dt)² every step.
+  // Works in engine units (px, px per step).
+  solveRods(delta) {
+    const rods = [];
+    for (const l of this.links.values()) {
+      if (l.type !== "rod") continue;
+      const ends = ["a", "b"].map((side) => {
+        const o = this.objects.get(l[side]);
+        if (!o) return { anchor: toEngine(l[side + "Point"]), w: 0 };
+        const held =
+          o.lockPosition ||
+          this.grab?.id === o.id ||
+          this.sizing?.id === o.id ||
+          this.group?.ids.has(o.id);
+        return { body: o.body, w: held ? 0 : o.body.inverseMass };
+      });
+      const [A, B] = ends,
+        w = A.w + B.w;
+      if (!w) continue;
+      const at = (e) => (e.body ? e.body.position : e.anchor),
+        dx = at(B).x - at(A).x,
+        dy = at(B).y - at(A).y,
+        d = Math.hypot(dx, dy),
+        // Coincident ends have no direction: fall back to the stored axis.
+        nx = d > 1e-9 ? dx / d : l.axis.x,
+        ny = d > 1e-9 ? dy / d : -l.axis.y;
+      rods.push({ A, B, w, dx, dy, nx, ny, length: l.length * SCALE });
+    }
+    if (!rods.length) return;
+    // Displacement each end will make this step: velocity plus the change
+    // its accumulated force is about to cause.
+    const move = (e) => {
+      const b = e.body;
+      if (!b || !e.w) return { x: 0, y: 0 };
+      const k = b.inverseMass * delta * delta;
+      return {
+        x: b.position.x - b.positionPrev.x + b.force.x * k,
+        y: b.position.y - b.positionPrev.y + b.force.y * k,
+      };
+    };
+    for (let i = 0; i < 40; i++) {
+      let worst = 0;
+      for (const r of rods) {
+        const a = move(r.A),
+          b = move(r.B),
+          px = r.dx + b.x - a.x,
+          py = r.dy + b.y - a.y,
+          along = px * r.nx + py * r.ny,
+          // Solve |p + s·n| = length for the shift s along the old direction.
+          root = along * along - (px * px + py * py - r.length * r.length),
+          shift = root > 0 ? Math.sqrt(root) - along : -along;
+        worst = Math.max(worst, Math.abs(shift));
+        for (const [e, sign] of [
+          [r.A, -1],
+          [r.B, 1],
+        ])
+          if (e.w) {
+            const share = (sign * shift * e.w) / r.w;
+            e.body.positionPrev.x -= share * r.nx;
+            e.body.positionPrev.y -= share * r.ny;
+          }
       }
+      if (worst < 1e-9) break;
+    }
   }
   setLock(id, axis, locked) {
     const o = this.objects.get(id);
@@ -333,7 +409,6 @@ export class Sandbox {
       Body.setInertia(o.body, locked ? Infinity : o.freeInertia);
       Body.setAngularVelocity(o.body, 0);
     } else throw new Error("Unknown lock axis.");
-    this.syncRods();
   }
   updateConstants(id, patch) {
     const o = this.objects.get(id);
@@ -355,12 +430,10 @@ export class Sandbox {
       )
         throw new Error("Invalid " + key + ".");
     if (patch.mass !== undefined) {
-      // Restore finite inertia before changing mass; retain independent locks.
-      Body.setInertia(o.body, o.freeInertia);
       Body.setMass(o.body, patch.mass);
-      o.freeInertia = o.body.inertia;
     }
     Object.assign(o, patch);
+    if (patch.mass !== undefined) o.freeInertia = this.momentOfInertia(o);
     o.body.friction = o.friction;
     // Discard warm-start friction from the old material value. Otherwise a
     // resting contact can stay stuck even after its coefficient becomes zero.
@@ -378,6 +451,7 @@ export class Sandbox {
         }
       }
     o.body.restitution = o.restitution;
+    // Independent locks survive a mass change; inertia is restored from o.
     o.body.inverseMass = o.lockPosition ? 0 : 1 / o.mass;
     Body.setInertia(o.body, o.lockRotation ? Infinity : o.freeInertia);
   }
@@ -397,7 +471,6 @@ export class Sandbox {
       )
         throw new Error("Invalid " + key + ".");
     Object.assign(l, patch);
-    if (l.constraint) l.constraint.length = l.length * SCALE;
   }
   setSpringAngle(id, locked) {
     const l = this.links.get(id);
@@ -516,10 +589,10 @@ export class Sandbox {
       height / (o.shape === "ball" ? o.radius * 2 : o.height),
     );
     Body.setMass(b, o.mass);
-    o.freeInertia = b.inertia;
     o.width = width;
     o.height = height;
     if (o.shape === "ball") o.radius = width / 2;
+    o.freeInertia = this.momentOfInertia(o);
     Body.setAngle(b, angle);
     b.inverseMass = o.lockPosition ? 0 : 1 / o.mass;
     Body.setInertia(b, o.lockRotation ? Infinity : o.freeInertia);
@@ -702,13 +775,18 @@ export class Sandbox {
     const o = this.objects.get(g.id),
       b = o.body;
     const old = this.state(g.id);
+    // A fully locked body ignores every pointer gesture while running. Paused,
+    // it is edited like a free body: a plain drag moves it, Ctrl rotates it.
+    const fixed = o.lockPosition && o.lockRotation;
     g.blocked =
       !g.paused &&
-      ((g.mode === "move" && o.lockPosition) ||
+      (fixed ||
+        (g.mode === "move" && o.lockPosition) ||
         (g.mode === "rotate" && o.lockRotation));
     if (g.blocked) return;
     const rotating =
-      g.mode === "rotate" || (g.mode === "auto" && o.lockPosition);
+      g.mode === "rotate" ||
+      (g.mode === "auto" && o.lockPosition && !(g.paused && fixed));
     if (rotating) {
       if (
         g.mode === "rotate" &&
@@ -1051,6 +1129,7 @@ export class Sandbox {
     for (const o of this.objects.values()) {
       const s = this.state(o.id),
         b = o.body;
+      o.before = s;
       if (!o.lockPosition) {
         this.fields.advance(o, s, DT);
         this.applyForce(o.id, s, { x: 0, y: -this.settings.gravity * o.mass });
@@ -1094,6 +1173,8 @@ export class Sandbox {
     this.holdResize();
     this.group?.hold();
     this.mechanisms.beforeStep();
+    solveRestingContacts(this.engine, DT * 1000);
+    this.solveRods(DT * 1000);
     Engine.update(this.engine, DT * 1000);
     this.enforceLocks();
     this.placeGrab();
@@ -1101,7 +1182,313 @@ export class Sandbox {
     for (let i = 0; i < 6; i++) this.solveGuides();
     this.mechanisms.afterStep();
     this.group?.hold();
+    // Net force is what actually changed each velocity over the step, so it
+    // includes contact, friction, rod, cable and field forces.
+    for (const o of this.objects.values()) {
+      const s = this.state(o.id),
+        held = this.grab?.id === o.id || this.sizing?.id === o.id;
+      o.netForce =
+        o.lockPosition || held || this.group?.ids.has(o.id)
+          ? { x: 0, y: 0 }
+          : {
+              x: (o.mass * (s.vx - o.before.vx)) / DT,
+              y: (o.mass * (s.vy - o.before.vy)) / DT,
+            };
+    }
     this.time += DT;
+  }
+  // Net force on a body over the last step, in newtons.
+  netForce(id) {
+    const o = this.objects.get(id);
+    return o ? { ...(o.netForce || { x: 0, y: 0 }) } : null;
+  }
+  // Where a body was half a step ago. The engine's velocity is the average
+  // over the step just taken, so it belongs to the middle of that step, not
+  // its end. Pairing it with potential energy at the end position makes K + U
+  // wobble by about ±(force × speed × dt/2) through every swing or bounce;
+  // evaluating U at this point instead removes that, leaving a total that is
+  // steady to second order. The shift is under a centimetre at normal speeds.
+  potentialPoint(id) {
+    const s = this.state(id);
+    return { x: s.x - (s.vx * DT) / 2, y: s.y - (s.vy * DT) / 2 };
+  }
+  // Momentum and energies of one body (SI). Gravitational energy is measured
+  // from the floor; positive gravity points down. Electric energy is the
+  // body's energy in the global uniform field plus half of each mutual
+  // Coulomb pair it belongs to, so the bodies' shares add up to the scene's.
+  measure(id) {
+    const o = this.objects.get(id);
+    if (!o) return null;
+    const s = this.state(id),
+      p = this.potentialPoint(id),
+      inertia = o.freeInertia / (SCALE * SCALE),
+      translational = 0.5 * o.mass * (s.vx * s.vx + s.vy * s.vy),
+      rotational = 0.5 * inertia * s.omega * s.omega;
+    return {
+      speed: Math.hypot(s.vx, s.vy),
+      momentum: { x: o.mass * s.vx, y: o.mass * s.vy },
+      angularMomentum: inertia * s.omega,
+      translational,
+      rotational,
+      kinetic: translational + rotational,
+      gravitational: o.mass * this.settings.gravity * p.y,
+      electric:
+        this.fields.uniformEnergy(o, p) +
+        this.fields
+          .pairEnergies()
+          .reduce(
+            (sum, p) => sum + (p.a === id || p.b === id ? p.energy / 2 : 0),
+            0,
+          ),
+    };
+  }
+  // Energy of the whole scene. `electric` covers the conservative electric
+  // forces: the global uniform field and mutual Coulomb interaction. Field
+  // regions have no potential energy (see Fields.work); `fieldWork` is the
+  // energy they have supplied so far, so `total − fieldWork` is what stays
+  // constant in a scene without friction, damping or inelastic impacts.
+  energy() {
+    let kinetic = 0,
+      gravitational = 0,
+      elastic = 0,
+      electric = 0;
+    // Not measure(): that would recompute every Coulomb pair for each body.
+    for (const [id, o] of this.objects) {
+      const s = this.state(id),
+        p = this.potentialPoint(id),
+        inertia = o.freeInertia / (SCALE * SCALE);
+      kinetic +=
+        0.5 * o.mass * (s.vx * s.vx + s.vy * s.vy) +
+        0.5 * inertia * s.omega * s.omega;
+      gravitational += o.mass * this.settings.gravity * p.y;
+      electric += this.fields.uniformEnergy(o, p);
+    }
+    for (const pair of this.fields.pairEnergies()) electric += pair.energy;
+    for (const l of this.links.values())
+      if (l.type === "spring") {
+        const a = l.a ? this.potentialPoint(l.a) : l.aPoint,
+          b = l.b ? this.potentialPoint(l.b) : l.bPoint,
+          dx = b.x - a.x,
+          dy = b.y - a.y,
+          extension =
+            (l.lockAngle ? dx * l.axis.x + dy * l.axis.y : Math.hypot(dx, dy)) -
+            l.length;
+        elastic += 0.5 * l.k * extension * extension;
+      }
+    return {
+      kinetic,
+      gravitational,
+      elastic,
+      electric,
+      total: kinetic + gravitational + elastic + electric,
+      fieldWork: this.fields.work,
+    };
+  }
+  // Place a body exactly, without the floor clamp that `add` applies. This is
+  // a layout edit: do it before connecting springs, rods, belts or cables.
+  setPose(id, { x, y, angle = 0 }) {
+    const o = this.objects.get(id);
+    if (!o) throw new Error("Object no longer exists.");
+    if (![x, y, angle].every(Number.isFinite))
+      throw new Error("Invalid position.");
+    Body.setAngle(o.body, -angle);
+    Body.setPosition(o.body, toEngine({ x, y }));
+    Body.setVelocity(o.body, { x: 0, y: 0 });
+    Body.setAngularVelocity(o.body, 0);
+    o.positionAnchor = { ...o.body.position };
+    o.angleAnchor = o.body.angle;
+  }
+  // Set velocity in m/s and spin in rad/s. Locked degrees of freedom stay 0.
+  setVelocity(id, { vx = 0, vy = 0, omega = 0 }) {
+    const o = this.objects.get(id);
+    if (!o) throw new Error("Object no longer exists.");
+    if (![vx, vy, omega].every(Number.isFinite))
+      throw new Error("Invalid velocity.");
+    if (!o.lockPosition)
+      Body.setVelocity(o.body, {
+        x: (vx * SCALE) / 60,
+        y: (-vy * SCALE) / 60,
+      });
+    if (!o.lockRotation) Body.setAngularVelocity(o.body, -omega / 60);
+  }
+  // A plain JSON description of the whole scene, for saving, sharing, presets
+  // and "reset to start". Load it with Sandbox.fromScene().
+  exportScene() {
+    const point = (p) => ({ x: p.x, y: p.y });
+    return {
+      format: "physics-sim-scene",
+      version: 1,
+      time: this.time,
+      fieldWork: this.fields.work,
+      settings: { ...this.settings },
+      bounds: this.viewport ? { ...this.viewport } : null,
+      floor: { ...this.floorMaterial },
+      bodies: [...this.objects.values()].map((o) => ({
+        id: o.id,
+        shape: o.shape,
+        ...this.state(o.id),
+        width: o.shape === "ball" ? o.radius * 2 : o.width,
+        height: o.shape === "ball" ? o.radius * 2 : o.height,
+        mass: o.mass,
+        charge: o.charge,
+        friction: o.friction,
+        restitution: o.restitution,
+        linearDamping: o.linearDamping,
+        angularDamping: o.angularDamping,
+        lockPosition: o.lockPosition,
+        lockRotation: o.lockRotation,
+      })),
+      links: [...this.links.values()].map((l) =>
+        l.type === "belt"
+          ? {
+              type: l.type,
+              a: l.a,
+              b: l.b,
+              crossed: l.crossed,
+              motor: l.motor,
+              speed: l.speed,
+            }
+          : l.type === "pulley"
+            ? {
+                type: l.type,
+                a: l.a,
+                b: l.b,
+                wheel: l.wheel,
+                reverse: l.reverse,
+                aAngle: l.aAngle,
+                bAngle: l.bAngle,
+                feedA: l.feedA,
+                feedB: l.feedB,
+                length: l.length,
+              }
+            : {
+                type: l.type,
+                a: l.a,
+                b: l.b,
+                aPoint: point(l.aPoint),
+                bPoint: point(l.bPoint),
+                length: l.length,
+                k: l.k,
+                damping: l.damping,
+                lockAngle: l.lockAngle,
+                axis: point(l.axis),
+              },
+      ),
+      fields: [...this.fields.regions.values()].map((f) => ({ ...f })),
+    };
+  }
+  static fromScene(data) {
+    const sim = new Sandbox();
+    try {
+      sim.loadScene(data);
+      return sim;
+    } catch (error) {
+      sim.dispose();
+      throw error;
+    }
+  }
+  // Build a scene into this (empty) sandbox. Values pass through the same
+  // validation as edits made by hand. On failure the sandbox is left partly
+  // built, so prefer Sandbox.fromScene(), which discards it.
+  loadScene(data) {
+    checkFormat(data, "physics-sim-scene");
+    if (this.objects.size || this.links.size || this.fields.regions.size)
+      throw new Error("Load a scene into an empty sandbox.");
+    const list = (value) => {
+      if (value !== undefined && !Array.isArray(value))
+        throw new Error("This scene file is damaged.");
+      return value || [];
+    };
+    const ids = new Map(),
+      resolve = (id) => {
+        if (id === null || id === undefined) return null;
+        if (!ids.has(id)) throw new Error("This scene file is damaged.");
+        return ids.get(id);
+      };
+    const bodies = list(data.bodies);
+    for (const b of bodies) {
+      // Build well above the floor so resizing cannot be refused, then place.
+      const id = this.add(b.shape, { x: 0, y: 10000 });
+      this.setLock(id, "position", false);
+      this.setLock(id, "rotation", false);
+      this.resizeBody(id, b.width, b.height);
+      const constants = {};
+      for (const key of [
+        "mass",
+        "charge",
+        "friction",
+        "restitution",
+        "linearDamping",
+        "angularDamping",
+      ])
+        if (b[key] !== undefined) constants[key] = b[key];
+      this.updateConstants(id, constants);
+      this.setPose(id, b);
+      ids.set(b.id, id);
+    }
+    for (const l of list(data.links)) {
+      const a = resolve(l.a),
+        b = resolve(l.b);
+      if (l.type === "belt") {
+        const id = this.mechanisms.createBelt(a, b);
+        this.mechanisms.configureBelt(id, {
+          crossed: !!l.crossed,
+          motor: !!l.motor,
+          speed: l.speed ?? 1,
+        });
+      } else if (l.type === "pulley") {
+        const id = this.mechanisms.createPulley(a, resolve(l.wheel), b),
+          cable = this.links.get(id);
+        if (l.reverse) this.mechanisms.cables.reverse(id, true);
+        // Keep the saved rope length and wrap rather than refitting it.
+        for (const key of ["aAngle", "bAngle", "feedA", "feedB", "length"])
+          if (Number.isFinite(l[key])) cable[key] = l[key];
+      } else {
+        const id = this.connect(l.type, a, b, l.aPoint, l.bPoint),
+          link = this.links.get(id);
+        this.updateLink(
+          id,
+          l.type === "spring"
+            ? { k: l.k, damping: l.damping, length: l.length }
+            : { length: l.length },
+        );
+        if (l.type === "spring" && l.lockAngle) {
+          const size = Math.hypot(l.axis?.x, l.axis?.y);
+          if (!(size > 1e-6)) throw new Error("This scene file is damaged.");
+          link.axis = { x: l.axis.x / size, y: l.axis.y / size };
+          link.lockAngle = true;
+        }
+      }
+    }
+    for (const b of bodies) {
+      const id = ids.get(b.id),
+        o = this.objects.get(id);
+      if (o.lockPosition !== !!b.lockPosition)
+        this.setLock(id, "position", !!b.lockPosition);
+      if (o.lockRotation !== !!b.lockRotation)
+        this.setLock(id, "rotation", !!b.lockRotation);
+      this.setVelocity(id, b);
+    }
+    for (const f of list(data.fields)) {
+      const { id: _id, type, ...rest } = f,
+        id = this.fields.add(type, { x: f.x, y: f.y });
+      this.fields.update(id, rest);
+    }
+    if (data.floor) this.updateFloor(data.floor);
+    if (data.bounds) {
+      const { minX, maxX, minY, maxY } = data.bounds;
+      if (
+        ![minX, maxX, minY, maxY].every(Number.isFinite) ||
+        maxX - minX < 2 ||
+        maxY - minY < 2
+      )
+        throw new Error("This scene file is damaged.");
+      this.setViewport({ minX, maxX, minY, maxY });
+    }
+    if (data.settings) this.updateSettings(data.settings);
+    if (Number.isFinite(data.time)) this.time = data.time;
+    if (Number.isFinite(data.fieldWork)) this.fields.work = data.fieldWork;
+    return this;
   }
   remove(id) {
     this.fields.regions.delete(id);
@@ -1110,10 +1497,7 @@ export class Sandbox {
     if (this.sizing?.id === id) this.endResize();
     this.mechanisms.remove(id);
     for (const [key, l] of this.links)
-      if (key === id || l.a === id || l.b === id) {
-        if (l.constraint) Composite.remove(this.engine.world, l.constraint);
-        this.links.delete(key);
-      }
+      if (key === id || l.a === id || l.b === id) this.links.delete(key);
     const o = this.objects.get(id);
     if (o) {
       Composite.remove(this.engine.world, o.body);

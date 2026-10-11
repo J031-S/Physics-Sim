@@ -162,8 +162,8 @@ function pulley() {
 test("pulley acceleration agrees with Atwood including wheel rotational inertia", () => {
   const { s, a, b, wheel } = pulley();
   s.updateConstants(a, { mass: 2 });
-  const I = s.objects.get(wheel).freeInertia / 10000,
-    r = 1.5,
+  const r = 1.5,
+    I = 0.5 * s.objects.get(wheel).mass * r * r, // uniform disc
     acc = 9.81 / (3 + I / (r * r));
   run(s, 0.5);
   near(s.state(a).vy, -acc * 0.5, 0.01);
