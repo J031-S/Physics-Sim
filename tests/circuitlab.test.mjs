@@ -1101,7 +1101,10 @@ test("random circuits: never NaN, never unsolvable, current conserved at every n
 test("presets: each builds a sound circuit and shows its stated readings", () => {
   assert.deepEqual(
     presets.map((p) => p.id),
-    ["series", "parallel", "divider", "internal-resistance", "wheatstone", "rc"],
+    [
+      ..."series parallel divider internal-resistance wheatstone rc rl".split(" "),
+      ..."ac-resistor ac-capacitor ac-inductor rlc resonance".split(" "),
+    ],
   );
   for (const preset of presets) {
     const lab = new CircuitLab();
@@ -1138,6 +1141,28 @@ test("presets: each builds a sound circuit and shows its stated readings", () =>
     }
     if (preset.timeConstant)
       close(lab.timeConstants()[0], preset.timeConstant, STEADY);
+    assert.ok(["dc", "ac"].includes(preset.view));
+    assert.equal(preset.view === "ac", lab.period !== null, preset.id);
+    if (!preset.steady) continue;
+    // AC: RMS readings over a whole cycle, once the circuit has settled.
+    lab.advance(preset.settle - lab.time);
+    const steady = lab.solve();
+    for (const r of preset.steady)
+      close(
+        steady.of(named(r.name).id)[r.quantity],
+        r.value,
+        TIMED,
+        `${preset.id}: ${r.name} ${r.quantity}`,
+      );
+    // How far the current leads the p.d. across the named component (for
+    // the source: how far the current it drives leads its EMF).
+    const lead = steady.of(named(preset.lead.name).id);
+    near(
+      angle(lead.phaseCurrent, lead.phaseVoltage),
+      preset.lead.value,
+      preset.lead.within || 2e-3,
+      `${preset.id}: phase`,
+    );
   }
   // The capacitor preset, switched over once charged: discharge through
   // the same 10 kΩ, the ammeter now reading the other way.
