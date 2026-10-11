@@ -144,8 +144,14 @@ test("field movement, rotation and resizing obey Z snapping with a fixed resize 
 });
 
 test("circular field resizing can shrink as well as grow without moving its centre", () => {
-  const s=make(), id=s.fields.add("magnetic",{x:0,y:10});
-  const d=new FieldDrag(s.fields,id,{x:2,y:10},"resize");
-  d.move({x:1,y:10},"resize",true);
-  const f=s.fields.regions.get(id);near(f.width,2);near(f.height,2);near(f.x,0);near(f.y,10);s.dispose();
+  const s = make(),
+    id = s.fields.add("magnetic", { x: 0, y: 10 });
+  const d = new FieldDrag(s.fields, id, { x: 2, y: 10 }, "resize");
+  d.move({ x: 1, y: 10 }, "resize", true);
+  const f = s.fields.regions.get(id);
+  near(f.width, 2);
+  near(f.height, 2);
+  near(f.x, 0);
+  near(f.y, 10);
+  s.dispose();
 });

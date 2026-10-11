@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- Written by `npm run pages` from src/minitools/catalogue.js. Do not edit. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Physium · Power lines</title>
+    <link rel="icon" type="image/svg+xml" href="../assets/logo.svg" />
+    <link rel="stylesheet" href="../styles/tokens.css" />
+    <link rel="stylesheet" href="../styles/base.css" />
+    <link rel="stylesheet" href="../styles/minitools.css" />
+  </head>
+  <body class="doc-page" data-page="minitools">
+    <header>
+      <a class="brand"></a>
+      <nav class="site-nav"></nav>
+      <div class="playback">
+        <button
+          id="settings-toggle"
+          title="Settings"
+          aria-expanded="false"
+          aria-controls="settings-panel"
+        >
+          Settings
+        </button>
+      </div>
+    </header>
+    <main id="minitool"></main>
+    <section id="settings-panel" hidden aria-labelledby="settings-title">
+      <div class="menu-header">
+        <strong id="settings-title">Settings</strong
+        ><button id="close-settings" aria-label="Close settings">×</button>
+      </div>
+      <details id="website-settings" class="settings-section" open></details>
+    </section>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="../src/minitools/app.js"></script>
+  </body>
+</html>

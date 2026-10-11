@@ -921,7 +921,11 @@ test("arrows do not move when the drawn region is moved", () => {
   wires.add("wire", { x: -0.75, y: 0, current: 10 });
   wires.add("wire", { x: 0.75, y: 0.25, current: 10 });
   const magnetic = (bounds) =>
-    magneticFieldLines(wires, bounds, { cell: 0.05, coreRadius: 0.14, reference })
+    magneticFieldLines(wires, bounds, {
+      cell: 0.05,
+      coreRadius: 0.14,
+      reference,
+    })
       .lines.flatMap((line) =>
         lineArrows(line, arrowFeatures(wires.compiled(), "magnetic"), S),
       )
@@ -955,7 +959,9 @@ test("arrows do not move when the drawn region is moved", () => {
   const parse = (k) => k.split(",").map(Number);
   for (const k of e1) {
     const [x, y] = parse(k),
-      gap = Math.min(...e2.map(parse).map((p) => Math.hypot(p[0] - x, p[1] - y)));
+      gap = Math.min(
+        ...e2.map(parse).map((p) => Math.hypot(p[0] - x, p[1] - y)),
+      );
     near(gap, 0, 2e-3, "same arrow");
   }
 });

@@ -292,7 +292,11 @@ test("presets show the results they claim", () => {
   {
     const { s, ids } = load("projectile");
     let peak = 0;
-    run(s, (2 * 7) / g - 0.02, () => (peak = Math.max(peak, s.state(ids[0]).y)));
+    run(
+      s,
+      (2 * 7) / g - 0.02,
+      () => (peak = Math.max(peak, s.state(ids[0]).y)),
+    );
     near(peak - 0.2, 49 / (2 * g), 0.04);
     near(s.state(ids[0]).x + 6, (2 * 49) / g, 0.25);
     s.dispose();

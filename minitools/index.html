@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Physium · Minitools</title>
+    <link rel="icon" type="image/svg+xml" href="../assets/logo.svg" />
+    <link rel="stylesheet" href="../styles/tokens.css" />
+    <link rel="stylesheet" href="../styles/base.css" />
+    <link rel="stylesheet" href="../styles/minitools.css" />
+  </head>
+  <body class="doc-page" data-page="minitools">
+    <header>
+      <a class="brand"></a>
+      <nav class="site-nav"></nav>
+      <div class="playback">
+        <button
+          id="settings-toggle"
+          title="Settings"
+          aria-expanded="false"
+          aria-controls="settings-panel"
+        >
+          Settings
+        </button>
+      </div>
+    </header>
+    <main class="mt-catalogue">
+      <h1>Minitools</h1>
+      <p class="mt-intro">
+        Small pages that each explain one equation, or one combination of
+        equations, with values to change. Pick what to solve for, move the
+        sliders, and watch the working, a graph and (where one of the
+        simulations can show it) a small live simulation.
+      </p>
+      <div class="mt-filters" role="search">
+        <label class="mt-search"
+          >Search
+          <input
+            id="tool-search"
+            type="search"
+            placeholder="e.g. orbit, spring"
+        /></label>
+        <label class="select-row"
+          >Topic
+          <select id="tool-topic">
+            <option value="">All topics</option>
+          </select></label
+        >
+        <fieldset class="mt-kind">
+          <legend>Show</legend>
+          <label
+            ><input type="radio" name="tool-kind" value="all" checked />
+            All</label
+          >
+          <label
+            ><input type="radio" name="tool-kind" value="single" /> Single
+            equations</label
+          >
+          <label
+            ><input type="radio" name="tool-kind" value="combined" />
+            Combinations</label
+          >
+        </fieldset>
+        <span id="tool-count" class="mt-count" aria-live="polite"></span>
+      </div>
+      <div id="catalogue"></div>
+    </main>
+    <section id="settings-panel" hidden aria-labelledby="settings-title">
+      <div class="menu-header">
+        <strong id="settings-title">Settings</strong
+        ><button id="close-settings" aria-label="Close settings">×</button>
+      </div>
+      <details id="website-settings" class="settings-section" open></details>
+    </section>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="../src/minitools/index.js"></script>
+  </body>
+</html>

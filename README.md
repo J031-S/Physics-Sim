@@ -466,6 +466,18 @@ Springs expose stiffness, axial damping and rest length; rods expose length. Eve
 
 Material menus contain no position/velocity inputs or geometry controls. Geometry, locks and belt drive controls are separate from material constants. Field menus separately expose shape, dimensions, angle and strength. There are no temperature placeholders, equation editor, arbitrary custom body shapes, inspector or scene autosave. Scenes are saved and loaded only as files you choose (see Presets, save and load). Only website preferences (and, in developer mode, the developer settings and schemes) use localStorage; old scene saves are not loaded or deleted. This is a fresh, transient sandbox on every page load.
 
+## Minitools
+
+`/minitools/` lists small pages that each explain one equation, or one combination of equations ("Kepler's third law", "Block on a ramp"), grouped by topic, with a search box, a topic filter and a choice of single equations or combinations. Each tool has its own address, `/minitools/<id>`.
+
+On a tool's page: the equation; **Solve for** buttons choosing the unknown (the equation is shown rearranged for it); one row per other quantity with a slider (logarithmic where the range spans powers of ten), a number field and its unit; **Working**, the rearranged equation with the numbers put in and the result to three significant figures; a picture and a graph of the unknown against any one quantity you choose; and, for combinations, where the equation comes from, one step at a time (**Next step**, **Show all**). Links lead to the full simulation and to the single-equation tools a combination is built from. **Reset to defaults** restores the starting values, and the address always holds the current values, so a link reproduces the set-up exactly.
+
+Where one of the four simulations can show the behaviour, the page has a small live simulation built with that simulation's own engine, with **Play/Pause**, **Restart** and the sliders only. Beside the result it shows the value **measured in the simulation**. The two are not forced to agree: where they differ (finite plates are not infinite ones; a pendulum released from 10° is not quite a small swing), that is part of what the page shows. A simulation that cannot represent the chosen values says so instead of showing something else. Tools no simulation can show yet (waves, light, special relativity, induction and the like) show the graph and say which simulation they are waiting for.
+
+Every formula and range is a first version marked "not verified" until it has been reviewed against the course formula sheet.
+
+Equations are typeset with KaTeX 0.16.22, vendored in `vendor/katex/` (no CDN, so they work offline and on school networks); only pages that show equations load it. An equation that cannot be typeset shows its source in red and is listed under the developer Checks.
+
 ## Developer options
 
 For the site's author, not for students. Turn developer mode on with `?dev` at the end of any address (for example `/sims/Mechanics?dev`; `?dev=0` turns it off) or with the small **Developer options** switch at the foot of the Website section. It is remembered in this browser. With it off, none of the following shows and every page uses the built-in look from `src/site/theme.js`; a developer scheme never reaches anyone else.
@@ -478,7 +490,6 @@ With it on, a **Developer** group appears at the bottom of the Website section o
 - **Layout aids**: outline every element's box, an 8 px spacing grid, the window size and breakpoint in a corner, and a preview of the page at phone (390 px), tablet (768 px), laptop (1366 px) and projector (1024 px) widths.
 - **Checks**: a performance overlay (frames per second, frame time, the page's own work per frame, and simulation steps per frame where the page knows them; the orbits page reports simulated seconds per frame instead), transitions slowed five times, reduced motion, long labels to find text overflow, minitool ids and verified flags, a sample toast and a sample error, the list of equations that failed to render, and **Save canvas PNG**, named after the page, theme and scheme.
 - **Stored preferences**: show every Physium key stored in this browser as JSON, export it, import it, or clear it.
-- **Equations** are typeset with KaTeX 0.16.22, vendored in `vendor/katex/` (no CDN, so they work offline and on school networks); only pages that show equations load it. An equation that cannot be typeset shows its source in red and is listed under Checks.
 - **Component gallery** (`/dev/gallery`): every shared component in the light and the dark theme side by side, following the theme tweaker live.
 
 What the developer options cannot do: a canvas pattern is drawn behind the canvas by CSS, so **Save canvas PNG** does not include it; preset thumbnails take new colours the next time the presets panel opens.

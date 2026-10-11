@@ -1,2 +1,4 @@
 styles/tokens.css
 vendor/
+minitools/*.html
+!minitools/index.html

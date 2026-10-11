@@ -5,6 +5,8 @@
 // made in another frame or tab).
 import { setupSite, setupSettingsPanel } from "./shell.js";
 import { renderAllMath } from "./math.js";
+import { toolById } from "../minitools/catalogue.js";
+import { toolCard } from "../minitools/card.js";
 
 setupSite();
 if (document.body.classList.contains("gallery-pane")) {
@@ -32,6 +34,8 @@ if (document.body.classList.contains("gallery-pane")) {
     menu.classList.add("gallery-static");
     document.querySelector(".gallery-nav").append(menu);
   }
+  for (const id of ["kepler-third-law", "ohms-law"])
+    document.querySelector(".gallery-minitool").append(toolCard(toolById(id)));
   renderAllMath();
 } else {
   setupSettingsPanel();

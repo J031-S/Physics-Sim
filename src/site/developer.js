@@ -265,6 +265,10 @@ const GROUP = `<summary>Developer</summary>
       <button type="button" id="dev-screenshot">Save canvas PNG</button>
     </div>
     <p class="dev-note" id="dev-equations">No equation has failed to render.</p>
+    <details class="dev-note" id="dev-waiting">
+      <summary>Minitools waiting for a simulation</summary>
+      <ul></ul>
+    </details>
   </fieldset>
   <fieldset class="dev-set">
     <legend>Stored preferences</legend>
@@ -375,7 +379,24 @@ function buildGroup() {
   $("dev-screenshot").addEventListener("click", screenshot);
   setupPreferencesTools();
   listFailedEquations();
+  listWaiting();
   window.addEventListener("physium-equation-error", listFailedEquations);
+}
+
+// Minitools with no mini simulation yet, by the simulation each waits for
+// (the standing rule in CLAUDE.md: a new simulation supplies theirs).
+async function listWaiting() {
+  const { tools } = await import("../minitools/catalogue.js"),
+    list = $("dev-waiting")?.querySelector("ul");
+  if (!list) return;
+  const waiting = tools.filter((t) => t.wants);
+  $("dev-waiting").querySelector("summary").textContent =
+    `Minitools waiting for a simulation (${waiting.length})`;
+  for (const t of waiting) {
+    const item = document.createElement("li");
+    item.textContent = `${t.title} (${t.id}): ${t.wants}`;
+    list.append(item);
+  }
 }
 
 function listFailedEquations() {

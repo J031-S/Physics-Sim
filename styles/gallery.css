@@ -83,3 +83,9 @@
 .gallery-toast {
   min-height: 40px;
 }
+.gallery-minitool .mt-card {
+  width: 260px;
+}
+.gallery-minitool {
+  align-items: stretch;
+}

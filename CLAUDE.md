@@ -81,14 +81,15 @@ No bundler, no framework, no runtime dependencies. `sims/Mechanics.html` loads `
 
 The site is served by GitHub Pages at `https://physium.j031.dev` (the `CNAME` file; `.nojekyll` stops Jekyll processing). **No address ever ends in `.html`**: GitHub Pages serves `sims/Mechanics.html` at `/sims/Mechanics`, and `server.mjs` does the same locally (the path, then the path plus `.html`, then a folder's `index.html` after adding the trailing slash, otherwise `404.html` with status 404). Addresses are case-sensitive, as on GitHub Pages; `404.html` redirects a wrong case, a trailing `.html` and the old addresses (`fields.html` and so on).
 
-| Page                       | Address           | File                   |
-| -------------------------- | ----------------- | ---------------------- |
-| Homepage                   | `/`               | `index.html`           |
-| Mechanics sandbox          | `/sims/Mechanics` | `sims/Mechanics.html`  |
-| Electric & magnetic fields | `/sims/EMFields`  | `sims/EMFields.html`   |
-| Orbits & gravitation       | `/sims/Orbits`    | `sims/Orbits.html`     |
-| Electric circuits          | `/sims/Circuits`  | `sims/Circuits.html`   |
-| Minitool catalogue         | `/minitools/`     | `minitools/index.html` |
+| Page                       | Address           | File                                                    |
+| -------------------------- | ----------------- | ------------------------------------------------------- |
+| Homepage                   | `/`               | `index.html`                                            |
+| Mechanics sandbox          | `/sims/Mechanics` | `sims/Mechanics.html`                                   |
+| Electric & magnetic fields | `/sims/EMFields`  | `sims/EMFields.html`                                    |
+| Orbits & gravitation       | `/sims/Orbits`    | `sims/Orbits.html`                                      |
+| Electric circuits          | `/sims/Circuits`  | `sims/Circuits.html`                                    |
+| Minitool catalogue         | `/minitools/`     | `minitools/index.html`                                  |
+| One minitool               | `/minitools/<id>` | `minitools/<id>.html` (stub written by `npm run pages`) |
 
 - Every page has the placeholders `<a class="brand"></a>`, `<nav class="site-nav"></nav>` and `<details id="website-settings" class="settings-section">` (with `open` if the section should start open), sets `<body data-page="<id from pages.js>">`, and calls `setupSite()` at the top of its script, before anything looks up a control. The Website section is identical on every page; a control with no effect on a page still appears there. Page-specific settings (such as the fields page's Snapping) live in the page's own sections.
 - Links are built from `siteRoot` in `shell.js`, never written into the HTML. Stylesheets and scripts in a page use relative paths (`../styles/base.css`); only `404.html` uses root paths, because GitHub Pages serves it at whatever address was missed.
@@ -100,6 +101,17 @@ The site is served by GitHub Pages at `https://physium.j031.dev` (the `CNAME` fi
 - A page with an animation loop calls `reportFrame({ steps, simulated, ms })` once a frame; a page that draws only on demand, or caches drawings (preset thumbnails), calls `onSchemeChange` to redraw. A scene canvas context goes through `styleCanvas`; arrows, field lines and grids in the renderers use the `canvas-style.js` helpers, which return the designed values when no scheme is on.
 - The icon set is part of a scheme, not a website preference: `prefs.iconSet` is Material unless developer mode sets it. Every icon set in `vendor/icons/sets.js` supplies every icon name (`CHOICES` lists the sets; a test checks they match).
 - Tests: `tests/developer.test.mjs` (schemes, code round trip, override CSS, canvas fonts, vendored fonts); `tests/site-smoke.mjs` checks the switch, `?dev` and the gallery.
+
+## Minitools (`src/minitools/`)
+
+Small pages that each explain one equation, or one combination of equations, with values to change. The catalogue is `/minitools/` (`minitools/index.html`, script `src/minitools/index.js`); each tool is at `/minitools/<id>`.
+
+- **`src/minitools/catalogue.js` is the only place a tool is defined** (no DOM). An entry gives the equation (`latex`), its quantities (`variables` with ranges and a `scale` of `"log"` where they span decades; `constants`), which quantities may be the unknown (`solveFor`), a `solve` function and a rearranged `forms` template for each (`@key` for a quantity, `·` for a product), a `derivation` for combinations, the tools it is built from (`uses`), a `visual`, a `sim` or a `wants`, the related full simulation, and `verified: false`. Formulas are the plain textbook ones; the physics review checks them and sets `verified`. Never change a formula or a range to make a mini simulation agree with it.
+- **Adding a tool** means adding one entry and running `npm run pages`, which writes the stub `minitools/<id>.html` (identical pages apart from the title; the one script `src/minitools/app.js` reads the id from the address). Never edit a stub by hand: `tests/minitools.test.mjs` fails if one is missing, extra or out of date.
+- **Mini simulations** (`sim`) use one of the four real engines through its public API (`build(values, E)` with `E` the engine module; helpers in `src/minitools/scenes.js`), are stepped by the engine's own `step`/`advance` and drawn by the shared `render.js` (`src/minitools/minisim.js`). `watch` reads the measured value of the unknown from the engine's state, shown beside the formula's result and labelled as measured; a mismatch is information for the review, not something to tune away. Matter.js is loaded only for sandbox scenes. Values outside an engine's own limits make the simulation say it cannot show them; they are not clamped.
+- Pictures: `src/minitools/visuals/`, one module each; every tool gets `graph` (the unknown against a chosen quantity).
+- **Standing rule:** whenever a new full simulation is added to the site, every minitool whose `wants` names it gets a mini simulation in the same piece of work, and its `wants` is cleared. `tests/minitools.test.mjs` prints the tools still waiting, and the developer options list them (Developer › Checks).
+- `tests/minitools.test.mjs` checks structure only (fields, ranges, finite results, visuals, links, every `sim.build` at the defaults, the stubs). Numerical checks against textbook values belong to the review.
 
 ## Units and conventions (easy to get wrong)
 

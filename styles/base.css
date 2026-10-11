@@ -1133,3 +1133,8 @@ body.doc-page {
 .gallery-sheet {
   zoom: var(--ui-scale);
 }
+/* Review badges (minitool ids, verified flags): shown only by the developer
+   options (styles/developer.css). */
+.dev-review {
+  display: none;
+}

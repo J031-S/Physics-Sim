@@ -60,7 +60,7 @@ const describe = (doc) => {
 };
 
 const shellPages = [
-  ...pages.filter((p) => p.group === "simulation" || p.group === "developer"),
+  ...pages.filter((p) => p.group !== "home"),
   { id: "not-found", file: "404.html", address: "no-such-page" },
 ];
 let reference = null,
@@ -167,6 +167,12 @@ for (const p of pages) assert.ok(!p.address.endsWith(".html"), p.id);
       assert.match(await r.text(), /data-page=/);
     }
     assert.equal((await get("/")).status, 200);
+    // Minitools: the catalogue, and each tool at its own address.
+    assert.equal((await get("/minitools/")).status, 200);
+    assert.equal((await get("/minitools")).status, 301);
+    const tool = await get("/minitools/kepler-third-law");
+    assert.equal(tool.status, 200);
+    assert.match(await tool.text(), /src\/minitools\/app\.js/);
     assert.equal((await get("/sims/Mechanics.html")).status, 200);
     const folder = await get("/sims");
     assert.equal(folder.status, 301);
