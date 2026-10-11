@@ -100,6 +100,14 @@ const SHAPES = {
   ],
 };
 const terminalCount = (kind) => KINDS[kind].terminals || 2;
+// Components that behave the same either way round. They have two
+// orientations only, along the grid or up it (terminal 0 at the left or at
+// the top), so turning one never draws it upside down or back to front. A
+// cell, a capacitor and a meter have a + terminal, and a two-way switch has
+// three contacts: those keep all four.
+export const SYMMETRIC = new Set(["resistor", "variable", "lamp", "switch"]);
+export const turnsOf = (kind, rot) =>
+  SYMMETRIC.has(kind) ? (rot & 1 ? 3 : 0) : rot & 3;
 // `rot` counts quarter-turns anticlockwise (y is up).
 export function terminalOffsets(kind, rot = 0) {
   return SHAPES[terminalCount(kind)].map(([x, y]) => {
@@ -527,6 +535,7 @@ export class CircuitLab {
     if (kind === "variable" && props.maximum === undefined)
       item.maximum = Math.max(item.maximum, item.resistance || 0);
     validate(item);
+    if (!explicit && kind !== "wire") item.rot = turnsOf(kind, item.rot);
     if (
       kind === "wire" &&
       !explicit &&
@@ -584,6 +593,7 @@ export class CircuitLab {
     const next = { ...item, ...patch };
     if (patch.nodes) next.nodes = [...patch.nodes];
     validate(next);
+    if ("rot" in next) next.rot = turnsOf(item.kind, next.rot);
     Object.assign(item, next);
     // A change of position is part of a gesture: `settle` ends it.
     if (["x", "y", "rot", "x1", "y1", "x2", "y2"].some((k) => k in patch))
@@ -708,7 +718,7 @@ export class CircuitLab {
       Object.assign(item, {
         x,
         y,
-        rot: rot === undefined ? item.rot : rot & 3,
+        rot: rot === undefined ? item.rot : turnsOf(item.kind, rot),
       });
       const now = this.terminals(item);
       for (const c of carry) {
@@ -726,9 +736,10 @@ export class CircuitLab {
   }
 
   // A quarter-turn anticlockwise (or `turns` of them) about the centre.
-  // The wires stay where they are: two quarter-turns put the component
-  // back on them the other way round, which is how a cell or a meter is
-  // reversed.
+  // The wires stay where they are: two quarter-turns put a cell, capacitor
+  // or meter back on them the other way round, which is how one is
+  // reversed. A component with no way round (SYMMETRIC) just alternates
+  // between lying along the grid and standing up it.
   rotate(id, turns = 1) {
     const item = this.#need(id);
     if (item.explicit || item.kind === "wire") return;

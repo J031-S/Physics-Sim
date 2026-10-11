@@ -935,26 +935,55 @@ test("on the grid: terminals that touch are joined, wires split and follow", () 
       .filter((i) => i.kind === "wire")
       .map((w) => [w.x1, w.y1, w.x2, w.y2].join());
   const before = wiring();
+  // A resistor is the same either way round, so it has two orientations
+  // only: along the grid (terminal 0 at the left) or up it (at the top).
   lab.rotate(r2);
+  assert.equal(lab.get(r2).rot, 3);
   assert.deepEqual(
     lab.terminals(r2).map((t) => [t.x, t.y]),
     [
-      [4, 1],
       [4, 3],
+      [4, 1],
     ],
   );
   assert.deepEqual(wiring(), before);
   assert.equal(lab.solve().status, "open", "a quarter-turn takes it off");
-  // A second quarter-turn puts it back the other way round.
+  // A second quarter-turn puts it back exactly as it was, not reversed.
   lab.rotate(r2);
+  assert.equal(lab.get(r2).rot, 0);
   s = solved(lab);
-  close(s.of(r2).voltage, -8, STEADY, "reversed: terminal 0 is now the low end");
+  close(s.of(r2).voltage, 8, STEADY, "the same way round as before");
   close(s.of(r1).voltage, 4, STEADY);
+  for (const kind of ["resistor", "variable", "lamp", "switch"]) {
+    const two = new CircuitLab(),
+      id = two.add(kind, { x: 0, y: 0, rot: 2 });
+    assert.equal(two.get(id).rot, 0, kind + " placed back to front");
+    two.update(id, { rot: 1 });
+    two.settle();
+    assert.equal(two.get(id).rot, 3, kind + " placed upside down");
+    two.rotate(id, 2);
+    assert.equal(two.get(id).rot, 3, kind + ": a half-turn changes nothing");
+  }
+  // Components with a + terminal, and the two-way switch, keep all four.
+  for (const kind of ["cell", "capacitor", "ammeter", "voltmeter", "switch2"]) {
+    const four = new CircuitLab(),
+      id = four.add(kind, { x: 0, y: 0 });
+    const seen = [0, 1, 2, 3].map(() => {
+      four.rotate(id);
+      return four.get(id).rot;
+    });
+    assert.deepEqual(seen, [1, 2, 3, 0], kind);
+  }
   // A cell turned round drives the current the other way.
   lab.rotate(cell, 2);
   s = solved(lab);
   close(s.of(cell).current, 1, STEADY, "still out of its + terminal");
   close(s.of(r1).voltage, -4, STEADY, "but the other way round the loop");
+  // So does a meter: an ammeter in the loop reads the other sign.
+  const forwards = lab.solve().of(ammeter).current;
+  lab.rotate(ammeter, 2);
+  close(Math.abs(forwards), 1, STEADY);
+  close(lab.solve().of(ammeter).current, -forwards, STEADY, "meter reversed");
   lab.clear();
   assert.equal(lab.list().length, 0);
   assert.equal(lab.time, 0);
