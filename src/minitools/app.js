@@ -108,6 +108,7 @@ function build() {
         <h1></h1>
         <p class="mt-topic"></p>
         <p class="mt-purpose"></p>
+        <p class="mt-about" hidden></p>
         <p class="mt-note" hidden></p>
       </div>
       <div class="mt-columns">
@@ -117,11 +118,11 @@ function build() {
             <span id="solve-label">Solve for</span>
             <div class="mt-solve-buttons" role="group" aria-labelledby="solve-label"></div>
           </div>
-          <div class="mt-rearranged"></div>
-          <details class="mt-algebra" open>
+          <details class="mt-algebra">
             <summary>How to rearrange it, step by step</summary>
             <ol></ol>
           </details>
+          <div class="mt-rearranged"></div>
           <div class="mt-rows"></div>
           <p class="mt-constants"></p>
           <section class="mt-working" aria-labelledby="working-title">
@@ -129,6 +130,15 @@ function build() {
             <div class="mt-working-math" aria-live="polite"></div>
             <p class="mt-caution" role="status" hidden></p>
             <p class="mt-measured" aria-live="polite"></p>
+          </section>
+          <section class="mt-derivation" aria-labelledby="derivation-title" hidden>
+            <h2 id="derivation-title">Where it comes from</h2>
+            <p class="mt-idea" hidden></p>
+            <ol></ol>
+            <div class="mt-row-buttons">
+              <button type="button" class="mt-next">Next step</button>
+              <button type="button" class="mt-all">Show all</button>
+            </div>
           </section>
         </section>
         <section class="mt-right" aria-label="Simulation and pictures">
@@ -140,14 +150,6 @@ function build() {
           </div>
         </section>
       </div>
-      <section class="mt-derivation" aria-labelledby="derivation-title" hidden>
-        <h2 id="derivation-title">Where it comes from</h2>
-        <ol></ol>
-        <div class="mt-row-buttons">
-          <button type="button" class="mt-next">Next step</button>
-          <button type="button" class="mt-all">Show all</button>
-        </div>
-      </section>
       <section class="mt-links" aria-label="Related pages"></section>
       <div class="mt-row-buttons">
         <button type="button" class="mt-reset">Reset to defaults</button>
@@ -162,6 +164,10 @@ function build() {
   q(".mt-topic span + span").textContent =
     tool.kind === "combined" ? "a combination of equations" : "one equation";
   q(".mt-purpose").textContent = tool.purpose;
+  if (tool.about) {
+    q(".mt-about").hidden = false;
+    say(q(".mt-about"), tool.about);
+  }
   if (tool.note) {
     q(".mt-note").hidden = false;
     q(".mt-note").textContent = tool.note;
@@ -269,6 +275,10 @@ function build() {
     const section = q(".mt-derivation"),
       list = section.querySelector("ol");
     section.hidden = false;
+    if (tool.idea) {
+      section.querySelector(".mt-idea").hidden = false;
+      say(section.querySelector(".mt-idea"), tool.idea);
+    }
     stepList(list, tool.derivation);
     for (const item of list.children) item.hidden = true;
     let shown = 1;

@@ -187,6 +187,34 @@ test("the stub pages match the catalogue", async () => {
     );
 });
 
+test("every tool's graph draws in both themes, for every unknown and every axis", () => {
+  let drawn = 0;
+  for (const t of tools)
+    for (const unknown of t.solveFor)
+      for (const x of t.variables.filter((v) => v.key !== unknown))
+        for (const dark of [false, true]) {
+          const values = defaults(t);
+          for (const c of t.constants) values[c.key] = c.value;
+          values[unknown] = t.solve[unknown](values);
+          const { ctx, texts } = recordingContext();
+          visuals.graph(ctx, {
+            width: 560,
+            height: 230,
+            values,
+            unknown,
+            tool: t,
+            xKey: x.key,
+            dark,
+          });
+          // Both axes carry numbers: at least two on each.
+          const numbers = texts.filter((s) => /^[−-]?\d/.test(s));
+          assert.ok(numbers.length >= 4, `${t.id} ${unknown} against ${x.key}`);
+          assert.doesNotMatch(texts.join(" "), /NaN|undefined/, `${t.id} ${unknown}`);
+          drawn++;
+        }
+  assert.ok(drawn > 500);
+});
+
 // ---------------------------------------------------------------------------
 // Explanations, and the mini simulations against their formulas.
 
@@ -199,6 +227,72 @@ test("every tool says where its equation comes from, with one change a step", ()
       assert.equal(step.say.split("$").length % 2, 1, `${t.id}: unpaired $`);
     }
   }
+});
+
+test("v² = u² + 2as says when its numbers describe no real motion", () => {
+  const check = toolById("suvat-v2-u2-2as").check;
+  // u = −6, v = −12 over s = +35: a = (144 − 36)/70 = 1.54, but moving
+  // backwards throughout it cannot end up 35 m forwards.
+  assert.match(check({ u: -6, v: -12, s: 35, a: 108 / 70 }, "a"), /no real motion/);
+  assert.equal(check({ u: 2, v: 8, s: 10, a: 3 }, "a"), null);
+  // u = 8, v = 2 with a = +3: the velocity is rising away from 2.
+  assert.match(check({ u: 8, v: 2, a: 3, s: -10 }, "s"), /no real motion/);
+  assert.equal(check({ u: 2, v: 8, a: 3, s: 10 }, "s"), null);
+});
+
+test("every tool has a longer description and the idea behind its derivation", () => {
+  for (const t of tools) {
+    assert.ok(t.about?.length >= 200, `${t.id}: a description of what it is about`);
+    assert.ok(t.idea?.length >= 40, `${t.id}: the idea of the derivation`);
+    assert.ok(t.derivation.length >= 4, `${t.id}: at least four steps`);
+    for (const text of [t.about, t.idea])
+      assert.equal(text.split("$").length % 2, 1, `${t.id}: unpaired $`);
+    // A proportion sign is explained in words the first time it is used.
+    const first = t.derivation.find((s) => s.latex.includes("\\propto"));
+    if (first)
+      assert.match(first.say, /proportional/, `${t.id}: ∝ used without saying what it means`);
+  }
+});
+
+test("graphs: tick values are round and inside the range", async () => {
+  const { ticksBetween, logTicks, tickText } = await import(
+    "../src/minitools/visuals/graph.js"
+  );
+  assert.deepEqual(ticksBetween(0, 10), [0, 2, 4, 6, 8, 10]);
+  assert.deepEqual(logTicks(1, 1e4), [1, 10, 100, 1000, 10000]);
+  assert.equal(tickText(0.5), "0.5");
+});
+
+test("graphs: an asymptote is found where the formula has one, and nowhere else", async () => {
+  const { curve } = await import("../src/minitools/visuals/graph.js");
+  // Time dilation against speed runs off at v = c, just beyond the slider.
+  const dilation = toolById("time-dilation"),
+    v = Object.fromEntries(
+      [...dilation.variables, ...dilation.constants].map((q) => [q.key, q.value]),
+    ),
+    speed = dilation.variables.find((q) => q.key === "v");
+  assert.ok(dilation.asymptotes.some((a) => a.x === "v" && a.y === "t"));
+  assert.deepEqual(
+    curve(dilation.solve.t, speed, v, "v", { extend: v.c }).asymptotes,
+    [v.c],
+  );
+  // 1/(1/x − 1/12) changes sign through infinity at x = 12.
+  const inside = curve(
+    (q) => 1 / (1 / q.x - 1 / 12),
+    { key: "x", min: 1, max: 100, scale: "" },
+    {},
+    "x",
+  );
+  assert.equal(inside.asymptotes.length, 1);
+  assert.ok(Math.abs(inside.asymptotes[0] - 12) < 1e-6);
+  // A power law has none, on a linear or a log axis.
+  for (const scale of ["", "log"])
+    assert.deepEqual(
+      curve((q) => 1 / q.x ** 2, { key: "x", min: 0.5, max: 500, scale }, {}, "x")
+        .asymptotes,
+      [],
+      `1/x² on a ${scale || "linear"} axis`,
+    );
 });
 
 test("every unknown has its rearranging steps, and each worked-out line is true", async () => {

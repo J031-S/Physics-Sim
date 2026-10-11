@@ -8,6 +8,7 @@ import { color } from "../site/theme.js";
 import { tidyNumber } from "../site/numbers.js";
 import { styleCanvas } from "../site/canvas-style.js";
 import { reportFrame } from "../site/dev-hooks.js";
+import { renderIcons } from "../site/icons.js";
 import { startRun } from "./runner.js";
 import { explain } from "./sims.js";
 
@@ -60,10 +61,30 @@ const ENGINES = {
 
 // ---------------------------------------------------------------- sandbox
 
+// The middle one of a short list of numbers.
+const median = (list) => [...list].sort((a, b) => a - b)[list.length >> 1];
+
 const sandboxDriver = {
   still: false,
+  // Which arrows this scene can show.
+  arrows: () => ({ velocity: true, force: true }),
   renderer: (R, ctx, view) => R.createSceneRenderer(ctx, view),
-  draw(model, renderer, view, size, prefs, R, E, ctx) {
+  draw(model, renderer, view, size, prefs, R, E, ctx, shown) {
+    // Net force arrows: the largest steady force seen so far in the scene is
+    // drawn 56 px long and the others in proportion. "Steady" is the median
+    // of the last few frames, so that the one-step force of an impact (which
+    // is drawn, up to the renderer's longest arrow) does not shrink every
+    // other arrow for the rest of the run.
+    let largest = 0;
+    for (const id of model.objects.keys()) {
+      const f = model.netForce(id);
+      largest = Math.max(largest, Math.hypot(f.x, f.y));
+    }
+    const recent = (model.tags.forceRecent ??= []);
+    recent.push(largest);
+    if (recent.length > 9) recent.shift();
+    model.tags.forceRef = Math.max(model.tags.forceRef ?? 0, median(recent));
+    const forceScale = model.tags.forceRef > 0 ? 56 / model.tags.forceRef : 4;
     // The region to show: the scene's own, grown to keep every body in view.
     // A strip below the floor holds its metre labels.
     const fit = (model.tags.fit ??= {
@@ -93,7 +114,10 @@ const sandboxDriver = {
       height: size.height,
       grid: prefs.grid,
       locks: false,
-      vectors: true,
+      vectors: shown.velocity,
+      forceVectors: shown.force,
+      forceOf: (id) => model.netForce(id),
+      forceScale,
       iconWeight: prefs.iconWeight,
       angleUnit: prefs.angleUnit,
     });
@@ -140,8 +164,9 @@ const orbitFormat = {
 };
 const orbitDriver = {
   still: false,
+  arrows: () => ({ velocity: true, force: true }),
   renderer: (R, ctx, view) => R.createOrbitRenderer(ctx, view),
-  draw(model, renderer, view, size, prefs, R, E) {
+  draw(model, renderer, view, size, prefs, R, E, ctx, shown) {
     const aim = model.tags.aim,
       p = model.preview(aim),
       preview = {
@@ -175,8 +200,8 @@ const orbitDriver = {
       colours: R.orbitPalette(isDark()),
       grid: prefs.grid,
       show: {
-        velocity: true,
-        force: false,
+        velocity: shown.velocity,
+        force: shown.force,
         prediction: true,
         trails: true,
         areas: false,
@@ -197,8 +222,10 @@ const orbitDriver = {
 const fieldDriver = {
   // Nothing moves: the sources are fixed.
   still: true,
+  // Nothing has a velocity; forces only where the scene has a test charge.
+  arrows: (model) => ({ velocity: false, force: !!model.tags.forces }),
   renderer: (R, ctx, view) => R.createFieldRenderer(ctx, view),
-  draw(model, renderer, view, size, prefs, R, E, ctx) {
+  draw(model, renderer, view, size, prefs, R, E, ctx, shown) {
     const half = model.tags.view,
       state = {
         mode: model.tags.mode,
@@ -208,7 +235,7 @@ const fieldDriver = {
           lines: true,
           arrows: false,
           equipotentials: false,
-          forces: !!model.tags.forces,
+          forces: !!model.tags.forces && shown.force,
           labels: model.tags.labels !== false,
         },
       };
@@ -250,6 +277,8 @@ const fieldDriver = {
 
 const circuitDriver = {
   still: false,
+  // A circuit has no velocity or force arrows.
+  arrows: () => ({ velocity: false, force: false }),
   renderer: (R, ctx, view) => R.createCircuitRenderer(ctx, view),
   draw(model, renderer, view, size, prefs, R) {
     let minX = Infinity,
@@ -298,13 +327,30 @@ export async function createMiniSim(box, options) {
     <div class="mt-sim-controls">
       <button type="button" class="mt-play" aria-pressed="false">Pause</button>
       <button type="button" class="mt-restart">Restart</button>
+      <label class="icon-toggle mt-show-velocity" title="Velocity vectors"
+        ><input type="checkbox" checked /><span
+          data-icon="velocity"
+          data-icon-label="Velocity vectors"
+          data-icon-only="true"
+        ></span></label
+      ><label class="icon-toggle mt-show-force" title="Net force vectors"
+        ><input type="checkbox" checked /><span
+          data-icon="force"
+          data-icon-label="Net force vectors"
+          data-icon-only="true"
+        ></span></label>
       <span class="mt-sim-time" aria-live="off"></span>
     </div>
     <p class="mt-sim-caption"></p>`;
   const canvas = box.querySelector("canvas"),
     message = box.querySelector(".mt-sim-message"),
     play = box.querySelector(".mt-play"),
-    clock = box.querySelector(".mt-sim-time");
+    clock = box.querySelector(".mt-sim-time"),
+    toggles = {
+      velocity: box.querySelector(".mt-show-velocity"),
+      force: box.querySelector(".mt-show-force"),
+    };
+  renderIcons(prefs.iconWeight);
   canvas.setAttribute("aria-label", `Simulation: ${sim.caption}`);
   box.querySelector(".mt-sim-caption").textContent = sim.caption;
   const ctx = styleCanvas(canvas.getContext("2d"));
@@ -328,6 +374,9 @@ export async function createMiniSim(box, options) {
       run = startRun(sim, driver.E, options.values, options.unknown);
       message.hidden = true;
       canvas.hidden = false;
+      // Only the arrows this scene can show have a button.
+      const can = driver.arrows(run.model);
+      for (const key of ["velocity", "force"]) toggles[key].hidden = !can[key];
     } catch (error) {
       message.hidden = false;
       canvas.hidden = true;
@@ -380,6 +429,10 @@ export async function createMiniSim(box, options) {
           driver.R,
           driver.E,
           ctx,
+          {
+            velocity: toggles.velocity.querySelector("input").checked,
+            force: toggles.force.querySelector("input").checked,
+          },
         );
       } catch (error) {
         message.hidden = false;

@@ -71,8 +71,14 @@ const tool = (entry) => ({
     say,
     latex,
   })),
+  // A longer description for the top of the page, and the idea behind the
+  // derivation in a sentence or two.
+  about: explain[entry.id]?.about ?? null,
+  idea: explain[entry.id]?.idea ?? null,
   note: explain[entry.id]?.note ?? null,
   check: explain[entry.id]?.check ?? null,
+  // Asymptotes just beyond a slider's range, for the graph (v = c).
+  asymptotes: explain[entry.id]?.asymptotes ?? [],
 });
 
 // Constants.
@@ -1444,22 +1450,6 @@ export const tools = [
       r: "\\sqrt[3]{\\frac{@G·@M·@T^{2}}{4\\pi^{2}}}",
       M: "\\frac{4\\pi^{2}·@r^{3}}{@G·@T^{2}}",
     },
-    derivation: [
-      {
-        say: "Gravity provides the centripetal force",
-        latex: "\\frac{GMm}{r^2} = \\frac{mv^2}{r}",
-      },
-      { say: "The satellite's mass cancels", latex: "v^2 = \\frac{GM}{r}" },
-      {
-        say: "One orbit is a circumference in one period",
-        latex: "v = \\frac{2\\pi r}{T}",
-      },
-      {
-        say: "Substitute and rearrange",
-        latex:
-          "\\frac{4\\pi^2 r^2}{T^2} = \\frac{GM}{r} \;\\Rightarrow\; T^2 = \\frac{4\\pi^2}{GM} r^3",
-      },
-    ],
     uses: ["newtons-gravitation", "centripetal-force", "circular-speed"],
     related: "orbits",
   }),
@@ -1497,14 +1487,6 @@ export const tools = [
       r: "\\frac{@G·@M}{@v^{2}}",
       M: "\\frac{@v^{2}·@r}{@G}",
     },
-    derivation: [
-      {
-        say: "Gravity provides the centripetal force",
-        latex: "\\frac{GMm}{r^2} = \\frac{mv^2}{r}",
-      },
-      { say: "Cancel m and one r", latex: "v^2 = \\frac{GM}{r}" },
-      { say: "Take the square root", latex: "v = \\sqrt{\\frac{GM}{r}}" },
-    ],
     uses: ["newtons-gravitation", "centripetal-force"],
     related: "orbits",
   }),
@@ -1531,20 +1513,6 @@ export const tools = [
       r: "\\sqrt[3]{\\frac{@G·@M·@T^{2}}{4\\pi^{2}}}",
       T: "2\\pi\\sqrt{\\frac{@r^{3}}{@G·@M}}",
     },
-    derivation: [
-      {
-        say: "Kepler's third law for a circular orbit",
-        latex: "T^2 = \\frac{4\\pi^2}{GM} r^3",
-      },
-      {
-        say: "Set T to one turn of the planet (a sidereal day) and solve for r",
-        latex: "r = \\sqrt[3]{\\frac{GMT^2}{4\\pi^2}}",
-      },
-      {
-        say: "The altitude is the radius less the planet's radius",
-        latex: "h = r - R",
-      },
-    ],
     uses: ["kepler-third-law"],
     related: "orbits",
   }),
@@ -1591,14 +1559,6 @@ export const tools = [
       M: "\\frac{@v^{2}·@r}{2·@G}",
       r: "\\frac{2·@G·@M}{@v^{2}}",
     },
-    derivation: [
-      {
-        say: "To escape, the total energy must reach zero",
-        latex: "\\tfrac{1}{2}mv^2 - \\frac{GMm}{r} = 0",
-      },
-      { say: "Cancel m and rearrange", latex: "v^2 = \\frac{2GM}{r}" },
-      { say: "Take the square root", latex: "v = \\sqrt{\\frac{2GM}{r}}" },
-    ],
     uses: ["kinetic-energy", "gravitational-potential"],
     related: "orbits",
   }),
@@ -1628,21 +1588,6 @@ export const tools = [
       B: "\\frac{@m·@v}{@q·@r}",
       v: "\\frac{@r·@q·@B}{@m}",
     },
-    derivation: [
-      {
-        say: "The magnetic force is always at right angles to the velocity",
-        latex: "F = qvB",
-      },
-      {
-        say: "It provides the centripetal force",
-        latex: "qvB = \\frac{mv^2}{r}",
-      },
-      { say: "Solve for the radius", latex: "r = \\frac{mv}{qB}" },
-      {
-        say: "The period does not depend on the speed",
-        latex: "T = \\frac{2\\pi r}{v} = \\frac{2\\pi m}{qB}",
-      },
-    ],
     uses: ["force-on-moving-charge", "centripetal-force"],
     related: "mechanics",
   }),
@@ -1666,17 +1611,6 @@ export const tools = [
       B: ({ E, v }) => E / v,
     },
     forms: { v: "\\frac{@E}{@B}", E: "@v·@B", B: "\\frac{@E}{@v}" },
-    derivation: [
-      { say: "The electric force on the charge", latex: "F_E = qE" },
-      {
-        say: "The magnetic force, in the opposite direction",
-        latex: "F_B = qvB",
-      },
-      {
-        say: "Undeflected when they balance",
-        latex: "qE = qvB \;\\Rightarrow\; v = \\frac{E}{B}",
-      },
-    ],
     uses: ["electric-field-force", "force-on-moving-charge"],
     related: "mechanics",
   }),
@@ -1706,22 +1640,6 @@ export const tools = [
       m: "\\frac{@q·@r^{2}·@B^{2}}{2·@V}",
       B: "\\frac{1}{@r}\\sqrt{\\frac{2·@m·@V}{@q}}",
     },
-    derivation: [
-      {
-        say: "The accelerating p.d. gives the ion its kinetic energy",
-        latex:
-          "qV = \\tfrac{1}{2}mv^2 \;\\Rightarrow\; v = \\sqrt{\\frac{2qV}{m}}",
-      },
-      {
-        say: "In the magnetic field it moves on a circle",
-        latex: "r = \\frac{mv}{qB}",
-      },
-      {
-        say: "Substitute v",
-        latex:
-          "r = \\frac{m}{qB}\\sqrt{\\frac{2qV}{m}} = \\frac{1}{B}\\sqrt{\\frac{2mV}{q}}",
-      },
-    ],
     uses: ["electron-gun", "cyclotron-motion"],
     related: "mechanics",
   }),
@@ -1748,11 +1666,6 @@ export const tools = [
       v: "\\sqrt{\\frac{2·@q·@V}{@m}}",
       V: "\\frac{@m·@v^{2}}{2·@q}",
     },
-    derivation: [
-      { say: "The work done by the field", latex: "W = qV" },
-      { say: "becomes kinetic energy", latex: "qV = \\tfrac{1}{2}mv^2" },
-      { say: "Solve for the speed", latex: "v = \\sqrt{\\frac{2qV}{m}}" },
-    ],
     uses: ["electric-work", "kinetic-energy"],
     related: "mechanics",
   }),
@@ -1784,21 +1697,6 @@ export const tools = [
       V: "\\frac{2·@m·@d·@u^{2}·@y}{@q·@L^{2}}",
       u: "\\sqrt{\\frac{@q·@V·@L^{2}}{2·@m·@d·@y}}",
     },
-    derivation: [
-      { say: "The field between the plates", latex: "E = \\frac{V}{d}" },
-      {
-        say: "gives a steady sideways acceleration",
-        latex: "a = \\frac{qE}{m} = \\frac{qV}{md}",
-      },
-      {
-        say: "The time between the plates, at the steady forward speed",
-        latex: "t = \\frac{L}{u}",
-      },
-      {
-        say: "Sideways, from rest",
-        latex: "y = \\tfrac{1}{2}at^2 = \\frac{qVL^2}{2mdu^2}",
-      },
-    ],
     uses: ["uniform-field-plates", "newtons-second-law", "suvat-s-ut-at2"],
     related: "mechanics",
   }),
@@ -1828,14 +1726,6 @@ export const tools = [
       V: "\\frac{@m·@g·@d}{@q}",
       m: "\\frac{@q·@V}{@g·@d}",
     },
-    derivation: [
-      { say: "The field between the plates", latex: "E = \\frac{V}{d}" },
-      {
-        say: "Held still when the electric force balances the weight",
-        latex: "qE = mg",
-      },
-      { say: "Solve for the charge", latex: "q = \\frac{mgd}{V}" },
-    ],
     uses: ["uniform-field-plates", "electric-field-force", "weight"],
     related: "mechanics",
   }),
@@ -1862,29 +1752,6 @@ export const tools = [
       R: "\\frac{@u^{2}\\sin(2·@theta)}{@g}",
       u: "\\sqrt{\\frac{@R·@g}{\\sin(2·@theta)}}",
     },
-    derivation: [
-      {
-        say: "Split the launch velocity",
-        latex: "u_x = u\\cos\\theta, \\quad u_y = u\\sin\\theta",
-      },
-      {
-        say: "Vertically: up and back down",
-        latex:
-          "0 = u_y t - \\tfrac{1}{2}gt^2 \;\\Rightarrow\; t = \\frac{2u\\sin\\theta}{g}",
-      },
-      {
-        say: "Horizontally: steady speed",
-        latex: "R = u_x t = \\frac{2u^2\\sin\\theta\\cos\\theta}{g}",
-      },
-      {
-        say: "Use 2 sin θ cos θ = sin 2θ",
-        latex: "R = \\frac{u^2\\sin 2\\theta}{g}",
-      },
-      {
-        say: "Also: the greatest height",
-        latex: "H = \\frac{u^2\\sin^2\\theta}{2g}",
-      },
-    ],
     uses: ["suvat-s-ut-at2", "suvat-v-u-at"],
     related: "mechanics",
   }),
@@ -1907,10 +1774,6 @@ export const tools = [
       h: ({ v, g }) => (v * v) / (2 * g),
     },
     forms: { v: "\\sqrt{2·@g·@h}", h: "\\frac{@v^{2}}{2·@g}" },
-    derivation: [
-      { say: "Energy is conserved", latex: "mgh = \\tfrac{1}{2}mv^2" },
-      { say: "The mass cancels", latex: "v = \\sqrt{2gh}" },
-    ],
     uses: ["gravitational-potential-energy", "kinetic-energy"],
     related: "mechanics",
   }),
@@ -1946,22 +1809,6 @@ export const tools = [
       theta:
         "\\sin^{-1}\\left(\\frac{@a/@g}{\\sqrt{1+@mu^{2}}}\\right) + \\tan^{-1} @mu",
     },
-    derivation: [
-      {
-        say: "Along the slope, the weight's component",
-        latex: "mg\\sin\\theta",
-      },
-      { say: "Across it, the normal force", latex: "N = mg\\cos\\theta" },
-      {
-        say: "Friction opposes the sliding",
-        latex: "F_f = \\mu N = \\mu mg\\cos\\theta",
-      },
-      {
-        say: "Newton's second law along the slope; m cancels",
-        latex:
-          "ma = mg\\sin\\theta - \\mu mg\\cos\\theta \;\\Rightarrow\; a = g(\\sin\\theta - \\mu\\cos\\theta)",
-      },
-    ],
     uses: ["weight", "friction", "newtons-second-law"],
     related: "mechanics",
   }),
@@ -1990,17 +1837,6 @@ export const tools = [
       v: "\\sqrt{@r·@g\\tan @theta}",
       r: "\\frac{@v^{2}}{@g\\tan @theta}",
     },
-    derivation: [
-      {
-        say: "Vertically, the normal force holds up the weight",
-        latex: "N\\cos\\theta = mg",
-      },
-      {
-        say: "Horizontally, it provides the centripetal force",
-        latex: "N\\sin\\theta = \\frac{mv^2}{r}",
-      },
-      { say: "Divide the two", latex: "\\tan\\theta = \\frac{v^2}{rg}" },
-    ],
     uses: ["centripetal-force", "weight"],
     wants: "mechanics-3d",
   }),
@@ -2029,21 +1865,6 @@ export const tools = [
       T: "2\\pi\\sqrt{\\frac{@L\\cos @theta}{@g}}",
       L: "\\frac{@g·@T^{2}}{4\\pi^{2}\\cos @theta}",
     },
-    derivation: [
-      {
-        say: "Vertically, the tension holds up the weight",
-        latex: "F_T\\cos\\theta = mg",
-      },
-      {
-        say: "Horizontally, it gives the centripetal force on a circle of radius L sin θ",
-        latex: "F_T\\sin\\theta = m\\omega^2 L\\sin\\theta",
-      },
-      {
-        say: "Divide, and use ω = 2π/T",
-        latex:
-          "\\omega^2 = \\frac{g}{L\\cos\\theta} \;\\Rightarrow\; T = 2\\pi\\sqrt{\\frac{L\\cos\\theta}{g}}",
-      },
-    ],
     uses: ["centripetal-force", "weight"],
     wants: "mechanics-3d",
   }),
@@ -2066,20 +1887,6 @@ export const tools = [
       r: ({ v, g }) => (v * v) / g,
     },
     forms: { v: "\\sqrt{@g·@r}", r: "\\frac{@v^{2}}{@g}" },
-    derivation: [
-      {
-        say: "At the top, tension and weight both point to the centre",
-        latex: "F_T + mg = \\frac{mv^2}{r}",
-      },
-      {
-        say: "The string stays taut while the tension is not negative",
-        latex: "F_T \\ge 0 \;\\Rightarrow\; \\frac{mv^2}{r} \\ge mg",
-      },
-      {
-        say: "So the least speed at the top is",
-        latex: "v_{min} = \\sqrt{gr}",
-      },
-    ],
     uses: ["centripetal-force", "weight"],
     wants: "mechanics-ropes",
   }),
@@ -2107,24 +1914,6 @@ export const tools = [
       m: "\\frac{@k·@T^{2}}{4\\pi^{2}}",
       k: "\\frac{4\\pi^{2}·@m}{@T^{2}}",
     },
-    derivation: [
-      {
-        say: "The spring pulls back in proportion to the displacement",
-        latex: "F = -kx",
-      },
-      {
-        say: "Newton's second law",
-        latex: "ma = -kx \;\\Rightarrow\; a = -\\frac{k}{m}x",
-      },
-      {
-        say: "That is simple harmonic motion with",
-        latex: "\\omega^2 = \\frac{k}{m}",
-      },
-      {
-        say: "The period",
-        latex: "T = \\frac{2\\pi}{\\omega} = 2\\pi\\sqrt{\\frac{m}{k}}",
-      },
-    ],
     uses: ["hookes-law", "newtons-second-law"],
     related: "mechanics",
   }),
@@ -2152,18 +1941,6 @@ export const tools = [
       L: "\\frac{@g·@T^{2}}{4\\pi^{2}}",
       g: "\\frac{4\\pi^{2}·@L}{@T^{2}}",
     },
-    derivation: [
-      {
-        say: "The restoring force along the arc",
-        latex: "F = -mg\\sin\\theta",
-      },
-      {
-        say: "For small angles sin θ ≈ θ = x/L",
-        latex: "F \\approx -\\frac{mg}{L}x",
-      },
-      { say: "Simple harmonic motion with", latex: "\\omega^2 = \\frac{g}{L}" },
-      { say: "The period", latex: "T = 2\\pi\\sqrt{\\frac{L}{g}}" },
-    ],
     uses: ["weight", "newtons-second-law"],
     related: "mechanics",
   }),
@@ -2191,24 +1968,6 @@ export const tools = [
     forms: {
       v1: "\\frac{(@m1 - @e·@m2)·@u1 + (1 + @e)·@m2·@u2}{@m1 + @m2}",
     },
-    derivation: [
-      {
-        say: "Momentum is conserved",
-        latex: "m_1u_1 + m_2u_2 = m_1v_1 + m_2v_2",
-      },
-      {
-        say: "Restitution relates the speeds of separation and approach",
-        latex: "v_2 - v_1 = e(u_1 - u_2)",
-      },
-      {
-        say: "Solve the two together",
-        latex: "v_1 = \\frac{(m_1 - em_2)u_1 + (1 + e)m_2u_2}{m_1 + m_2}",
-      },
-      {
-        say: "and",
-        latex: "v_2 = \\frac{(m_2 - em_1)u_2 + (1 + e)m_1u_1}{m_1 + m_2}",
-      },
-    ],
     uses: ["momentum", "kinetic-energy"],
     related: "mechanics",
   }),
@@ -2244,18 +2003,6 @@ export const tools = [
       Ploss: "\\left(\\frac{@P}{@V}\\right)^{2}·@R",
       V: "@P\\sqrt{\\frac{@R}{@Ploss}}",
     },
-    derivation: [
-      {
-        say: "The current needed to send power P at voltage V",
-        latex: "I = \\frac{P}{V}",
-      },
-      { say: "The line heats at", latex: "P_{loss} = I^2R" },
-      { say: "So", latex: "P_{loss} = \\left(\\frac{P}{V}\\right)^2 R" },
-      {
-        say: "A transformer raises V by the turns ratio, cutting the loss by its square",
-        latex: "\\frac{V_p}{V_s} = \\frac{N_p}{N_s}",
-      },
-    ],
     uses: ["electrical-power", "power-current-resistance", "transformer"],
     related: "circuits",
   }),
@@ -2280,21 +2027,6 @@ export const tools = [
       omega: ({ emf, N, B, A }) => emf / (N * B * A),
     },
     forms: { emf: "@N·@B·@A·@omega", omega: "\\frac{@emf}{@N·@B·@A}" },
-    derivation: [
-      {
-        say: "The flux through the turning coil",
-        latex: "\\Phi = BA\\cos\\omega t",
-      },
-      {
-        say: "Faraday's law for N turns",
-        latex: "\\varepsilon = -N\\frac{d\\Phi}{dt}",
-      },
-      {
-        say: "Differentiate",
-        latex: "\\varepsilon = NBA\\omega\\sin\\omega t",
-      },
-      { say: "The peak", latex: "\\varepsilon_0 = NBA\\omega" },
-    ],
     uses: ["magnetic-flux", "faradays-law"],
     wants: "induction",
   }),
@@ -2321,14 +2053,6 @@ export const tools = [
       Vs: "\\frac{@h·@f - @W}{@e}",
       f: "\\frac{@Vs·@e + @W}{@h}",
     },
-    derivation: [
-      { say: "Einstein's photoelectric equation", latex: "E_k = hf - W" },
-      {
-        say: "The stopping p.d. takes away exactly that energy",
-        latex: "eV_s = E_k",
-      },
-      { say: "So", latex: "V_s = \\frac{hf - W}{e}" },
-    ],
     uses: ["photoelectric-effect", "electric-work"],
     wants: "modern",
   }),

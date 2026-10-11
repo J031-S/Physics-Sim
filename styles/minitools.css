@@ -291,6 +291,9 @@
 .mt-sim-controls button {
   padding: 5px 12px;
 }
+.mt-sim-controls .icon-toggle[hidden] {
+  display: none;
+}
 .mt-sim-time {
   margin-left: auto;
   font:
@@ -315,9 +318,26 @@
   gap: 8px;
   font-size: 13px;
 }
+.mt-about {
+  margin: 8px 0 0;
+  max-width: 78ch;
+  font-size: 14px;
+  line-height: 1.55;
+}
 .mt-derivation {
-  margin-top: 26px;
-  max-width: 760px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.mt-idea {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.mt-derivation li {
+  font-size: 13.5px;
+  line-height: 1.5;
 }
 .mt-derivation ol {
   padding-left: 22px;
@@ -370,7 +390,7 @@
 }
 /* The algebra of rearranging, one move a line. */
 .mt-algebra {
-  margin: 4px 0 12px;
+  margin: 0;
   padding: 6px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
