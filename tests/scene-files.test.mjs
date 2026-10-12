@@ -227,7 +227,7 @@ test("a file from another tool, or not ours at all, is refused readably", () => 
   };
   for (const [tool, load] of Object.entries(tools)) {
     for (const junk of JUNK)
-      assert.throws(() => load(junk), /not a Physics Sim scene/, tool);
+      assert.throws(() => load(junk), /not a Physium scene/, tool);
     for (const [other, file] of Object.entries(OTHERS)) {
       if (other === tool) continue;
       assert.throws(() => load(file), /saved from the .+ tool/, tool);

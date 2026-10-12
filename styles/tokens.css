@@ -1,0 +1,93 @@
+/* Generated from src/site/theme.js by `npm run tokens`. Do not edit. */
+:root {
+  --canvas-bg: #f2f0e9;
+  --panel: #fffefa;
+  --line: #ccd3c7;
+  --ink: #354438;
+  --ink-soft: #6f7f63;
+  --accent: #435d49;
+  --accent-text: #4f7547;
+  --accent-soft: #e5eedf;
+  --danger: #a5544a;
+  --danger-text: #b3261e;
+  --on-colour: #ffffff;
+  --shadow: #34473125;
+  --canvas-grid: #dce1d4;
+  --canvas-ground: #e0e3d8;
+  --structure: #7f9076;
+  --body-ball: #dba66b;
+  --body-block: #8ca6bc;
+  --body-wedge: #a2b889;
+  --orbit-body: #9fb39a;
+  --vector-velocity: #497caa;
+  --vector-force: #c2410c;
+  --energy-kinetic: #497caa;
+  --energy-gravitational: #6d8f5f;
+  --energy-elastic: #c99a3e;
+  --energy-electric: #b0577f;
+  --field-electric: #ae7d24;
+  --field-magnetic: #8060ae;
+  --charge-positive: #c2503c;
+  --charge-negative: #3f76aa;
+  --field-equipotential: #3f8c7c;
+  --field-test-charge: #2f7d4f;
+  --field-neutral: #9aa392;
+  --circuit-current: #b4530a;
+  --circuit-dot: #ff7a00;
+  --circuit-dot-electron: #00a3ff;
+  --circuit-glow: #f5b700;
+  --dev-outline: #c2187a;
+  --dev-grid: #2f7dd0;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas-bg: #1c1a16;
+  --panel: #2a2722;
+  --line: #4a453b;
+  --ink: #ebe5d6;
+  --ink-soft: #bdb4a2;
+  --accent: #435d49;
+  --accent-text: #a9c49d;
+  --accent-soft: #3b4c3f;
+  --danger: #b35d52;
+  --danger-text: #ff8f7d;
+  --on-colour: #ffffff;
+  --shadow: #34473125;
+  --canvas-grid: #2a2721;
+  --canvas-ground: #25332a;
+  --structure: #7f9076;
+  --body-ball: #dba66b;
+  --body-block: #8ca6bc;
+  --body-wedge: #a2b889;
+  --orbit-body: #5d6b5c;
+  --vector-velocity: #6fa8ec;
+  --vector-force: #ef8a6f;
+  --energy-kinetic: #3987e5;
+  --energy-gravitational: #199e70;
+  --energy-elastic: #c98500;
+  --energy-electric: #d55181;
+  --field-electric: #e0a94a;
+  --field-magnetic: #a891e0;
+  --charge-positive: #e9826e;
+  --charge-negative: #6fa8ec;
+  --field-equipotential: #6fbfae;
+  --field-test-charge: #8fd3a4;
+  --field-neutral: #8d8777;
+  --circuit-current: #f2c14e;
+  --circuit-dot: #ff4d2e;
+  --circuit-dot-electron: #1f8bff;
+  --circuit-glow: #ffd866;
+  --dev-outline: #ff6fb0;
+  --dev-grid: #6fa8ec;
+}
+:root,
+:root[data-theme="dark"] {
+  --canvas-grid-major: color-mix(in srgb, var(--canvas-grid) 85%, var(--ink-soft));
+  --accent-border: color-mix(in srgb, var(--line) 70%, var(--accent-text));
+  --accent-hover: color-mix(in srgb, var(--accent) 82%, black);
+  --danger-hover: color-mix(in srgb, var(--danger) 85%, black);
+  --body-ball-edge: color-mix(in srgb, var(--body-ball) 72%, black);
+  --body-edge: color-mix(in srgb, var(--body-block) 72%, black);
+  --body-label: color-mix(in srgb, var(--body-wedge) 25%, black);
+  --hatch: color-mix(in srgb, var(--on-colour) 50%, transparent);
+}

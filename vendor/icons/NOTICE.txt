@@ -1,11 +1,4 @@
-Material Symbols — @iconify-json/material-symbols 1.2.94
-Apache 2.0 — https://github.com/google/material-design-icons/blob/master/LICENSE
-Icons bundled via Iconify; selected original SVGs only.
-
-Lucide — @iconify-json/lucide 1.2.140
-ISC — https://github.com/lucide-icons/lucide/blob/main/LICENSE
-Icons bundled via Iconify; selected original SVGs only.
-
-Tabler Icons — @iconify-json/tabler 1.2.41
-MIT — https://github.com/tabler/tabler-icons/blob/master/LICENSE
-Icons bundled via Iconify; selected original SVGs only.
+Phosphor Icons 2.1.1 — @iconify-json/ph 1.2.2
+MIT — https://github.com/phosphor-icons/core/blob/main/LICENSE (phosphor-LICENSE.txt)
+Icons bundled via Iconify; the original SVGs of the icons the site uses, in
+each of Phosphor's six weights (thin, light, regular, bold, fill, duotone).

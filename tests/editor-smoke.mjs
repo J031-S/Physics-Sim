@@ -3,9 +3,9 @@ import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import Matter from "../vendor/matter.js";
 import { presets } from "../src/presets.js";
-const window = new Window({ url: "http://localhost:3000" });
+const window = new Window({ url: "http://localhost:3000/sims/Mechanics" });
 window.document.write(
-  await readFile(new URL("../index.html", import.meta.url), "utf8"),
+  await readFile(new URL("../sims/Mechanics.html", import.meta.url), "utf8"),
 );
 for (const key of ["document"]) globalThis[key] = window[key];
 globalThis.window = window;
@@ -716,10 +716,7 @@ change($("ui-theme"), "dark");
 assert.equal(document.documentElement.dataset.theme, "dark");
 change($("ui-size"), "125", "input");
 assert.equal($("ui-size-value").textContent, "125%");
-assert.equal(
-  JSON.parse(window.localStorage.getItem("physics-sim-ui")).size,
-  125,
-);
+assert.equal(JSON.parse(window.localStorage.getItem("physium-ui")).size, 125);
 $("close-settings").click();
 const priorZoom = $("zoom-level").textContent;
 $("zoom-out").click();
@@ -778,24 +775,48 @@ $("close-menu").click();
 $("settings-toggle").click();
 const wedgeButton = document.querySelector('[data-tool="wedge"]');
 const initialIcon = wedgeButton.querySelector("svg").innerHTML;
-for (const name of ["lucide", "tabler", "material"]) {
+// The icon weight is a developer option: hidden until developer mode is on.
+assert.equal($("ui-icons"), null);
+const tick = (node, on) => {
+  node.checked = on;
+  node.dispatchEvent(new window.Event("change"));
+};
+tick($("ui-developer"), true);
+assert.ok($("developer-settings"), "developer group shown");
+const weights = [...$("ui-icons").options].map((o) => o.value);
+assert.deepEqual(weights, [
+  "thin",
+  "light",
+  "regular",
+  "bold",
+  "fill",
+  "duotone",
+]);
+for (const name of [...weights.filter((w) => w !== "regular"), "regular"]) {
   change($("ui-icons"), name);
-  assert.equal(wedgeButton.dataset.iconSet, name);
+  assert.equal(wedgeButton.dataset.iconWeight, name);
   assert.equal(wedgeButton.textContent, "Wedge");
   assert.equal($("pause").textContent, "Run");
   assert.ok($("pause").querySelector("svg"));
+  const stored = JSON.parse(window.localStorage.getItem("physium-schemes"));
   assert.equal(
-    JSON.parse(window.localStorage.getItem("physics-sim-ui")).iconSet,
-    name,
+    stored.current.values["icon-weight"],
+    name === "regular" ? undefined : name,
   );
   for (const button of document.querySelectorAll("[data-icon]"))
     assert.ok(
       button.querySelector("svg"),
       "missing icon " + button.dataset.icon,
     );
-  if (name !== "material")
+  if (name !== "regular")
     assert.notEqual(wedgeButton.querySelector("svg").innerHTML, initialIcon);
 }
+// With developer mode off the site is back to its defaults.
+change($("ui-icons"), "bold");
+tick($("ui-developer"), false);
+assert.equal($("developer-settings"), null);
+assert.equal(wedgeButton.dataset.iconWeight, "regular");
+assert.equal(wedgeButton.querySelector("svg").innerHTML, initialIcon);
 $("close-settings").click();
 key(" ");
 assert.equal($("pause").textContent, "Pause");
@@ -874,9 +895,9 @@ for (const open of [
   key(" ");
   const before = $("time").textContent;
   await load("not json");
-  assert.equal($("toast").textContent, "This file is not a Physics Sim scene.");
+  assert.equal($("toast").textContent, "This file is not a Physium scene.");
   await load(JSON.stringify({ format: "something-else" }));
-  assert.equal($("toast").textContent, "This file is not a Physics Sim scene.");
+  assert.equal($("toast").textContent, "This file is not a Physium scene.");
   frames(1);
   assert.equal($("time").textContent, before, "bad file left scene untouched");
   await load(sceneText);

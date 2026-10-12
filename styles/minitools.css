@@ -1,0 +1,425 @@
+/* Minitools: the catalogue (/minitools/), each tool's page, and the cards
+   (also used on the homepage and in the component gallery). */
+
+.mt-catalogue,
+.mt-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 24px 64px;
+  zoom: var(--ui-scale);
+}
+.mt-catalogue h1,
+.mt-page h1 {
+  margin: 0 0 6px;
+  font-size: 26px;
+}
+.mt-intro {
+  max-width: 70ch;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+/* ---- catalogue ---- */
+.mt-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin: 18px 0 8px;
+}
+.mt-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mt-search input {
+  width: 220px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+}
+.mt-filters .select-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mt-kind {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.mt-kind legend {
+  padding: 0 4px;
+  font-size: 11px;
+}
+.mt-count {
+  font-size: 12px;
+  opacity: 0.75;
+}
+.mt-topic-group h2 {
+  margin: 26px 0 10px;
+  font-size: 17px;
+}
+.mt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 12px;
+}
+
+/* ---- cards ---- */
+.mt-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.mt-card:hover {
+  border-color: var(--accent-text);
+}
+.mt-card:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+.mt-card[hidden] {
+  display: none;
+}
+.mt-card-kind {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+.mt-card-title {
+  font-size: 15px;
+}
+/* Every card's equation is set at one size, in a box tall enough for the
+   tallest (a fraction with a root or powers in it) and, at the narrowest
+   card, wide enough for the widest (the collision formula), so that none is
+   cut off and the text below lines up from card to card. */
+.mt-card-equation {
+  display: flex;
+  align-items: center;
+  height: 64px;
+  overflow: visible;
+}
+.mt-card-equation .katex {
+  font-size: 16px;
+}
+.mt-card-purpose {
+  font-size: 12.5px;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
+/* ---- one tool ---- */
+.mt-back {
+  margin: 0 0 10px;
+}
+
+.mt-topic {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.8;
+}
+.mt-purpose {
+  margin: 6px 0 0;
+  font-size: 15px;
+}
+.mt-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  margin-top: 18px;
+}
+@media (max-width: 900px) {
+  .mt-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.mt-left,
+.mt-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.mt-equation {
+  padding: 8px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 22px;
+  overflow-x: auto;
+}
+.mt-solve {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.mt-solve-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.mt-solve-buttons button {
+  min-width: 40px;
+  padding: 4px 10px;
+}
+.mt-solve-buttons button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--ink);
+}
+.mt-rearranged {
+  font-size: 18px;
+  overflow-x: auto;
+}
+.mt-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mt-row {
+  grid-template-columns: minmax(9em, 1.2fr) minmax(80px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+.mt-row[hidden] {
+  display: none;
+}
+.mt-row label {
+  font-size: 13px;
+}
+.mt-symbol {
+  display: inline-block;
+  min-width: 1.6em;
+  font-size: 15px;
+}
+.mt-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent-text);
+}
+.mt-row input[type="number"] {
+  width: 96px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+}
+.mt-row .unit {
+  min-width: 3.4em;
+  margin-left: 6px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+.mt-constants {
+  margin: 0;
+  font-size: 13px;
+  overflow-x: auto;
+}
+.mt-working {
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.mt-working h2,
+.mt-derivation h2 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.mt-working-math {
+  font-size: 17px;
+  overflow-x: auto;
+}
+.mt-measured {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-text);
+}
+.mt-sim {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mt-sim-stage {
+  position: relative;
+}
+.mt-sim-canvas,
+.mt-visual,
+.mt-graph {
+  display: block;
+  width: 100%;
+  height: 280px;
+  background: var(--canvas-bg);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  touch-action: auto;
+}
+.mt-visual {
+  height: 250px;
+}
+.mt-graph {
+  height: 230px;
+}
+.mt-sim-canvas[hidden],
+.mt-visual[hidden] {
+  display: none;
+}
+.mt-sim-message,
+.mt-wants {
+  margin: 0;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+  font-size: 13px;
+}
+.mt-sim-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mt-sim-controls button {
+  padding: 5px 12px;
+}
+.mt-sim-controls .icon-toggle[hidden] {
+  display: none;
+}
+.mt-sim-time {
+  margin-left: auto;
+  font:
+    12px ui-monospace,
+    monospace;
+  opacity: 0.8;
+}
+.mt-sim-caption {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.8;
+}
+.mt-graph-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mt-plot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.mt-about {
+  margin: 8px 0 0;
+  max-width: 78ch;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.mt-derivation {
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.mt-idea {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.mt-derivation li {
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.mt-derivation ol {
+  padding-left: 22px;
+}
+.mt-derivation li p {
+  margin: 8px 0 0;
+}
+.mt-step-math {
+  font-size: 16px;
+  overflow-x: auto;
+}
+.mt-row-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.mt-links {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.mt-links p {
+  margin: 0;
+}
+.mt-share {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* A note under the purpose, and a caution under the working when the values
+   are outside what the equation describes. */
+.mt-note {
+  margin: 6px 0 0;
+  max-width: 70ch;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.mt-caution {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--danger);
+  border-radius: 8px;
+  background: var(--panel);
+  font-size: 13px;
+}
+/* The algebra of rearranging, one move a line. */
+.mt-algebra {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.mt-algebra summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.mt-algebra ol {
+  margin: 8px 0 4px;
+  padding-left: 1.4em;
+}
+.mt-algebra li {
+  margin-bottom: 6px;
+}
+.mt-algebra li p {
+  margin: 0 0 2px;
+}
+.mt-algebra .mt-step-math {
+  margin: 2px 0 4px;
+}
+.mt-inline-math {
+  white-space: nowrap;
+}

@@ -494,7 +494,12 @@ test("separate and floating sections each get their own reference", () => {
   assert.equal(s.potential("b"), 0);
   assert.equal(s.potential("d"), 0);
   close(s.potential("a"), 12, STEADY);
-  close(s.potential("h"), 12, STEADY, "a dangling wire is at its end's potential");
+  close(
+    s.potential("h"),
+    12,
+    STEADY,
+    "a dangling wire is at its end's potential",
+  );
   close(s.potential("e"), 2.5, STEADY);
   // A voltmeter between two sections that are not joined has no reading.
   assert.equal(s.of(across).voltage, null);
@@ -725,9 +730,10 @@ test("several time constants: each is found, and the step follows the shortest",
   close(taus[0], 1e-3, STEADY, "1 kΩ × 1 µF");
   close(taus[1], 2, STEADY, "2 MΩ × 1 µF");
   close(lab.timestep, 1e-3 / STEPS_PER_TAU, STEADY);
-  assert.deepEqual(lab.timeConstants(fast).map((t) => +t.toPrecision(9)), [
-    1e-3,
-  ]);
+  assert.deepEqual(
+    lab.timeConstants(fast).map((t) => +t.toPrecision(9)),
+    [1e-3],
+  );
   close(lab.timeConstants(slow)[0], 2, STEADY);
   // A two-stage RC ladder: the modes of dv/dt = −C⁻¹Gv.
   const ladder = new CircuitLab(),
@@ -1011,8 +1017,7 @@ test("the linear solver: Gaussian elimination with partial pivoting", () => {
 
 test("random circuits: never NaN, never unsolvable, current conserved at every node", () => {
   let seed = 20261011;
-  const random = () =>
-      (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32,
+  const random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32,
     pick = (list) => list[Math.floor(random() * list.length)],
     kinds = [
       ..."cell cell resistor resistor resistor variable lamp".split(" "),
@@ -1102,7 +1107,9 @@ test("presets: each builds a sound circuit and shows its stated readings", () =>
   assert.deepEqual(
     presets.map((p) => p.id),
     [
-      ..."series parallel divider internal-resistance wheatstone rc rl".split(" "),
+      ..."series parallel divider internal-resistance wheatstone rc rl".split(
+        " ",
+      ),
       ..."ac-resistor ac-capacitor ac-inductor rlc resonance".split(" "),
     ],
   );
@@ -1439,7 +1446,7 @@ test("AC source across a capacitor and across an inductor: reactance and 90°", 
     1e-3,
     "current lags by 90°",
   );
-  near(s.of(l).meanPower, 0, 1e-3 * (RMS * RMS) / (OMEGA * L));
+  near(s.of(l).meanPower, 0, (1e-3 * (RMS * RMS)) / (OMEGA * L));
   // Switched on at a zero of the p.d. instead, an ideal inductor's current
   // never reverses: i = (V₀/ωL)(1 − cos ωt). That is the real behaviour.
   const offset = new CircuitLab();
@@ -1530,7 +1537,11 @@ test("series RLC: impedance, phase, component p.d.s, power, and resonance", () =
 
 test("AC faults and limits: a shorted source is reported even at a zero of its EMF", () => {
   const lab = new CircuitLab(),
-    src = lab.add("source", { amplitude: PEAK, frequency: HZ, nodes: ["p", "n"] });
+    src = lab.add("source", {
+      amplitude: PEAK,
+      frequency: HZ,
+      nodes: ["p", "n"],
+    });
   lab.add("wire", { nodes: ["p", "n"] });
   let s = lab.solve();
   finite(s);
@@ -1556,7 +1567,9 @@ test("AC faults and limits: a shorted source is reported even at a zero of its E
 test("a saved AC circuit loads back as the same circuit", () => {
   const lab = new CircuitLab();
   presets.find((p) => p.id === "rlc").build(lab);
-  const copy = CircuitLab.fromScene(JSON.parse(JSON.stringify(lab.exportScene())));
+  const copy = CircuitLab.fromScene(
+    JSON.parse(JSON.stringify(lab.exportScene())),
+  );
   assert.deepEqual(
     copy.list().map((i) => [i.kind, i.name, i.nodes.join()]),
     lab.list().map((i) => [i.kind, i.name, i.nodes.join()]),

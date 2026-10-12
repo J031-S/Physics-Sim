@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Physium · Component gallery</title>
+    <link rel="icon" type="image/svg+xml" href="../assets/logo.svg" />
+    <link rel="stylesheet" href="../styles/tokens.css" />
+    <link rel="stylesheet" href="../styles/base.css" />
+    <link rel="stylesheet" href="../styles/gallery.css" />
+    <script src="../src/site/boot.js"></script>
+  </head>
+  <body class="doc-page" data-page="gallery">
+    <header>
+      <a class="brand"></a>
+      <nav class="site-nav"></nav>
+      <div class="playback">
+        <button
+          id="settings-toggle"
+          title="Settings"
+          aria-expanded="false"
+          aria-controls="settings-panel"
+        >
+          Settings
+        </button>
+      </div>
+    </header>
+    <main class="gallery-main">
+      <p class="gallery-intro">
+        Developer page: every shared component in the light and the dark theme,
+        side by side, with the current developer scheme. Open the theme tweaker
+        from Settings › Website › Developer; both sides follow its changes.
+      </p>
+      <div class="gallery-panes">
+        <iframe
+          data-src="gallery-pane?theme=light"
+          title="Components in the light theme"
+        ></iframe>
+        <iframe
+          data-src="gallery-pane?theme=dark"
+          title="Components in the dark theme"
+        ></iframe>
+      </div>
+    </main>
+    <section id="settings-panel" hidden aria-labelledby="settings-title">
+      <div class="menu-header">
+        <strong id="settings-title">Settings</strong
+        ><button id="close-settings" aria-label="Close settings">×</button>
+      </div>
+      <details id="website-settings" class="settings-section" open></details>
+    </section>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="../src/site/gallery.js"></script>
+  </body>
+</html>

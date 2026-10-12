@@ -1,0 +1,7 @@
+{
+  "name": "katex",
+  "version": "0.16.22",
+  "license": "MIT",
+  "homepage": "https://katex.org",
+  "description": "Vendored for Physium: dist/katex.min.js, dist/katex.min.css and the .woff2 fonts only, unmodified. Loaded by src/site/math.js on pages that show equations."
+}

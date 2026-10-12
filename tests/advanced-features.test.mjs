@@ -3,9 +3,8 @@ import assert from "node:assert/strict";
 import Matter from "../vendor/matter.js";
 globalThis.Matter = Matter;
 const { Sandbox, DT } = await import("../src/physics.js");
-const { FieldDrag, fieldSpacing, drawFields } = await import(
-  "../src/field-view.js"
-);
+const { FieldDrag, fieldSpacing, drawFields } =
+  await import("../src/field-view.js");
 const near = (a, b, t = 1e-7) => assert.ok(Math.abs(a - b) < t, `${a} != ${b}`);
 const make = () => {
   const s = new Sandbox();
@@ -216,8 +215,19 @@ test("stronger fields have denser indicators; magnetic rendering uses circles on
   s.dispose();
 });
 
-test('a nonuniform electric field drives actual body acceleration at its local strength',()=>{
- const s=make(),id=s.add('ball',{x:2,y:10}),f=s.fields.add('electric',{x:0,y:10});
- s.fields.update(f,{width:20,height:20,strength:8,gradient:'linear',gradientScaleX:4});s.updateConstants(id,{charge:1,mass:2});
- s.step();near(s.state(id).vx,2*DT);s.dispose();
+test("a nonuniform electric field drives actual body acceleration at its local strength", () => {
+  const s = make(),
+    id = s.add("ball", { x: 2, y: 10 }),
+    f = s.fields.add("electric", { x: 0, y: 10 });
+  s.fields.update(f, {
+    width: 20,
+    height: 20,
+    strength: 8,
+    gradient: "linear",
+    gradientScaleX: 4,
+  });
+  s.updateConstants(id, { charge: 1, mass: 2 });
+  s.step();
+  near(s.state(id).vx, 2 * DT);
+  s.dispose();
 });

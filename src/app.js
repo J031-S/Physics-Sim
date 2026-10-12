@@ -1,10 +1,22 @@
-import { canvasIcon, renderIcons, setPlaybackIcon } from "./icons.js";
+import { $ } from "./site/dom.js";
+import { renderIcons, setPlaybackIcon } from "./site/icons.js";
 import { Sandbox, DT, GRID, snap } from "./physics.js";
 import { presets } from "./presets.js";
-import { setupPreferences } from "./preferences.js";
-import { drawFields, FieldDrag } from "./field-view.js";
-import { setupNav } from "./nav.js";
-setupNav();
+import { FieldDrag } from "./field-view.js";
+import { setupSite } from "./site/shell.js";
+import { styleCanvas } from "./site/canvas-style.js";
+import { color } from "./site/theme.js";
+import {
+  createSceneRenderer,
+  fixed,
+  linkPath as pathOfLink,
+  VELOCITY_PX,
+} from "./sandbox/render.js";
+import { onSchemeChange, reportFrame } from "./site/dev-hooks.js";
+import { tidyNumber } from "./site/numbers.js";
+// Builds the brand, navigation and Website settings before anything below
+// looks up a control.
+const prefs = setupSite();
 let fieldDrag = null,
   impulseDrag = null,
   panDrag = null;
@@ -15,9 +27,8 @@ const settingKeys = [
   "electricY",
   "magneticZ",
 ];
-const $ = (id) => document.getElementById(id),
-  canvas = $("canvas"),
-  ctx = canvas.getContext("2d");
+const canvas = $("canvas"),
+  ctx = styleCanvas(canvas.getContext("2d"));
 let sim = new Sandbox(),
   running = true,
   tool = "grab",
@@ -39,9 +50,10 @@ let sim = new Sandbox(),
   startScene = null,
   toastTimer;
 sim.updateSettings({ walls: true });
-const prefs = setupPreferences($);
 prefs.onchange = () => showDimensions();
 const view = { scale: 65, x: 0, y: 0, width: 0, height: 0 };
+const scene = createSceneRenderer(ctx, view),
+  { line, arrow } = scene;
 function toast(message) {
   $("toast").textContent = message;
   $("toast").classList.add("show");
@@ -81,7 +93,7 @@ function chooseTool(next) {
       ? `${group.dataset.label}: ${current.dataset.iconLabel} active`
       : group.dataset.label;
   }
-  renderIcons(prefs.iconSet);
+  renderIcons(prefs.iconWeight);
   // One hint per tool, shown in the tool-options strip under the toolbar.
   $("tool-help").textContent = {
     select:
@@ -234,9 +246,7 @@ function formatAngle(radians) {
     : ((radians * 180) / Math.PI).toFixed(1) + "°";
 }
 function linkPath(l) {
-  if (l.type === "belt") return sim.mechanisms.beltGeometry(l).path;
-  if (l.type === "pulley") return sim.mechanisms.pulleyPath(l);
-  return [sim.endpoint(l, "a"), sim.endpoint(l, "b")];
+  return pathOfLink(sim, l);
 }
 function linkAt(p) {
   return [...sim.links.values()].reverse().find((l) => {
@@ -334,7 +344,7 @@ function propertyRow({ id, name, unit, min, max, help, value }) {
   input.min = min;
   input.max = max;
   input.step = "any";
-  input.value = value;
+  input.value = tidyNumber(value);
   input.setAttribute("aria-label", name);
   range.type = "range";
   range.min = min;
@@ -699,7 +709,7 @@ function openMenu(id, x, y) {
         else sim.updateLink(id, { [key]: Number(input.value) });
       } catch (error) {
         toast(error.message);
-        input.value = current[key];
+        input.value = tidyNumber(current[key]);
       }
       range.value = current[key];
     };
@@ -710,7 +720,7 @@ function openMenu(id, x, y) {
       input.onchange();
     };
     addZeroDetent(range, step, (value) => {
-      input.value = String(value);
+      input.value = tidyNumber(value);
       input.onchange();
     });
     form.append(row);
@@ -1178,7 +1188,7 @@ function syncSettings() {
   $("setting-walls").checked = sim.settings.walls;
   $("setting-chargeInteractions").checked = sim.settings.chargeInteractions;
   for (const key of ["coulombConstant", "chargeSoftening"])
-    $("setting-" + key).value = sim.settings[key];
+    $("setting-" + key).value = tidyNumber(sim.settings[key]);
   if (sim.viewport) {
     $("scene-width").value = Number(
       (sim.viewport.maxX - sim.viewport.minX).toFixed(3),
@@ -1189,7 +1199,7 @@ function syncSettings() {
   }
   snapStatus();
   for (const key of settingKeys) {
-    $("setting-" + key).value = sim.settings[key];
+    $("setting-" + key).value = tidyNumber(sim.settings[key]);
     $("range-" + key).value = sim.settings[key];
   }
 }
@@ -1235,7 +1245,7 @@ for (const key of settingKeys) {
     const value = detent(range, Number(range.value));
     sim.updateSettings({ [key]: value });
     range.value = value;
-    input.value = sim.settings[key];
+    input.value = tidyNumber(sim.settings[key]);
   };
 }
 function updateVectorLegend() {
@@ -1318,7 +1328,7 @@ function setRunning(next) {
   }
   running = next;
   accumulator = 0;
-  setPlaybackIcon(running, prefs.iconSet);
+  setPlaybackIcon(running, prefs.iconWeight);
   $("step").disabled = running;
 }
 // One fixed 1/120 s step while paused.
@@ -1464,11 +1474,11 @@ function drawPreview(el, scene, dark) {
     ox = w / 2 - cx * k,
     oy = h / 2 + cy * k,
     at = (p) => ({ x: ox + p.x * k, y: oy - p.y * k });
-  g.fillStyle = dark ? "#1c1a16" : "#f2f0e9";
+  g.fillStyle = color("canvas-bg", dark);
   g.fillRect(0, 0, w, h);
-  g.fillStyle = dark ? "#25332a" : "#e0e3d8";
+  g.fillStyle = color("canvas-ground", dark);
   g.fillRect(0, oy, w, h - oy);
-  g.strokeStyle = "#7f9076";
+  g.strokeStyle = color("structure", dark);
   g.lineWidth = 1;
   if (scene.settings.walls) {
     const a = at({ x: v.minX, y: v.maxY });
@@ -1493,9 +1503,14 @@ function drawPreview(el, scene, dark) {
       );
     else
       g.ellipse(0, 0, (f.width * k) / 2, (f.height * k) / 2, 0, 0, 2 * Math.PI);
-    g.fillStyle = f.type === "electric" ? "#dea73940" : "#9874cb40";
+    g.fillStyle =
+      color(f.type === "electric" ? "field-electric" : "field-magnetic", dark) +
+      "40";
     g.fill();
-    g.strokeStyle = f.type === "electric" ? "#c8902c" : "#9474c8";
+    g.strokeStyle = color(
+      f.type === "electric" ? "field-electric" : "field-magnetic",
+      dark,
+    );
     g.stroke();
     g.restore();
   }
@@ -1510,7 +1525,7 @@ function drawPreview(el, scene, dark) {
     path
       .map(at)
       .forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)));
-    g.strokeStyle = dark ? "#a9b89b" : "#6f7f63";
+    g.strokeStyle = color("ink-soft", dark);
     g.lineWidth = l.type === "rod" ? 1.5 : 1;
     g.stroke();
   }
@@ -1521,14 +1536,19 @@ function drawPreview(el, scene, dark) {
       i ? g.lineTo(q.x, q.y) : g.moveTo(q.x, q.y);
     });
     g.closePath();
-    g.fillStyle =
+    g.fillStyle = color(
       o.shape === "ball"
-        ? "#dba66b"
+        ? "body-ball"
         : o.shape === "wedge"
-          ? "#a2b889"
-          : "#8ca6bc";
+          ? "body-wedge"
+          : "body-block",
+      dark,
+    );
     g.fill();
-    g.strokeStyle = o.shape === "ball" ? "#a77943" : "#658199";
+    g.strokeStyle = color(
+      o.shape === "ball" ? "body-ball-edge" : "body-edge",
+      dark,
+    );
     g.lineWidth = 0.75;
     g.stroke();
     // Initial velocity, so moving starts (projectile, collisions) read.
@@ -1539,7 +1559,7 @@ function drawPreview(el, scene, dark) {
         len = Math.min(18, 3 + speed * 2.5),
         e = { x: p.x + (s.vx / speed) * len, y: p.y - (s.vy / speed) * len },
         a = Math.atan2(e.y - p.y, e.x - p.x);
-      g.strokeStyle = dark ? "#6fa8ec" : "#497caa";
+      g.strokeStyle = color("vector-velocity", dark);
       g.lineWidth = 1.2;
       g.beginPath();
       g.moveTo(p.x, p.y);
@@ -1632,7 +1652,7 @@ $("scene-file").onchange = async () => {
   try {
     data = JSON.parse(await file.text());
   } catch {
-    toast("This file is not a Physics Sim scene.");
+    toast("This file is not a Physium scene.");
     return;
   }
   let next;
@@ -1941,63 +1961,11 @@ $("scene-to-view").onclick = () => {
   sim.setViewport(v);
   syncSettings();
 };
-function line(a, b, colour, width = 1) {
-  ctx.beginPath();
-  ctx.moveTo(a.x, a.y);
-  ctx.lineTo(b.x, b.y);
-  ctx.strokeStyle = colour;
-  ctx.lineWidth = width;
-  ctx.stroke();
-}
-// Lock indicator at a body's centre (or beside a body too small on screen),
-// sized in screen pixels so it does not grow with zoom. It uses the same icons
-// as the Lock toggles in the selected-item panel, so it follows the icon set.
-function lockGlyph(o, p, dark, size) {
-  const names = [
-      ...(o.lockPosition ? ["lockPosition"] : []),
-      ...(o.lockRotation ? ["lockRotation"] : []),
-    ],
-    icons = names.map((n) => canvasIcon(prefs.iconSet, n)).filter(Boolean),
-    px = 14,
-    gap = 3,
-    w = icons.length * px + (icons.length - 1) * gap + 8,
-    h = px + 6,
-    offset = size < 14 ? size * Math.SQRT1_2 + w / 2 + 2 : 0;
-  if (!icons.length) return;
-  ctx.save();
-  ctx.translate(Math.round(p.x + offset), Math.round(p.y - (offset && h)));
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(-w / 2, -h / 2, w, h, h / 2);
-  else ctx.rect(-w / 2, -h / 2, w, h);
-  ctx.fillStyle = dark ? "#2a2722dd" : "#fffefadd";
-  ctx.fill();
-  ctx.lineWidth = 0.75;
-  ctx.strokeStyle = dark ? "#768d70" : "#b6c9ad";
-  ctx.stroke();
-  const ink = dark ? "#cfdec8" : "#3a5140";
-  icons.forEach((icon, i) => {
-    ctx.save();
-    ctx.translate(-w / 2 + 4 + i * (px + gap), -px / 2);
-    ctx.scale(px / icon.size, px / icon.size);
-    ctx.fillStyle = ctx.strokeStyle = ink;
-    ctx.lineWidth = 2;
-    ctx.lineCap = ctx.lineJoin = "round";
-    for (const path of icon.paths)
-      if (icon.filled) ctx.fill(path);
-      else ctx.stroke(path);
-    ctx.restore();
-  });
-  ctx.restore();
-}
 // Vector arrows use linear scales in screen pixels, so lengths compare
 // directly. Velocity: fixed px per m/s. Net force: px per newton set in the
 // view cluster, averaged over the last few steps because a collision is a
 // single-step spike; long force arrows are capped and marked with a break.
-const VELOCITY_PX = 12,
-  // Velocity arrows; the dark theme gets a lighter blue for contrast.
-  VELOCITY_COLOUR = { light: "#497caa", dark: "#6fa8ec" },
-  FORCE_CAP = 180,
-  FORCE_STEPS = 6,
+const FORCE_STEPS = 6,
   forceHistory = new Map();
 // Last valid px/N value: an empty or out-of-range entry never takes effect.
 let forceScaleValue = 4;
@@ -2010,9 +1978,6 @@ function typedForceScale() {
   return text !== "" && Number.isFinite(value) && value >= 0.1 && value <= 100
     ? value
     : null;
-}
-function fixed(value) {
-  return Number(value.toPrecision(3)).toString();
 }
 function recordForces() {
   for (const o of sim.objects.values()) {
@@ -2035,48 +2000,6 @@ function averageForce(id) {
 function stepOnce() {
   sim.step();
   recordForces();
-}
-// Arrow from screen point p along world-space (dx, dy) pixels (y up).
-function arrow(p, dx, dy, colour, label, cap = 600) {
-  const length = Math.hypot(dx, dy),
-    capped = length > cap,
-    k = capped ? cap / length : 1,
-    end = { x: p.x + dx * k, y: p.y - dy * k },
-    a = Math.atan2(end.y - p.y, end.x - p.x);
-  line(p, end, colour, 2);
-  for (const turn of [-0.45, 0.45])
-    line(
-      end,
-      {
-        x: end.x - 7 * Math.cos(a + turn),
-        y: end.y - 7 * Math.sin(a + turn),
-      },
-      colour,
-      2,
-    );
-  if (capped)
-    // Two short slashes across the shaft: drawn shorter than true length.
-    for (const at of [0.62, 0.68]) {
-      const c = { x: p.x + (end.x - p.x) * at, y: p.y + (end.y - p.y) * at },
-        n = { x: -Math.sin(a), y: Math.cos(a) };
-      line(
-        {
-          x: c.x + 5 * n.x - 2 * Math.cos(a),
-          y: c.y + 5 * n.y - 2 * Math.sin(a),
-        },
-        {
-          x: c.x - 5 * n.x + 2 * Math.cos(a),
-          y: c.y - 5 * n.y + 2 * Math.sin(a),
-        },
-        colour,
-        1.5,
-      );
-    }
-  if (label) {
-    ctx.fillStyle = colour;
-    ctx.font = "10px ui-monospace, monospace";
-    ctx.fillText(label, end.x + 7, end.y - 6);
-  }
 }
 // Graph of one quantity of the selected body against simulation time. One
 // sample per rendered frame, keeping the last 20 s of sim.time, so pausing
@@ -2140,9 +2063,9 @@ function drawGraph(dark) {
   }
   const key = $("graph-quantity").value,
     unit = GRAPH_UNITS[key],
-    ink = dark ? "#ebe5d6" : "#354438",
-    grid = dark ? "#4a453b" : "#dfe4d9",
-    trace = dark ? "#8fb6e0" : "#3d6f9f",
+    ink = color("ink", dark),
+    grid = color("canvas-grid-major", dark),
+    trace = color("vector-velocity", dark),
     left = 44,
     right = 8,
     top = 16,
@@ -2374,147 +2297,6 @@ function placeToast() {
     el.style.bottom = bottom + "px";
   }
 }
-// Ruler markings rotate with the body, so spin is visible on any shape. Tick
-// lengths and spacing are fixed in metres, so a large body is marked exactly
-// like a small one (ticks still scale with zoom, like the body itself).
-const TICK = { gap: 0.025, minor: 0.075, mid: 0.1, major: 0.13 },
-  RULER_INK = "#fff7e9";
-function distanceToSegment(p, a, b) {
-  const dx = b.x - a.x,
-    dy = b.y - a.y,
-    t = Math.max(
-      0,
-      Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)),
-    );
-  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
-}
-function drawRuler(o, s) {
-  if (o.shape === "ball") {
-    // Degree ticks: the finest of these steps whose arc spacing is at least
-    // 0.065 m (10° on the default 0.4 m radius) and 5 px on screen. Long
-    // ticks every 30°, medium every 10°.
-    const outer = o.radius - Math.min(TICK.gap, o.radius * 0.1),
-      room = Math.min(1, (o.radius * 0.45) / TICK.major),
-      step =
-        [1, 2, 5, 10, 15, 30, 90].find((d) => {
-          const arc = (o.radius * d * Math.PI) / 180;
-          return arc >= 0.065 && arc * view.scale >= 5;
-        }) ?? 90;
-    for (let degrees = 0; degrees < 360; degrees += step) {
-      const angle = s.angle + (degrees * Math.PI) / 180,
-        level =
-          degrees % 30 === 0 ? "major" : degrees % 10 === 0 ? "mid" : "minor",
-        inner = outer - (TICK[level] - TICK.gap) * room,
-        c = Math.cos(angle),
-        si = Math.sin(angle);
-      line(
-        screen({ x: s.x + inner * c, y: s.y + inner * si }),
-        screen({ x: s.x + outer * c, y: s.y + outer * si }),
-        RULER_INK,
-        level === "major" ? 2 : 1,
-      );
-    }
-    return;
-  }
-  // Straight edges carry length ticks: 0.1 m apart with long ones every
-  // 0.5 m, coarser when zoomed out so ticks never merge.
-  const minor = [0.1, 0.5, 1, 5].find((m) => m * view.scale >= 5) ?? 10,
-    every = minor === 0.5 ? 2 : 5,
-    corners = o.body.vertices.map((v) => ({ x: v.x / 100, y: -v.y / 100 })),
-    edges = corners.map((a, i) => [a, corners[(i + 1) % corners.length]]);
-  ctx.save();
-  ctx.clip(); // the body outline is still the current path
-  edges.forEach(([a, b], i) => {
-    const length = Math.hypot(b.x - a.x, b.y - a.y),
-      ux = (b.x - a.x) / length,
-      uy = (b.y - a.y) / length,
-      // Inward normal: towards the centre of mass.
-      side = (s.x - a.x) * -uy + (s.y - a.y) * ux > 0 ? 1 : -1,
-      nx = -uy * side,
-      ny = ux * side;
-    for (let k = 1; k * minor < length - 1e-6; k++) {
-      const major = k % every === 0,
-        x = a.x + ux * k * minor,
-        y = a.y + uy * k * minor,
-        to = major ? TICK.major : TICK.minor,
-        tip = { x: x + nx * to, y: y + ny * to };
-      // Near a corner a tick would run into the next edge's ticks; leave the
-      // corner clear instead (both edges skip, so corners stay symmetric).
-      if (
-        edges.some(
-          (e, j) =>
-            j !== i &&
-            Math.min(
-              distanceToSegment(tip, ...e),
-              distanceToSegment({ x, y }, ...e),
-            ) <
-              TICK.major + TICK.gap,
-        )
-      )
-        continue;
-      line(
-        screen({ x: x + nx * TICK.gap, y: y + ny * TICK.gap }),
-        screen(tip),
-        RULER_INK,
-        major ? 2 : 1,
-      );
-    }
-  });
-  ctx.restore();
-}
-// A wedge shows the size of both acute corners: a small arc at each, with the
-// angle written inside the corner where it fits and just outside it where the
-// corner is too narrow. Skipped only when the wedge is tiny on screen.
-function drawWedgeAngles(o, dark) {
-  const corners = o.body.vertices.map((v) =>
-      screen({ x: v.x / 100, y: -v.y / 100 }),
-    ),
-    inside = dark ? "#1d2a1f" : "#2f4630",
-    outside = dark ? "#cfd8c8" : "#46553e";
-  ctx.save();
-  ctx.font = "600 10px ui-monospace, monospace";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.lineWidth = 1.25;
-  corners.forEach((c, i) => {
-    const a = corners[(i + 1) % 3],
-      b = corners[(i + 2) % 3],
-      toA = Math.atan2(a.y - c.y, a.x - c.x),
-      toB = Math.atan2(b.y - c.y, b.x - c.x);
-    let sweep = toB - toA;
-    if (sweep > Math.PI) sweep -= 2 * Math.PI;
-    if (sweep < -Math.PI) sweep += 2 * Math.PI;
-    const angle = Math.abs(sweep);
-    if (angle > Math.PI / 2 - 1e-3) return; // the right angle
-    const reach = Math.min(
-      Math.hypot(a.x - c.x, a.y - c.y),
-      Math.hypot(b.x - c.x, b.y - c.y),
-    );
-    if (reach < 36) return;
-    const label = formatAngle(angle),
-      width = ctx.measureText(label)?.width || label.length * 6,
-      // The label must clear both edges whichever way the wedge is turned,
-      // so fit the circle around it into the corner.
-      clearance = Math.hypot(width / 2, 6) + 2,
-      radius = Math.min(26, reach * 0.3),
-      fit = Math.max(radius + clearance, clearance / Math.sin(angle / 2)),
-      // Kept in the corner's own half of the edge, clear of the lock badge.
-      fits = fit < reach * 0.45,
-      distance = fits ? fit : -(clearance + 4),
-      middle = toA + sweep / 2;
-    ctx.strokeStyle = inside;
-    ctx.beginPath();
-    ctx.arc(c.x, c.y, radius, toA, toB, sweep < 0);
-    ctx.stroke();
-    ctx.fillStyle = fits ? inside : outside;
-    ctx.fillText(
-      label,
-      c.x + distance * Math.cos(middle),
-      c.y + distance * Math.sin(middle),
-    );
-  });
-  ctx.restore();
-}
 function draw() {
   const r = canvas.getBoundingClientRect(),
     dpr = window.devicePixelRatio || 1;
@@ -2554,209 +2336,25 @@ function draw() {
   ctx.clearRect(0, 0, r.width, r.height);
   const min = world({ x: 0, y: r.height }),
     max = world({ x: r.width, y: 0 });
-  const gridStep =
-    GRID * 2 ** Math.max(0, Math.ceil(Math.log2(12 / (GRID * view.scale))));
-  if (prefs.grid)
-    for (
-      let x = Math.ceil(min.x / gridStep) * gridStep;
-      x <= max.x;
-      x += gridStep
-    ) {
-      const major = Math.abs(x - Math.round(x)) < 0.01;
-      line(
-        screen({ x, y: min.y }),
-        screen({ x, y: max.y }),
-        major ? (dark ? "#3d3930" : "#c6cebf") : dark ? "#2a2721" : "#dce1d4",
-        major ? 1 : 0.75,
-      );
-    }
-  if (prefs.grid)
-    for (
-      let y = Math.ceil(min.y / gridStep) * gridStep;
-      y <= max.y;
-      y += gridStep
-    ) {
-      const major = Math.abs(y - Math.round(y)) < 0.01;
-      line(
-        screen({ x: min.x, y }),
-        screen({ x: max.x, y }),
-        major ? (dark ? "#3d3930" : "#c6cebf") : dark ? "#2a2721" : "#dce1d4",
-        major ? 1 : 0.75,
-      );
-    }
-  ctx.fillStyle = dark ? "#25332a" : "#e0e3d8";
-  ctx.fillRect(0, view.y, r.width, r.height - view.y);
-  line({ x: 0, y: view.y }, { x: r.width, y: view.y }, "#7f9076", 2);
-  if (sim.settings.walls) {
-    ctx.strokeStyle = "#7f9076";
-    ctx.lineWidth = 4;
-    const v = sim.viewport,
-      p = screen({ x: v.minX, y: v.maxY });
-    ctx.strokeRect(
-      p.x,
-      p.y,
-      (v.maxX - v.minX) * view.scale,
-      (v.maxY - v.minY) * view.scale,
-    );
-  }
-  ctx.font = "9px ui-monospace,monospace";
-  ctx.fillStyle = "#819078";
-  const labelStep = Math.max(1, Math.ceil(60 / view.scale));
-  for (
-    let x = Math.ceil(min.x / labelStep) * labelStep;
-    x <= max.x;
-    x += labelStep
-  )
-    ctx.fillText(x + " m", screen({ x, y: 0 }).x + 4, view.y + 16);
-  drawFields(
-    ctx,
-    sim.fields,
-    screen,
-    view.scale,
-    highlighted,
-    { min, max },
+  scene.drawScene(sim, {
     dark,
-  );
-  for (const l of sim.links.values()) {
-    if (["belt", "pulley"].includes(l.type)) {
-      const path = linkPath(l).map(screen);
-      ctx.beginPath();
-      path.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.strokeStyle = highlighted(l.id) ? "#566b91" : "#617569";
-      ctx.lineWidth = l.type === "belt" ? 5 : 2.5;
-      ctx.stroke();
-      if (l.type === "belt") {
-        ctx.setLineDash([5, 14]);
-        ctx.lineDashOffset = -l.travel * view.scale;
-        ctx.strokeStyle = "#cdd9bd";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.lineDashOffset = 0;
-      }
-      continue;
-    }
-    const a = screen(sim.endpoint(l, "a")),
-      b = screen(sim.endpoint(l, "b")),
-      dx = b.x - a.x,
-      dy = b.y - a.y,
-      d = Math.hypot(dx, dy) || 1;
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    if (l.type === "spring")
-      for (let i = 1; i < 24; i++) {
-        const zig = i < 3 || i > 21 ? 0 : i % 2 ? 5 : -5;
-        ctx.lineTo(
-          a.x + (dx * i) / 24 - (dy / d) * zig,
-          a.y + (dy * i) / 24 + (dx / d) * zig,
-        );
-      }
-    ctx.lineTo(b.x, b.y);
-    ctx.strokeStyle = highlighted(l.id)
-      ? dark
-        ? "#8fa8d8"
-        : "#566b91"
-      : "#879579";
-    ctx.lineWidth = l.type === "rod" ? 3 : 1.8;
-    ctx.stroke();
-    if (l.type === "spring" && l.lockAngle) {
-      ctx.font = "10px system-ui";
-      ctx.fillStyle = dark ? "#a9c49d" : "#46553e";
-      ctx.fillText("axis locked", (a.x + b.x) / 2 + 8, (a.y + b.y) / 2 - 12);
-    }
-    for (const [id, p] of [
-      [l.a, a],
-      [l.b, b],
-    ])
-      if (!id) {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = dark ? "#a9c49d" : "#65775c";
-        ctx.fill();
-      }
-  }
-  for (const o of sim.objects.values()) {
-    const s = sim.state(o.id),
-      p = screen(s);
-    ctx.beginPath();
-    for (let i = 0; i < o.body.vertices.length; i++) {
-      const v = o.body.vertices[i],
-        q = screen({ x: v.x / 100, y: -v.y / 100 });
-      i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y);
-    }
-    ctx.closePath();
-    ctx.fillStyle =
-      o.shape === "ball"
-        ? "#dba66be0"
-        : o.shape === "wedge"
-          ? "#a2b889e0"
-          : "#8ca6bce0";
-    ctx.fill();
-    ctx.strokeStyle = highlighted(o.id)
-      ? "#334e3c"
-      : o.shape === "ball"
-        ? "#a77943"
-        : "#658199";
-    ctx.lineWidth = highlighted(o.id) ? 2.5 : 1.5;
-    ctx.stroke();
-    drawRuler(o, s);
-    if (o.shape === "wedge") drawWedgeAngles(o, dark);
-    if (o.charge) {
-      ctx.fillStyle =
-        o.charge > 0
-          ? dark
-            ? "#f08a78"
-            : "#bd5948"
-          : dark
-            ? "#7fb2f0"
-            : "#467cb8";
-      ctx.font = "bold 11px system-ui";
-      ctx.fillText(
-        (o.charge > 0 ? "+" : "") + o.charge + " C",
-        p.x + 12,
-        p.y + 20,
-      );
-    }
-    if (o.lockPosition || o.lockRotation)
-      lockGlyph(
-        o,
-        p,
-        dark,
-        (o.shape === "ball" ? o.radius : Math.min(o.width, o.height) / 2) *
-          view.scale,
-      );
-    if ($("vectors").checked) {
-      const speed = Math.hypot(s.vx, s.vy);
-      if (speed * VELOCITY_PX >= 3)
-        arrow(
-          p,
-          s.vx * VELOCITY_PX,
-          s.vy * VELOCITY_PX,
-          VELOCITY_COLOUR[dark ? "dark" : "light"],
-          highlighted(o.id) && fixed(speed) + " m/s",
-        );
-    }
-    if ($("force-vectors").checked) {
-      const f = averageForce(o.id),
-        size = Math.hypot(f.x, f.y),
-        length = size * forceScale();
-      // A body at rest has zero net force and draws nothing.
-      if (length >= 3)
-        arrow(
-          p,
-          f.x * forceScale(),
-          f.y * forceScale(),
-          dark ? "#ef8a6f" : "#c2410c",
-          o.id === selected && fixed(size) + " N",
-          FORCE_CAP,
-        );
-    }
-  }
+    width: r.width,
+    height: r.height,
+    grid: prefs.grid,
+    vectors: $("vectors").checked,
+    forceVectors: $("force-vectors").checked,
+    highlighted,
+    selected,
+    forceOf: averageForce,
+    forceScale: forceScale(),
+    iconWeight: prefs.iconWeight,
+    angleUnit: prefs.angleUnit,
+  });
   if (sim.grab) {
     const g = sim.grab;
     if (g.snapCentre) {
       const p = screen(g.snapCentre);
-      ctx.strokeStyle = "#426f3e";
+      ctx.strokeStyle = color("accent-text", dark);
       ctx.lineWidth = 2;
       ctx.strokeRect(p.x - 6, p.y - 6, 12, 12);
     }
@@ -2764,8 +2362,8 @@ function draw() {
   if (marquee) {
     const a = screen(marquee.start),
       b = screen(marquee.end);
-    ctx.fillStyle = "#63876a22";
-    ctx.strokeStyle = "#507954";
+    ctx.fillStyle = color("accent-text", dark) + "22";
+    ctx.strokeStyle = color("accent-text", dark);
     ctx.lineWidth = 1;
     ctx.setLineDash([5, 3]);
     ctx.fillRect(
@@ -2792,7 +2390,7 @@ function draw() {
         };
       const end = screen({ x: o.x + delta.x, y: o.y + delta.y }),
         a = Math.atan2(end.y - start.y, end.x - start.x);
-      const impulseColour = dark ? "#e9826e" : "#c16145";
+      const impulseColour = color("vector-force", dark);
       line(start, end, impulseColour, 3);
       line(
         end,
@@ -2825,7 +2423,7 @@ function draw() {
   }
   if (pending && pointer) {
     ctx.setLineDash([4, 4]);
-    line(screen(pending.point), screen(pointer), "#7d946e", 2);
+    line(screen(pending.point), screen(pointer), color("structure", dark), 2);
     ctx.setLineDash([]);
   }
   if (sim.sizing) showDimensions();
@@ -2837,17 +2435,21 @@ function draw() {
   drawGraph(dark);
 }
 function frame(now) {
-  const elapsed = last ? Math.min((now - last) / 1000, 0.05) : 0;
+  const elapsed = last ? Math.min((now - last) / 1000, 0.05) : 0,
+    began = performance.now();
+  let steps = 0;
   last = now;
   if (running) {
     // Slow motion: less simulated time per real second, same fixed step.
     accumulator += elapsed * Number($("speed").value);
     while (accumulator >= DT) {
       stepOnce();
+      steps++;
       accumulator -= DT;
     }
   }
   draw();
+  reportFrame({ steps, simulated: steps * DT, ms: performance.now() - began });
   requestAnimationFrame(frame);
 }
 for (const [key, t] of Object.entries({
@@ -2873,3 +2475,5 @@ updateVectorLegend();
 fitHeader();
 draw();
 requestAnimationFrame(frame);
+// A developer scheme changed the colours: redraw the preset thumbnails.
+onSchemeChange(() => (previewTheme = null));

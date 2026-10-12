@@ -6,13 +6,13 @@ export const FORMATS = {
   "physics-sim-orbits": "Orbits & gravitation",
   "physics-sim-circuit": "Electric circuits",
 };
-export const NOT_OURS = "This file is not a Physics Sim scene.";
+export const NOT_OURS = "This file is not a Physium scene.";
 export function checkFormat(data, format) {
   const found = data && typeof data === "object" ? data.format : undefined;
   if (found === format) {
     if (data.version === 1) return;
     throw new Error(
-      "This file was saved by a newer version of Physics Sim and cannot be opened here.",
+      "This file was saved by a newer version of Physium and cannot be opened here.",
     );
   }
   if (typeof found === "string" && Object.hasOwn(FORMATS, found))

@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Physium · Mechanics sandbox</title>
+    <link rel="icon" type="image/svg+xml" href="../assets/logo.svg" />
+    <link rel="stylesheet" href="../styles/tokens.css" />
+    <link rel="stylesheet" href="../styles/base.css" />
+    <link rel="stylesheet" href="../styles/mechanics.css" />
+    <script src="../src/site/boot.js"></script>
+  </head>
+  <body data-page="mechanics">
+    <header>
+      <a class="brand"></a>
+      <nav class="site-nav"></nav>
+      <div class="playback">
+        <button
+          id="settings-toggle"
+          title="Simulation settings"
+          aria-expanded="false"
+          aria-controls="settings-panel"
+        >
+          Settings</button
+        ><button id="shortcuts" title="Keyboard shortcuts (?)">Keys ?</button
+        ><span class="header-divider" aria-hidden="true"></span
+        ><button
+          id="reset"
+          title="Reset to the scene as loaded (or as it was at its first Run)"
+          disabled
+        >
+          Reset</button
+        ><button id="pause" title="Play / pause (Space)">Pause</button
+        ><button
+          id="step"
+          title="Advance one 1/120 s step while paused (.)"
+          disabled
+        >
+          Step</button
+        ><select
+          id="speed"
+          title="Simulation speed"
+          aria-label="Simulation speed"
+        >
+          <option value="1">1×</option>
+          <option value="0.5">0.5×</option>
+          <option value="0.25">0.25×</option>
+          <option value="0.1">0.1×</option></select
+        ><span class="header-divider" aria-hidden="true"></span
+        ><button
+          id="presets-toggle"
+          title="Ready-made experiments"
+          aria-expanded="false"
+          aria-controls="presets-panel"
+        >
+          Presets</button
+        ><button id="save-scene" title="Save scene to a file">Save scene</button
+        ><button id="load-scene" title="Load a saved scene file">
+          Load scene</button
+        ><input
+          id="scene-file"
+          type="file"
+          accept="application/json,.json"
+          hidden
+        /><button
+          id="clear"
+          title="Clear scene"
+          aria-expanded="false"
+          aria-controls="clear-confirm"
+        >
+          Clear scene
+        </button>
+      </div>
+    </header>
+    <main>
+      <canvas
+        id="canvas"
+        tabindex="0"
+        aria-label="Physics sandbox. Choose Ball or Block, then click to create. Drag to throw. Press Z to toggle snapping."
+      ></canvas>
+      <div
+        class="edit-tools"
+        role="toolbar"
+        aria-label="Edit tools"
+        aria-orientation="vertical"
+      >
+        <button data-tool="grab" aria-pressed="true">Grab</button
+        ><button data-tool="select" aria-pressed="false">Select</button
+        ><button data-tool="impulse" aria-pressed="false">Impulse</button
+        ><button data-tool="pan" aria-pressed="false">Pan</button>
+      </div>
+      <div class="tools" role="toolbar" aria-label="Add to scene">
+        <div class="tool-category" data-category="bodies" data-label="Bodies">
+          <button
+            class="category-toggle"
+            id="category-bodies"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="menu-bodies"
+          >
+            Bodies
+          </button>
+          <div
+            class="category-menu"
+            id="menu-bodies"
+            role="group"
+            aria-labelledby="category-bodies"
+            hidden
+          >
+            <button data-tool="ball" aria-pressed="false">Ball</button
+            ><button data-tool="block" aria-pressed="false">Block</button
+            ><button data-tool="wedge" aria-pressed="false">Wedge</button>
+          </div>
+        </div>
+        <div
+          class="tool-category"
+          data-category="connections"
+          data-label="Connections"
+        >
+          <button
+            class="category-toggle"
+            id="category-connections"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="menu-connections"
+          >
+            Connections
+          </button>
+          <div
+            class="category-menu"
+            id="menu-connections"
+            role="group"
+            aria-labelledby="category-connections"
+            hidden
+          >
+            <button data-tool="spring" aria-pressed="false">Spring</button
+            ><button data-tool="rod" aria-pressed="false">Rod</button
+            ><button data-tool="belt" aria-pressed="false">Belt</button
+            ><button data-tool="pulley" aria-pressed="false">Pulley</button>
+          </div>
+        </div>
+        <div class="tool-category" data-category="fields" data-label="Fields">
+          <button
+            class="category-toggle"
+            id="category-fields"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="menu-fields"
+          >
+            Fields
+          </button>
+          <div
+            class="category-menu"
+            id="menu-fields"
+            role="group"
+            aria-labelledby="category-fields"
+            hidden
+          >
+            <button data-tool="electric" aria-pressed="false">Electric</button
+            ><button data-tool="magnetic" aria-pressed="false">Magnetic</button>
+          </div>
+        </div>
+      </div>
+      <div id="tool-settings" class="tool-settings">
+        <strong id="tool-name">Grab</strong>
+        <span id="tool-help"
+          >Drag bodies or fields. Ctrl rotates; R resizes.</span
+        >
+        <div id="select-options" hidden>
+          <label
+            ><input id="select-bodies" type="checkbox" checked /> Bodies</label
+          ><label><input id="select-fields" type="checkbox" /> Fields</label>
+        </div>
+        <div id="impulse-options" hidden>
+          <label
+            >Mode
+            <select id="impulse-mode">
+              <option value="impulse">Impulse (N·s)</option>
+              <option value="velocity">Add velocity (m/s)</option>
+            </select></label
+          ><label
+            >Per metre dragged
+            <input
+              id="impulse-gain"
+              type="number"
+              min=".01"
+              max="100"
+              step="any"
+              value="1" /></label
+          ><span>Drag from a body towards the desired kick.</span>
+        </div>
+      </div>
+      <div class="camera-controls" role="toolbar" aria-label="View">
+        <button id="zoom-out" aria-label="Zoom out" title="Zoom out">−</button
+        ><span id="zoom-level">100%</span
+        ><button id="zoom-in" aria-label="Zoom in" title="Zoom in">+</button
+        ><button id="fit-scene" title="Fit scene">Fit scene</button
+        ><span class="cluster-divider" aria-hidden="true"></span
+        ><label class="icon-toggle" title="Velocity vectors (V)"
+          ><input type="checkbox" id="vectors" /><span
+            data-icon="velocity"
+            data-icon-label="Velocity vectors"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="Net force vectors (F)"
+          ><input type="checkbox" id="force-vectors" /><span
+            data-icon="force"
+            data-icon-label="Net force vectors"
+            data-icon-only="true"
+          ></span></label
+        ><label
+          id="force-scale-label"
+          class="cluster-scale"
+          title="Net force arrow scale"
+          hidden
+          ><input
+            id="force-scale"
+            type="number"
+            min="0.1"
+            max="100"
+            step="any"
+            value="4"
+            aria-label="Net force arrow scale, pixels per newton"
+          />
+          px/N</label
+        ><label class="icon-toggle" title="Snapping (Z) — 0.5 m / 15°"
+          ><input type="checkbox" id="snap-toggle" /><span
+            data-icon="snap"
+            data-icon-label="Snapping"
+            data-icon-only="true"
+          ></span
+        ></label>
+      </div>
+      <details id="energy-panel" class="energy-panel" open hidden>
+        <summary>
+          Scene energy <span class="energy-total" id="energy-total"></span>
+        </summary>
+        <div
+          class="energy-bar"
+          role="img"
+          id="energy-bar"
+          aria-label="Share of kinetic, gravitational, elastic and electric energy"
+        >
+          <span class="kinetic" id="bar-kinetic"></span
+          ><span class="gravitational" id="bar-gravitational"></span
+          ><span class="elastic" id="bar-elastic"></span
+          ><span class="electric" id="bar-electric"></span>
+        </div>
+        <div id="field-work" class="field-work" hidden>
+          <span>Supplied by field regions</span
+          ><span class="num" id="energy-field-work"></span
+          ><span class="unit">J</span> <span>Total − supplied</span
+          ><span class="num" id="energy-conserved"></span
+          ><span class="unit">J</span>
+        </div>
+        <div class="energy-rows">
+          <span class="key kinetic" aria-hidden="true"></span
+          ><span>Kinetic</span><span class="num" id="energy-kinetic"></span
+          ><span class="unit">J</span>
+          <span class="key gravitational" aria-hidden="true"></span
+          ><span>Gravitational</span
+          ><span class="num" id="energy-gravitational"></span
+          ><span class="unit">J</span>
+          <span class="key elastic" aria-hidden="true"></span
+          ><span>Elastic</span><span class="num" id="energy-elastic"></span
+          ><span class="unit">J</span>
+          <span class="key electric electric-row" aria-hidden="true"></span
+          ><span class="electric-row">Electric</span
+          ><span class="num electric-row" id="energy-electric"></span
+          ><span class="unit electric-row">J</span>
+        </div>
+      </details>
+      <div id="vector-legend" class="vector-legend" hidden>
+        <div id="legend-velocity">
+          <span class="swatch velocity" aria-hidden="true"></span> Velocity
+          <small id="legend-velocity-scale"></small>
+        </div>
+        <div id="legend-force">
+          <span class="swatch force" aria-hidden="true"></span> Net force
+          (average of last 6 steps)
+          <small id="legend-force-scale"></small>
+        </div>
+      </div>
+      <div
+        id="selection"
+        class="selection"
+        role="region"
+        aria-label="Selected item"
+        hidden
+      >
+        <div class="selection-header">
+          <strong id="selected-name"></strong><span id="dimensions"></span
+          ><span class="header-actions"
+            ><button
+              id="resize-object"
+              title="Resize tool: drag the object; Z toggles dimension snapping"
+            >
+              Resize (R)</button
+            ><button id="delete" title="Delete selected object or connection">
+              Delete
+            </button></span
+          >
+        </div>
+        <div class="selection-row">
+          <span id="lock-caption" class="row-caption">Lock</span
+          ><label class="icon-toggle" title="Lock position"
+            ><input type="checkbox" id="lock-position" /><span
+              data-icon="lockPosition"
+              data-icon-label="Lock position"
+              data-icon-only="true"
+            ></span></label
+          ><label class="icon-toggle" title="Lock rotation"
+            ><input type="checkbox" id="lock-rotation" /><span
+              data-icon="lockRotation"
+              data-icon-label="Lock rotation"
+              data-icon-only="true"
+            ></span></label
+          ><label class="switch" title="Keep the spring at its current angle"
+            ><input type="checkbox" id="lock-angle" /> Lock angle</label
+          ><label class="switch" title="Wrap the cable round the other side"
+            ><input type="checkbox" id="reverse-wrap" /> Reverse wrap</label
+          ><label class="switch"
+            ><input type="checkbox" id="crossed-belt" /> Crossed</label
+          ><label class="switch" title="Drive the belt at a set speed"
+            ><input type="checkbox" id="belt-motor" /> Drive</label
+          ><label id="belt-speed-label" class="switch"
+            ><input
+              id="belt-speed"
+              type="number"
+              min="-10"
+              max="10"
+              step="0.1"
+              value="1"
+              aria-label="Belt speed"
+            />
+            m/s</label
+          >
+        </div>
+        <details id="readout" class="readout" open>
+          <summary>Readouts</summary>
+          <div id="readout-grid" class="readout-grid"></div>
+        </details>
+        <details id="graph-panel" class="graph-panel">
+          <summary>Graph</summary>
+          <label class="select-row"
+            >Plot
+            <select id="graph-quantity">
+              <option value="x">Position x (m)</option>
+              <option value="y">Position y (m)</option>
+              <option value="vx">Velocity vx (m/s)</option>
+              <option value="vy">Velocity vy (m/s)</option>
+              <option value="speed">Speed (m/s)</option>
+              <option value="kinetic">Kinetic energy (J)</option>
+              <option value="electric" class="electric-option">
+                Electric PE (J)
+              </option>
+              <option value="total">Total scene energy (J)</option>
+              <option value="conserved" class="electric-option">
+                Total − supplied by field regions (J)
+              </option>
+            </select></label
+          >
+          <canvas
+            id="graph-canvas"
+            role="img"
+            aria-label="Graph of the chosen quantity against simulation time for the last 20 seconds"
+          ></canvas>
+        </details>
+      </div>
+      <div class="status">
+        <span id="snap-status">Snap off · Z toggles 0.5 m / 15°</span
+        ><span id="time">0.00 s</span>
+      </div>
+      <div id="toast" role="status" aria-live="polite"></div>
+    </main>
+    <section
+      id="material-menu"
+      role="dialog"
+      aria-labelledby="menu-title"
+      hidden
+    >
+      <div class="menu-header">
+        <strong id="menu-title">Material constants</strong
+        ><button id="close-menu" aria-label="Close material constants">
+          ×
+        </button>
+      </div>
+      <p id="menu-note">Changes apply while the simulation runs.</p>
+      <form id="constants"></form>
+    </section>
+    <section id="settings-panel" hidden aria-labelledby="settings-title">
+      <div class="menu-header">
+        <strong id="settings-title">Simulation settings</strong
+        ><button id="close-settings" aria-label="Close simulation settings">
+          ×
+        </button>
+      </div>
+      <p>
+        Changes apply immediately, including while running. Hover a name for
+        details.
+      </p>
+      <details class="settings-section" open>
+        <summary>Simulation</summary>
+        <label class="setting-toggle"
+          ><input id="setting-snapping" type="checkbox" /> Snapping (Z) — 0.5 m
+          / 15°</label
+        >
+        <label class="setting-toggle"
+          ><input id="setting-walls" type="checkbox" /> Scene boundary
+          walls</label
+        >
+        <div class="prop-row">
+          <label
+            for="setting-gravity"
+            title="Positive pulls down; negative pulls up. The slider snaps to zero near the centre mark. Type a value for fine control."
+            >Gravity ↓</label
+          >
+          <input
+            id="range-gravity"
+            type="range"
+            min="-50"
+            max="50"
+            step="0.01"
+            value="9.81"
+            aria-label="Gravity slider"
+            aria-describedby="help-gravity"
+          />
+          <span class="prop-value"
+            ><input
+              id="setting-gravity"
+              type="number"
+              min="-50"
+              max="50"
+              step="any"
+              value="9.81"
+              aria-describedby="help-gravity"
+            /><span class="unit">m/s²</span></span
+          ><span class="sr-only" id="help-gravity"
+            >Positive pulls down; negative pulls up. The slider snaps to zero
+            near the centre mark. Type a value for fine control.</span
+          >
+        </div>
+        <div class="prop-row">
+          <label
+            for="setting-airResistance"
+            title="Global linear drag and spin damping, added to each object's own damping. Zero means no air resistance."
+            >Air resistance</label
+          >
+          <input
+            id="range-airResistance"
+            type="range"
+            min="0"
+            max="10"
+            step="0.01"
+            value="0"
+            aria-label="Air resistance slider"
+            aria-describedby="help-airResistance"
+          />
+          <span class="prop-value"
+            ><input
+              id="setting-airResistance"
+              type="number"
+              min="0"
+              max="10"
+              step="any"
+              value="0"
+              aria-describedby="help-airResistance"
+            /><span class="unit">s⁻¹</span></span
+          ><span class="sr-only" id="help-airResistance"
+            >Global linear drag and spin damping, added to each object's own
+            damping. Zero means no air resistance.</span
+          >
+        </div>
+      </details>
+      <details class="settings-section">
+        <summary>Fields</summary>
+        <div class="prop-row">
+          <label
+            for="setting-electricX"
+            title="Global field. Positive points right; negative points left. Global and local fields add together."
+            >Electric field →</label
+          >
+          <input
+            id="range-electricX"
+            type="range"
+            min="-100"
+            max="100"
+            step=".1"
+            value="0"
+            aria-label="Electric field → slider"
+            aria-describedby="help-electricX"
+          />
+          <span class="prop-value"
+            ><input
+              id="setting-electricX"
+              type="number"
+              min="-100"
+              max="100"
+              step="any"
+              value="0"
+              aria-describedby="help-electricX"
+            /><span class="unit">N/C</span></span
+          ><span class="sr-only" id="help-electricX"
+            >Global field. Positive points right; negative points left. Global
+            and local fields add together.</span
+          >
+        </div>
+        <div class="prop-row">
+          <label
+            for="setting-electricY"
+            title="Global field. Positive points up; negative points down. Global and local fields add together."
+            >Electric field ↑</label
+          >
+          <input
+            id="range-electricY"
+            type="range"
+            min="-100"
+            max="100"
+            step=".1"
+            value="0"
+            aria-label="Electric field ↑ slider"
+            aria-describedby="help-electricY"
+          />
+          <span class="prop-value"
+            ><input
+              id="setting-electricY"
+              type="number"
+              min="-100"
+              max="100"
+              step="any"
+              value="0"
+              aria-describedby="help-electricY"
+            /><span class="unit">N/C</span></span
+          ><span class="sr-only" id="help-electricY"
+            >Global field. Positive points up; negative points down. Global and
+            local fields add together.</span
+          >
+        </div>
+        <div class="prop-row">
+          <label
+            for="setting-magneticZ"
+            title="Global field. Positive points out of the screen (⊙); negative into it (⊗). Global and local fields add together."
+            >Magnetic field ⊙</label
+          >
+          <input
+            id="range-magneticZ"
+            type="range"
+            min="-100"
+            max="100"
+            step=".1"
+            value="0"
+            aria-label="Magnetic field ⊙ slider"
+            aria-describedby="help-magneticZ"
+          />
+          <span class="prop-value"
+            ><input
+              id="setting-magneticZ"
+              type="number"
+              min="-100"
+              max="100"
+              step="any"
+              value="0"
+              aria-describedby="help-magneticZ"
+            /><span class="unit">T</span></span
+          ><span class="sr-only" id="help-magneticZ"
+            >Global field. Positive points out of the screen (⊙); negative into
+            it (⊗). Global and local fields add together.</span
+          >
+        </div>
+      </details>
+      <details class="settings-section">
+        <summary>Charge interactions</summary>
+        <label class="setting-toggle"
+          ><input id="setting-chargeInteractions" type="checkbox" /> Mutual
+          electric forces</label
+        >
+        <div class="prop-row">
+          <label
+            for="setting-coulombConstant"
+            title="Default 1 for manageable sandbox motion. Vacuum value ≈ 8.99 × 10⁹. Like charges repel; opposite charges attract."
+            >Coulomb constant</label
+          >
+          <span></span>
+          <span class="prop-value"
+            ><input
+              id="setting-coulombConstant"
+              type="number"
+              min="0"
+              max="10000000000"
+              step="any"
+              value="1"
+              aria-describedby="help-coulombConstant"
+            /><span class="unit">N·m²/C²</span></span
+          ><span class="sr-only" id="help-coulombConstant"
+            >Default 1 for manageable sandbox motion. Vacuum value ≈ 8.99 × 10⁹.
+            Like charges repel; opposite charges attract.</span
+          >
+        </div>
+        <div class="prop-row">
+          <label
+            for="setting-chargeSoftening"
+            title="Uses r / (r² + smoothing²)³ᐟ² to keep overlapping charges finite."
+            >Near-contact smoothing</label
+          >
+          <span></span>
+          <span class="prop-value"
+            ><input
+              id="setting-chargeSoftening"
+              type="number"
+              min=".01"
+              max="10"
+              step="any"
+              value=".1"
+              aria-describedby="help-chargeSoftening"
+            /><span class="unit">m</span></span
+          ><span class="sr-only" id="help-chargeSoftening"
+            >Uses r / (r² + smoothing²)³ᐟ² to keep overlapping charges
+            finite.</span
+          >
+        </div>
+      </details>
+      <details class="settings-section">
+        <summary>Scene</summary>
+        <div class="prop-row">
+          <label
+            for="scene-width"
+            title="Bounds stay fixed while you pan or zoom. Ground stays at y = 0. Resizing does not reposition existing objects."
+            >Width</label
+          ><span></span
+          ><span class="prop-value"
+            ><input
+              id="scene-width"
+              type="number"
+              min="2"
+              max="1000"
+              step="any"
+              aria-describedby="scene-help"
+            /><span class="unit">m</span></span
+          >
+        </div>
+        <div class="prop-row">
+          <label
+            for="scene-height"
+            title="Bounds stay fixed while you pan or zoom. Ground stays at y = 0. Resizing does not reposition existing objects."
+            >Height</label
+          ><span></span
+          ><span class="prop-value"
+            ><input
+              id="scene-height"
+              type="number"
+              min="2"
+              max="1000"
+              step="any"
+              aria-describedby="scene-help"
+            /><span class="unit">m</span></span
+          >
+        </div>
+        <div class="button-row">
+          <button id="apply-scene">Resize scene</button
+          ><button id="scene-to-view">Bounds to current view</button>
+        </div>
+        <small id="scene-help"
+          >Bounds stay fixed while you pan or zoom. Ground stays at y = 0.
+          Resizing does not reposition existing objects.</small
+        >
+      </details>
+      <details id="website-settings" class="settings-section"></details>
+      <button id="reset-settings">Restore defaults</button>
+    </section>
+    <section
+      id="clear-confirm"
+      role="alertdialog"
+      aria-labelledby="clear-confirm-title"
+      aria-describedby="clear-confirm-text"
+      hidden
+    >
+      <strong id="clear-confirm-title">Clear the scene?</strong>
+      <p id="clear-confirm-text">
+        Every object, connection and field is removed, and all settings return
+        to their defaults (gravity 9.81 m/s², no global fields, default floor).
+        This cannot be undone.
+      </p>
+      <div class="button-row">
+        <button id="clear-no">Cancel</button
+        ><button id="clear-yes" class="danger">Clear scene</button>
+      </div>
+    </section>
+    <section id="presets-panel" hidden aria-labelledby="presets-title">
+      <div class="menu-header">
+        <strong id="presets-title">Presets</strong
+        ><button id="close-presets" aria-label="Close presets">×</button>
+      </div>
+      <p>
+        Ready-made experiments. Loading one replaces the current scene and
+        starts paused, so you can read what to look for first.
+      </p>
+      <div id="preset-list"></div>
+    </section>
+    <section id="keys-panel" hidden aria-label="Keyboard shortcuts">
+      <div class="menu-header">
+        <strong>Keyboard &amp; mouse</strong
+        ><button id="close-keys" aria-label="Close shortcuts">×</button>
+      </div>
+      <dl>
+        <dt>.</dt>
+        <dd>Step one 1/120 s while paused (Step button)</dd>
+        <dt>Space</dt>
+        <dd>
+          Play / pause. Reset (beside it) returns to the state at load or at the
+          last Run.
+        </dd>
+        <dt>Q · Shift</dt>
+        <dd>Select tool · add to a selection box</dd>
+        <dt>G · B · N · W</dt>
+        <dd>Grab · Ball · Block · Wedge</dd>
+        <dt>S · D · T · U</dt>
+        <dd>Spring · Rod · Belt · Pulley</dd>
+        <dt>I · H</dt>
+        <dd>Impulse · Pan. Scroll to zoom; middle-drag pans in any tool.</dd>
+        <dt>E · M</dt>
+        <dd>
+          Electric · Magnetic field. Right-click for shape, size and strength;
+          drag to move, Ctrl to rotate, R to resize.
+        </dd>
+        <dt>V · F</dt>
+        <dd>Toggle velocity · net force vectors</dd>
+        <dt>R + drag</dt>
+        <dd>Resize in place (ball diameter; block width / height)</dd>
+        <dt>Z</dt>
+        <dd>Toggle snapping for all geometry edits (also in Settings)</dd>
+        <dt>Shift + drag</dt>
+        <dd>Move. A position-locked object moves only while paused.</dd>
+        <dt>Ctrl + drag</dt>
+        <dd>
+          Rotate around the centre. A rotation-locked object rotates only while
+          paused.
+        </dd>
+        <dt>Locked objects</dt>
+        <dd>
+          With both locks on, an object ignores dragging while running. Paused,
+          a plain drag moves it and Ctrl-drag rotates it; the locks then hold
+          the new pose.
+        </dd>
+        <dt>Alt + drag</dt>
+        <dd>
+          Refit rod / cable lengths; combine with Shift to move and change
+          length
+        </dd>
+        <dt>Ctrl + R</dt>
+        <dd>Browser reload</dd>
+        <dt>Click the scene</dt>
+        <dd>Closes an open panel or menu (that click does nothing else)</dd>
+        <dt>Right-click ground</dt>
+        <dd>Floor and wall friction / restitution</dd>
+        <dt>Delete · Escape</dt>
+        <dd>Delete selection · cancel interaction</dd>
+      </dl>
+      <p>
+        Select: enable Bodies and/or Fields in tool settings, drag a box, then
+        drag a selected item to move the connected assembly. Z toggles snapping.
+        Pause to move an assembly containing locked positions. Pins and world
+        anchors move with the layout. Belt: click two balls. Pulley: click
+        endpoint, wheel ball, endpoint. Cable ends can move at any angle and
+        connect to springs. Pulley axles start pinned; unlock position to move
+        them. Select a belt for crossed / driven modes. Select a spring to lock
+        its current angle.
+      </p>
+    </section>
+    <script src="../vendor/matter.js"></script>
+    <script type="module" src="../src/app.js"></script>
+  </body>
+</html>

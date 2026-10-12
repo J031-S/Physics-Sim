@@ -634,12 +634,27 @@ export function electricFieldLines(lab, bounds, options = {}) {
       startRadius = 0.05,
       maxLines = 500,
       maxSteps = 6000,
+      minGap = 3 * step,
     } = options,
     c = lab.compiled(),
     e = [0, 0],
     hMin = step / 50,
+    uniform = lab.uniform.electric,
     // Flux per line and per metre of depth, for plates and background field.
-    quantum = 1e-9 / (EPS0 * linesPerNC * 2),
+    // A strong background field would need its lines closer together than
+    // `minGap`; every line of the picture then stands for more flux instead,
+    // so that the lines stay apart and their spacing still shows the field.
+    // (Without this the lines ran out part of the way up the region, and a
+    // field over about 150 N/C drew none on the screen at all.) The rule
+    // depends on the field and the zoom alone, never on the region drawn.
+    coarsen = Math.max(
+      1,
+      Math.ceil(
+        (Math.hypot(uniform.x, uniform.y) * minGap) /
+          (1e-9 / (EPS0 * linesPerNC * 2)),
+      ),
+    ),
+    quantum = (1e-9 * coarsen) / (EPS0 * linesPerNC * 2),
     lines = [],
     chargeArrivals = new Map(c.charges.map((p) => [p.id, []])),
     plateArrivals = new Map();
@@ -773,7 +788,13 @@ export function electricFieldLines(lab, bounds, options = {}) {
   }
 
   const wanted = (p) =>
-    Math.min(64, Math.max(1, Math.round((linesPerNC * Math.abs(p.q)) / 1e-9)));
+    Math.min(
+      64,
+      Math.max(
+        1,
+        Math.round((linesPerNC * Math.abs(p.q)) / (1e-9 * coarsen)),
+      ),
+    );
   const reference = (p, sign) => {
     lab.electricField(p.x, p.y, p.id, e);
     return Math.hypot(e[0], e[1]) > 1e-12
@@ -825,7 +846,6 @@ export function electricFieldLines(lab, bounds, options = {}) {
 
   // 1. Lines entering through the edge of the region, when a background
   //    field brings them in from far away.
-  const uniform = lab.uniform.electric;
   if (uniform.x || uniform.y) {
     // They start where the background field's own stream function
     // ψ = E_x y − E_y x passes (k + ½) quanta of flux: places fixed in the
@@ -839,7 +859,7 @@ export function electricFieldLines(lab, bounds, options = {}) {
         [bounds.minX, bounds.minY, w, 0, 0, 1],
         [bounds.minX, bounds.maxY, w, 0, 0, -1],
       ];
-    let budget = 160;
+    let budget = Math.max(160, maxLines - 100);
     for (const [x0, y0, dx, dy, nx, ny] of edges) {
       if (!(uniform.x * nx + uniform.y * ny > 0)) continue;
       const p0 = psi(x0, y0),
