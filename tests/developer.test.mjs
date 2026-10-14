@@ -166,3 +166,46 @@ test("every vendored font file and licence exists", async () => {
   for (const font of FONTS.filter((f) => f.file))
     assert.ok(notice.includes(font.file), font.file);
 });
+
+test("built-in schemes are valid and readable in both themes", async () => {
+  const { PRESETS } = await import("../src/site/scheme-presets.js");
+  const { COLOURS } = await import("../src/site/theme.js");
+  const { checkScheme } = await import("../src/site/scheme.js");
+  const lum = (hex) => {
+    const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const [r, g, b] = c.map((v) =>
+      v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4,
+    );
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => {
+    const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+  assert.ok(PRESETS.length >= 8);
+  assert.equal(new Set(PRESETS.map((p) => p.name)).size, PRESETS.length);
+  for (const preset of PRESETS) {
+    const scheme = checkScheme(preset);
+    for (const mode of ["light", "dark"]) {
+      const col = (name) =>
+        (preset[mode][name] ??
+          COLOURS.find((t) => t.name === name)[mode]).slice(0, 7);
+      const at = `${preset.name} (${mode})`;
+      for (const bg of ["canvas-bg", "panel"]) {
+        assert.ok(ratio(col("ink"), col(bg)) >= 7, `${at}: ink on ${bg}`);
+        // Secondary text: at least as readable as theme.js's own (3.76:1).
+        assert.ok(ratio(col("ink-soft"), col(bg)) >= 3.7, `${at}: ink-soft on ${bg}`);
+        assert.ok(ratio(col("accent-text"), col(bg)) >= 4.5, `${at}: accent-text on ${bg}`);
+      }
+      assert.ok(ratio(col("ink"), col("accent-soft")) >= 4.5, `${at}: ink on accent-soft`);
+      assert.ok(ratio(col("on-colour"), col("accent")) >= 4.5, `${at}: text on accent`);
+      assert.ok(ratio(col("on-colour"), col("danger")) >= 4.5, `${at}: text on danger`);
+      // Velocity and force arrows must stay distinct, and visible on the page.
+      assert.notEqual(col("vector-velocity"), col("vector-force"), at);
+      assert.notEqual(col("charge-positive"), col("charge-negative"), at);
+      for (const k of ["vector-velocity", "vector-force"])
+        assert.ok(ratio(col(k), col("canvas-bg")) >= 3, `${at}: ${k} on the page`);
+    }
+    assert.ok(Object.keys(scheme.light).length + Object.keys(scheme.dark).length);
+  }
+});

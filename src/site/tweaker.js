@@ -25,6 +25,8 @@ import {
   redo,
   saveSchemeAs,
   savedSchemes,
+  schemeOptions,
+  BUILTIN,
   setScheme,
   switchTo,
   undo,
@@ -206,6 +208,8 @@ function build() {
     delete: () => {
       const name = q(".dev-saved").value;
       if (!name) throw new Error("The default scheme cannot be deleted.");
+      if (name.startsWith(BUILTIN))
+        throw new Error("Built-in schemes cannot be deleted.");
       if (!window.confirm(`Delete the saved scheme "${name}"?`)) return;
       deleteSaved(name);
       setScheme({ ...currentScheme(), name: name + " (deleted)" });
@@ -557,13 +561,7 @@ function fill() {
     scroll = panel.scrollTop,
     focusId = document.activeElement?.id;
 
-  const saved = q(".dev-saved"),
-    names = Object.keys(savedSchemes()).sort();
-  saved.replaceChildren(
-    option("Default (theme.js)", ""),
-    ...names.map((n) => option(n, n)),
-  );
-  saved.value = savedSchemes()[scheme.name] ? scheme.name : "";
+  schemeOptions(q(".dev-saved"));
   if (document.activeElement !== q(".dev-name"))
     q(".dev-name").value = scheme.name;
   q('[data-act="undo"]').disabled = !canUndo();

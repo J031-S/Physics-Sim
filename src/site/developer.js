@@ -7,6 +7,7 @@
 import { $, option, showToast } from "./dom.js";
 import { colourValue, setOverrides, value } from "./theme.js";
 import { checkScheme, emptyScheme, isDefault } from "./scheme.js";
+import { PRESETS, presetByName } from "./scheme-presets.js";
 import { fontStack, surfaceCss } from "./surface.js";
 import { failedEquations, onFrame } from "./dev-hooks.js";
 import { iconWeights } from "./icons.js";
@@ -174,9 +175,16 @@ export function deleteSaved(name) {
   delete store.saved[name];
   saveStore();
 }
+// A value from a scheme picker: "" for the default, "builtin:<name>" for a
+// built-in scheme (loaded as a copy to work on), otherwise a saved one.
+export const BUILTIN = "builtin:";
 export function switchTo(name) {
   const scheme =
-    name === "" ? emptyScheme("Default") : (store.saved[name] ?? null);
+    name === ""
+      ? emptyScheme("Default")
+      : name.startsWith(BUILTIN)
+        ? (presetByName(name.slice(BUILTIN.length)) ?? null)
+        : (store.saved[name] ?? null);
   if (!scheme) throw new Error(`There is no scheme called "${name}".`);
   setScheme(structuredClone(scheme));
 }
@@ -307,16 +315,44 @@ function disable() {
   applyToPage(null);
 }
 
-function fillSchemes() {
-  const select = $("dev-scheme");
-  if (!select) return;
+// The options of a scheme picker: the default, the built-in schemes and the
+// saved ones, with the working scheme selected. Shared with the tweaker.
+export function schemeOptions(select) {
+  const group = (label, items) => {
+    const g = document.createElement("optgroup");
+    g.label = label;
+    g.append(...items);
+    return g;
+  };
   const names = Object.keys(store.saved).sort();
   select.replaceChildren(
     option("Default (theme.js)", ""),
-    ...names.map((n) => option(n, n)),
+    group(
+      "Built-in schemes",
+      PRESETS.map((p) => option(p.name, BUILTIN + p.name)),
+    ),
+    ...(names.length
+      ? [group("Your saved schemes", names.map((n) => option(n, n)))]
+      : []),
   );
-  select.value = store.saved[store.current.name] ? store.current.name : "";
-  if (!store.saved[store.current.name] && !isDefault(store.current)) {
+  // A built-in shows as selected only while it is unchanged.
+  const preset = presetByName(store.current.name),
+    same =
+      preset &&
+      JSON.stringify(checkScheme(preset)) === JSON.stringify(store.current);
+  select.value = store.saved[store.current.name]
+    ? store.current.name
+    : same
+      ? BUILTIN + preset.name
+      : "";
+  return !!store.saved[store.current.name] || same;
+}
+
+function fillSchemes() {
+  const select = $("dev-scheme");
+  if (!select) return;
+  const known = schemeOptions(select);
+  if (!known && !isDefault(store.current)) {
     const unsaved = option(`${store.current.name} (unsaved)`, "*");
     select.append(unsaved);
     select.value = "*";

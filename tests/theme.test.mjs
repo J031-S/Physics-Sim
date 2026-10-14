@@ -94,7 +94,11 @@ test("no colour literals in the page scripts outside theme.js", async () => {
   // rgb(…) built from numbers in code (e.g. a colour mix) is not a literal.
   const literal = /#[0-9a-fA-F]{3,8}\b|rgba?\(\s*\d/;
   for (const file of files) {
-    if (file === "src/site/theme.js") continue;
+    // theme.js holds the colours; scheme-presets.js holds built-in developer
+    // schemes, which are data in the scheme format (like a saved scheme) and
+    // are only ever applied in developer mode.
+    if (file === "src/site/theme.js" || file === "src/site/scheme-presets.js")
+      continue;
     (await read(file))
       .split("\n")
       .forEach((line, i) =>
