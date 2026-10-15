@@ -1,7 +1,8 @@
 // The theme tweaker: a movable, collapsible window for building a developer
 // scheme. Every token from theme.js, grouped as there, with live changes to
-// the page's CSS and canvases; schemes saved, switched, duplicated, deleted,
-// exported, imported and copied as theme.js code; undo, redo, and a
+// the page's CSS and canvases. Colours and style (everything else) are picked,
+// saved and deleted as two separate halves; the pair can be exported,
+// imported and copied as theme.js code; undo, redo, and a
 // hold-to-compare button. Loaded by developer.js when first opened.
 import { $, option, showToast } from "./dom.js";
 import {
@@ -20,16 +21,18 @@ import {
   canUndo,
   compare,
   currentScheme,
-  deleteSaved,
+  deletePart,
   download,
+  partName,
+  partOptions,
+  pickedPart,
   redo,
-  saveSchemeAs,
-  savedSchemes,
-  schemeOptions,
-  BUILTIN,
+  savePart,
   setScheme,
-  switchTo,
+  usePart,
   undo,
+  BUILTIN,
+  MINE,
 } from "./developer.js";
 
 const TABS = [
@@ -95,17 +98,18 @@ const TEMPLATE = `
     <button type="button" class="dev-close" aria-label="Close the theme tweaker">×</button>
   </div>
   <div class="dev-window-body">
+    <p class="dev-note">Colours and style are chosen separately: any colour scheme goes with any style.</p>
     <div class="dev-row">
-      <label class="dev-inline">Scheme
-        <select class="dev-saved" aria-label="Saved schemes"></select></label>
-      <label class="dev-inline">Name
-        <input type="text" class="dev-name" maxlength="60" /></label>
+      <label class="dev-inline">Colours
+        <select class="dev-part" data-kind="colours" aria-label="Colour scheme"></select></label>
+      <button type="button" data-act="save" data-kind="colours">Save colours as…</button>
+      <button type="button" data-act="delete" data-kind="colours">Delete</button>
     </div>
     <div class="dev-row">
-      <button type="button" data-act="save">Save</button>
-      <button type="button" data-act="duplicate">Duplicate</button>
-      <button type="button" data-act="delete">Delete</button>
-      <button type="button" data-act="reset">Reset to default</button>
+      <label class="dev-inline">Style
+        <select class="dev-part" data-kind="style" aria-label="Style"></select></label>
+      <button type="button" data-act="save" data-kind="style">Save style as…</button>
+      <button type="button" data-act="delete" data-kind="style">Delete</button>
     </div>
     <div class="dev-row">
       <button type="button" data-act="undo">Undo</button>
@@ -114,6 +118,7 @@ const TEMPLATE = `
       <button type="button" data-act="export">Export</button>
       <button type="button" data-act="import">Import</button>
       <button type="button" data-act="code">Copy as code</button>
+      <button type="button" data-act="reset">Reset both to default</button>
       <input type="file" class="dev-import" accept=".json,application/json" hidden />
     </div>
     <div class="dev-row">
@@ -186,39 +191,43 @@ function build() {
     }
   });
 
-  // Schemes.
-  q(".dev-saved").addEventListener("change", (e) =>
-    attempt(() => switchTo(e.target.value)),
-  );
-  q(".dev-name").addEventListener("change", (e) =>
-    attempt(() => setScheme({ ...currentScheme(), name: e.target.value })),
-  );
+  // Colour schemes and styles, each picked, saved and deleted on its own.
+  for (const select of win.querySelectorAll(".dev-part"))
+    select.addEventListener("change", (e) => {
+      if (e.target.value !== "*")
+        attempt(() => usePart(select.dataset.kind, e.target.value));
+    });
+  const what = (kind) => (kind === "colours" ? "colour scheme" : "style");
   const act = {
-    save: () => {
-      const name = saveSchemeAs(q(".dev-name").value || "Untitled");
-      showToast(`Scheme saved as "${name}".`);
+    save: (kind) => {
+      const name = window.prompt(`Save this ${what(kind)} as:`, partName(kind));
+      if (name === null) return;
+      showToast(`Saved the ${what(kind)} "${savePart(kind, name)}".`);
     },
-    duplicate: () => {
-      let name = currentScheme().name + " copy",
-        n = 2;
-      while (savedSchemes()[name]) name = `${currentScheme().name} copy ${n++}`;
-      saveSchemeAs(name);
-      showToast(`Saved a copy as "${name}".`);
+    delete: (kind) => {
+      const key = pickedPart(kind);
+      if (key.startsWith(BUILTIN))
+        throw new Error("Built-in colour schemes cannot be deleted.");
+      if (!key.startsWith(MINE))
+        throw new Error(`Pick one of your own to delete it.`);
+      const name = key.slice(MINE.length);
+      if (!window.confirm(`Delete the ${what(kind)} "${name}"?`)) return;
+      deletePart(kind, name);
     },
-    delete: () => {
-      const name = q(".dev-saved").value;
-      if (!name) throw new Error("The default scheme cannot be deleted.");
-      if (name.startsWith(BUILTIN))
-        throw new Error("Built-in schemes cannot be deleted.");
-      if (!window.confirm(`Delete the saved scheme "${name}"?`)) return;
-      deleteSaved(name);
-      setScheme({ ...currentScheme(), name: name + " (deleted)" });
+    reset: () => {
+      setScheme(emptyScheme("Working"));
+      usePart("colours", "");
+      usePart("style", "");
     },
-    reset: () => setScheme(emptyScheme("Default")),
     undo: () => undo() || showToast("Nothing to undo."),
     redo: () => redo() || showToast("Nothing to redo."),
     export: () => {
-      const scheme = currentScheme();
+      const label = (kind) =>
+        partName(kind).replace(/ \(mine\)$/, "") || "default " + kind;
+      const scheme = {
+        ...currentScheme(),
+        name: `${label("colours")} + ${label("style")}`,
+      };
       download(
         new Blob([JSON.stringify(scheme, null, 2)], {
           type: "application/json",
@@ -244,7 +253,9 @@ function build() {
   };
   for (const button of win.querySelectorAll("[data-act]")) {
     if (button.dataset.act === "compare") continue;
-    button.addEventListener("click", () => attempt(act[button.dataset.act]));
+    button.addEventListener("click", () =>
+      attempt(() => act[button.dataset.act](button.dataset.kind)),
+    );
   }
   // Hold to compare: pointer or keyboard.
   const hold = q('[data-act="compare"]');
@@ -561,9 +572,8 @@ function fill() {
     scroll = panel.scrollTop,
     focusId = document.activeElement?.id;
 
-  schemeOptions(q(".dev-saved"));
-  if (document.activeElement !== q(".dev-name"))
-    q(".dev-name").value = scheme.name;
+  for (const select of win.querySelectorAll(".dev-part"))
+    partOptions(select, select.dataset.kind);
   q('[data-act="undo"]').disabled = !canUndo();
   q('[data-act="redo"]').disabled = !canRedo();
   mode = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
