@@ -11,11 +11,10 @@ export function circle(ctx, o) {
     a = -15 * deg,
     bx = cx + R * Math.cos(a),
     by = cy + R * Math.sin(a),
-    // The radius is marked to another point of the circle, clear of the
-    // inward arrow.
-    ra = 140 * deg,
-    rx = cx + R * Math.cos(ra),
-    ry = cy + R * Math.sin(ra);
+    // The radius is marked beside the rod, on the side away from the
+    // velocity.
+    nx = -Math.sin(a) * 16,
+    ny = Math.cos(a) * 16;
   P.line(
     Array.from({ length: 121 }, (_, i) => [
       cx + R * Math.cos((i / 120) * TAU),
@@ -25,9 +24,18 @@ export function circle(ctx, o) {
     1,
     [4, 4],
   );
-  P.ball(cx, cy, 3, "ink");
-  P.dim(cx, cy, rx, ry);
-  P.tag("r", (cx + rx) / 2 - 8, (cy + ry) / 2 - 12, "right");
+  // The rod (or string) from the centre to the ball.
+  P.line(
+    [
+      [cx, cy],
+      [bx, by],
+    ],
+    "structure",
+    2.5,
+  );
+  P.ball(cx, cy, 3.5, "structure");
+  P.dim(cx + nx, cy + ny, bx - 12 * Math.cos(a) + nx, by - 12 * Math.sin(a) + ny);
+  P.tag("r", (cx + bx) / 2 + nx * 2, (cy + by) / 2 + ny * 2);
   P.ball(bx, by, 11);
   // Moving anticlockwise: velocity along the tangent.
   const L = Math.min(by - 34, Math.abs(P.length("v", 28, 70)) || 45),
@@ -51,14 +59,56 @@ export function circle(ctx, o) {
   if (P.has("T")) P.text("T: time for one turn", right, y, "right");
 }
 
-// A car on a banked curve, seen from behind.
+// A car on a banked curve: on the left the curved track in perspective
+// (higher on the outside), on the right the slice through it at the car,
+// seen from behind, with the forces.
 export function banked(ctx, o) {
   const P = picture(ctx, o),
     { w, h, ctx: g } = P,
-    th = Math.max(2, Math.min(60, P.value("theta", 20))) * deg,
-    x0 = w * 0.18,
+    th = Math.max(2, Math.min(60, P.value("theta", 20))) * deg;
+  // The track in perspective: the inner edge is a flattened circle on the
+  // ground, the outer edge one raised by the bank.
+  const cx = w * 0.2,
+    cy = h * 0.5,
+    Ri = Math.min(w * 0.08, 44),
+    Ro = Ri * 1.7,
+    k = 0.38,
+    // Kept small enough that the inner edge stays inside the outer one.
+    lift = Math.min((Ro - Ri) * k * 0.9, (Ro - Ri) * Math.tan(th) * 0.5);
+  g.fillStyle = P.col("body-wedge");
+  g.beginPath();
+  g.ellipse(cx, cy - lift, Ro, Ro * k, 0, 0, TAU);
+  g.ellipse(cx, cy, Ri, Ri * k, 0, TAU, 0, true);
+  g.fill("evenodd");
+  g.strokeStyle = P.col("body-edge");
+  g.lineWidth = 1;
+  g.beginPath();
+  g.ellipse(cx, cy - lift, Ro, Ro * k, 0, 0, TAU);
+  g.stroke();
+  g.beginPath();
+  g.ellipse(cx, cy, Ri, Ri * k, 0, 0, TAU);
+  g.stroke();
+  P.ball(cx, cy, 3, "ink");
+  P.line(
+    [
+      [cx, cy],
+      [cx, cy - lift - Ro * k - 18],
+    ],
+    "ink-soft",
+    1,
+    [3, 3],
+  );
+  P.text("centre", cx, cy - lift - Ro * k - 28);
+  // The car on the near side of the track, going round to the right.
+  const fx = cx,
+    fy = (cy + Ri * k + cy - lift + Ro * k) / 2;
+  P.block(fx, fy - 5, 26, 12, "body-block");
+  P.arrow(fx + 16, fy - 5, fx + 44, fy - 9, "vector-velocity", 1.5);
+  P.text("seen from behind →", cx, h - 16);
+  // The slice at the car.
+  const x0 = w * 0.44,
     y0 = h - 30,
-    run = w * 0.5,
+    run = w * 0.32,
     rise = Math.min(run * Math.tan(th), h - 60),
     len = rise / Math.sin(th);
   g.fillStyle = P.col("body-wedge");
@@ -80,8 +130,10 @@ export function banked(ctx, o) {
   P.text("N", bx + nx * 80, by + ny * 80);
   P.arrow(bx, by, bx, by + 50);
   P.text("mg", bx + 8, by + 56, "left");
-  P.arrow(bx, by, bx - 60, by, "accent-text");
-  P.text("towards the centre", bx - 66, by, "right");
+  P.arrow(bx, by, bx - 50, by, "accent-text");
+  // Above the arrow on a gentle bank (below, it would meet θ), below it on
+  // a steep one (above, it would meet N).
+  P.text("to the centre", bx - 8, by + (th < 25 * deg ? -14 : 16), "right");
   P.tag("r", w - 24, 26, "right");
   P.tag("v", w - 24, 52, "right");
   P.tag("g", w - 24, 78, "right");
@@ -115,14 +167,17 @@ export function vertical(ctx, o) {
   P.tag("g", w - 24, h * 0.3 + 48, "right");
 }
 
-// A conical pendulum: a bob going round a horizontal circle.
+// A conical pendulum: a bob going round a horizontal circle. At 0° it just
+// hangs at rest: no circle and no inward force.
 export function conical(ctx, o) {
   const P = picture(ctx, o),
     { w, h, ctx: g } = P,
-    th = Math.max(3, Math.min(80, P.value("theta", 30))) * deg,
+    deg0 = P.value("theta", 30),
+    hangs = deg0 === 0,
+    th = hangs ? 0 : Math.max(3, Math.min(85, deg0)) * deg,
     px = w * 0.38,
     py = 18,
-    L = Math.min((h - 50) / Math.cos(th), (w * 0.3) / Math.sin(th)),
+    L = Math.min((h - 50) / Math.cos(th), (w * 0.3) / Math.max(Math.sin(th), 1e-9)),
     r = L * Math.sin(th),
     by = py + L * Math.cos(th);
   P.line(
@@ -133,22 +188,24 @@ export function conical(ctx, o) {
     "structure",
     3,
   );
-  g.strokeStyle = P.col("ink-soft");
-  g.setLineDash([4, 4]);
-  g.lineWidth = 1;
-  g.beginPath();
-  g.ellipse(px, by, r, Math.max(6, r * 0.22), 0, 0, TAU);
-  g.stroke();
-  g.setLineDash([]);
-  P.line(
-    [
-      [px, py],
-      [px, by],
-    ],
-    "ink-soft",
-    1,
-    [3, 3],
-  );
+  if (!hangs) {
+    g.strokeStyle = P.col("ink-soft");
+    g.setLineDash([4, 4]);
+    g.lineWidth = 1;
+    g.beginPath();
+    g.ellipse(px, by, r, Math.max(6, r * 0.22), 0, 0, TAU);
+    g.stroke();
+    g.setLineDash([]);
+    P.line(
+      [
+        [px, py],
+        [px, by],
+      ],
+      "ink-soft",
+      1,
+      [3, 3],
+    );
+  }
   P.line(
     [
       [px, py],
@@ -157,12 +214,24 @@ export function conical(ctx, o) {
     "ink",
     1.5,
   );
-  P.angle(px, py, 30, Math.PI / 2 - th, Math.PI / 2);
-  P.tag("theta", px + 8, py + 44, "left");
-  P.tag("L", px + r / 2 + 14, (py + by) / 2, "left");
+  // θ is written to the left of the vertical, clear of the string and the
+  // inward arrow at any angle.
+  if (!hangs) P.angle(px, py, 30, Math.PI / 2 - th, Math.PI / 2);
+  P.tag("theta", px - 10, py + 40, "right");
+  // L beside the middle of the string, on its upper side.
+  P.tag(
+    "L",
+    px + r / 2 + 16 * Math.cos(th),
+    (py + by) / 2 - 16 * Math.sin(th),
+    "left",
+  );
   P.ball(px + r, by, 11);
-  P.arrow(px + r, by, px + r - 50, by, "accent-text");
-  P.text("towards the centre", px + r - 56, by + 18, "right");
+  if (hangs)
+    P.text("hangs at rest: not going round", px + 18, by, "left");
+  else {
+    P.arrow(px + r, by, px + r - 50, by, "accent-text");
+    P.text("towards the centre", px + r - 30, by + 26, "center");
+  }
   P.tag("T", w - 24, 26, "right");
   P.tag("g", w - 24, 52, "right");
 }

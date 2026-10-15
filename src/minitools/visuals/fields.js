@@ -31,20 +31,12 @@ export function coulomb(ctx, o) {
   P.tag("k", w - 20, h - 18, "right");
 }
 
-// Horizontal field lines across the whole picture.
-function fieldLines(P, x0, x1, ys, dir = 1) {
-  for (const y of ys) {
-    P.line(
-      [
-        [x0, y],
-        [x1, y],
-      ],
-      "field-electric",
-      1.2,
-    );
-    const mx = (x0 + x1) / 2;
-    P.arrow(mx - 6 * dir, y, mx + 6 * dir, y, "field-electric", 1.2);
-  }
+// Circles every 16 px along a horizontal line: a strip kept free of field
+// arrows, where something is drawn.
+function along(x0, x1, y, r) {
+  const out = [];
+  for (let x = x0; x <= x1; x += 16) out.push({ x, y, r });
+  return out;
 }
 
 // A charge in a uniform field and the force on it.
@@ -54,8 +46,14 @@ export function fieldForce(ctx, o) {
     x = w * 0.42,
     y = h * 0.5,
     q = P.value("q", 1);
-  fieldLines(P, 20, w - 20, [h * 0.18, h * 0.82]);
-  P.tag("E", w - 24, h * 0.18 - 14, "right");
+  P.fieldArrows(10, 10, w - 10, h - 10, {
+    clear: [
+      ...along(x - 150, x + 150, y, 26),
+      { x, y: y - 44, r: 30 },
+      { x: w - 60, y: 22, r: 30 },
+    ],
+  });
+  P.tag("E", w - 24, 22, "right");
   P.charge(x, y, q, 13);
   P.tag("q", x, y + 30);
   const F = Math.abs(P.length("F", 30, 110)) * sign(q);
@@ -81,17 +79,31 @@ export function pointField(ctx, o) {
     cy = h * 0.52,
     q = P.value("q", 1),
     px = w * 0.66;
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * TAU;
-    P.line(
-      [
-        [cx + 20 * Math.cos(a), cy + 20 * Math.sin(a)],
-        [cx + 70 * Math.cos(a), cy + 70 * Math.sin(a)],
-      ],
-      "field-electric",
-      1,
-    );
-  }
+  // The field at points on a lattice: away from a positive charge, towards
+  // a negative one, shorter where it is weaker (as 1/r², down to a
+  // smallest size that can still be seen).
+  const step = 36;
+  for (let x = cx - step * 6; x < w; x += step)
+    for (let y = cy - step * 4; y < h; y += step) {
+      const dx = x - cx,
+        dy = y - cy,
+        r = Math.hypot(dx, dy);
+      if (x < 8 || y < 8 || r < 28) continue;
+      if (Math.abs(y - cy) < 22 && x > px - 30) continue;
+      if (Math.abs(y - (cy - 92)) < 16 && x > cx - 10 && x < px + 10) continue;
+      if (Math.abs(y - (cy + 48)) < 14 && Math.abs(x - px) < 130) continue;
+      const L = Math.max(5, Math.min(16, 16 * (60 / r) ** 2)) * sign(q),
+        ux = dx / r,
+        uy = dy / r;
+      P.arrow(
+        x - (ux * L) / 2,
+        y - (uy * L) / 2,
+        x + (ux * L) / 2,
+        y + (uy * L) / 2,
+        "field-electric",
+        1.2,
+      );
+    }
   P.charge(cx, cy, q, 14);
   P.tag("q", cx, cy + 88);
   P.dim(cx, cy - 92, px, cy - 92);
@@ -309,19 +321,13 @@ export function millikan(ctx, o) {
   P.tag("g", w - 20, bottom, "right");
 }
 
-// B as arrows across the picture (in the plane of the screen).
-function bLines(P, x0, x1, ys) {
-  for (const y of ys) {
-    P.line(
-      [
-        [x0, y],
-        [x1, y],
-      ],
-      "field-magnetic",
-      1.2,
-    );
-    P.arrow(x1 - 30, y, x1 - 18, y, "field-magnetic", 1.2);
-  }
+// B to the right, in the plane of the screen, as a lattice of arrows over
+// the picture, kept clear of the circles in `clear`.
+function bArrows(P, clear = []) {
+  P.fieldArrows(10, 10, P.w - 10, P.h - 10, {
+    colour: "field-magnetic",
+    clear,
+  });
 }
 
 // The force on a charge moving at an angle to B.
@@ -331,8 +337,19 @@ export function movingCharge(ctx, o) {
     x = w * 0.36,
     y = h * 0.58,
     th = P.value("theta", 90) * deg;
-  bLines(P, 20, w - 20, [h * 0.14, h * 0.92]);
-  P.tag("B", w - 24, h * 0.14 + 18, "right");
+  const L = Math.abs(P.length("v", 40, 100));
+  bArrows(P, [
+    ...along(x - 20, x + 110, y, 22),
+    ...[0.25, 0.5, 0.75, 1].map((f) => ({
+      x: x + L * f * Math.cos(th),
+      y: y - L * f * Math.sin(th),
+      r: 24,
+    })),
+    { x: x - 16, y: y + 24, r: 24 },
+    ...along(w * 0.72 - 60, w * 0.72 + 50, y + 13, 30),
+    { x: w - 50, y: 22, r: 30 },
+  ]);
+  P.tag("B", w - 24, 22, "right");
   P.line(
     [
       [x, y],
@@ -344,7 +361,6 @@ export function movingCharge(ctx, o) {
   );
   P.charge(x, y, P.value("q", 1), 10);
   P.tag("q", x - 16, y + 22, "right");
-  const L = Math.abs(P.length("v", 40, 100));
   P.arrow(
     x + 11 * Math.cos(th),
     y - 11 * Math.sin(th),
@@ -362,18 +378,72 @@ export function movingCharge(ctx, o) {
   P.text(`${into ? "into" : "out of"} the screen`, w * 0.72, y + 26);
 }
 
-// The force on a current-carrying wire in B.
+// The force on a current-carrying rod in B. Flexible leads join its ends to
+// a cell, so the current has a complete circuit to flow round.
 export function wireForce(ctx, o) {
   const P = picture(ctx, o),
     { w, h } = P,
-    x = w * 0.3,
-    y = h * 0.62,
     th = P.value("theta", 90) * deg,
-    L = 60 + 0.6 * Math.abs(P.length("l", 0, 100));
-  bLines(P, 20, w - 20, [h * 0.14, h * 0.92]);
-  P.tag("B", w - 24, h * 0.14 + 18, "right");
-  const ex = x + L * Math.cos(th),
-    ey = y - L * Math.sin(th);
+    L = 60 + 0.6 * Math.abs(P.length("l", 0, 100)),
+    cell = 34,
+    x = Math.max(w * 0.36, cell + 100 + L * Math.max(0, -Math.cos(th))),
+    y = h * 0.66,
+    ex = x + L * Math.cos(th),
+    ey = y - L * Math.sin(th),
+    mid = (y + ey) / 2,
+    // The current runs from the + terminal, up the lead to the rod's lower
+    // end, along the rod and back.
+    sx = -Math.sin(th),
+    sy = -Math.cos(th);
+  bArrows(P, [
+    ...[0, 0.25, 0.5, 0.75, 1].map((f) => ({
+      x: x + L * f * Math.cos(th),
+      y: y - L * f * Math.sin(th),
+      r: 30,
+    })),
+    { x: x + 40, y: y + 10, r: 30 },
+    ...along(w * 0.76 - 40, w * 0.76 + 60, y + 13, 30),
+    { x: w - 50, y: 22, r: 30 },
+    { x: cell, y: mid, r: 28 },
+  ]);
+  P.tag("B", w - 24, 22, "right");
+  P.line(
+    [
+      [x, y],
+      [x, h - 12],
+      [cell, h - 12],
+      [cell, mid + 5],
+    ],
+    "ink",
+    1.2,
+  );
+  P.line(
+    [
+      [ex, ey],
+      [ex, 12],
+      [cell, 12],
+      [cell, mid - 5],
+    ],
+    "ink",
+    1.2,
+  );
+  P.line(
+    [
+      [cell - 13, mid + 5],
+      [cell + 13, mid + 5],
+    ],
+    "ink",
+    1.5,
+  );
+  P.line(
+    [
+      [cell - 7, mid - 5],
+      [cell + 7, mid - 5],
+    ],
+    "ink",
+    3.5,
+  );
+  P.text("+", cell + 18, mid + 9, "left");
   P.line(
     [
       [x, y],
@@ -382,9 +452,6 @@ export function wireForce(ctx, o) {
     "structure",
     5,
   );
-  // The current, as an arrow beside the wire.
-  const sx = -Math.sin(th),
-    sy = -Math.cos(th);
   P.arrow(
     x + (L / 2 - 24) * Math.cos(th) + 13 * sx,
     y - (L / 2 - 24) * Math.sin(th) + 13 * sy,
@@ -399,7 +466,7 @@ export function wireForce(ctx, o) {
     y - (L / 2) * Math.sin(th) + 30 * sy,
     sx < -0.5 ? "right" : "center",
   );
-  P.tag("l", ex + 10, ey, "left");
+  P.tag("l", ex + 10 * Math.sign(Math.cos(th) || 1), ey, Math.cos(th) < -0.1 ? "right" : "left");
   P.line(
     [
       [x, y],
@@ -412,9 +479,9 @@ export function wireForce(ctx, o) {
   P.angle(x, y, 26, -th, 0);
   P.tag("theta", x + 34, y + 14, "left");
   // F = Il × B: into the screen.
-  P.outOf(w * 0.74, y, 9, "vector-force", true);
-  P.tag("F", w * 0.74 + 16, y, "left");
-  P.text("F into the screen", w * 0.74, y + 26);
+  P.outOf(w * 0.76, y, 9, "vector-force", true);
+  P.tag("F", w * 0.76 + 16, y, "left");
+  P.text("F into the screen", w * 0.76, y + 26);
 }
 
 // The field round a long straight wire.
@@ -459,8 +526,23 @@ export function flux(ctx, o) {
     cy = h / 2,
     th = P.value("theta", 0) * deg,
     half = h * 0.32;
-  bLines(P, 20, w - 20, [h * 0.14, h * 0.38, h * 0.62, h * 0.86]);
-  P.tag("B", w - 24, h * 0.14 - 14, "right");
+  bArrows(P, [
+    ...[-1, -0.5, 0, 0.5, 1].map((f) => ({
+      x: cx - Math.sin(th) * half * f,
+      y: cy - Math.cos(th) * half * f,
+      r: 22,
+    })),
+    ...[0.3, 0.6, 1, 1.25].map((f) => ({
+      x: cx + Math.cos(th) * 70 * f,
+      y: cy - Math.sin(th) * 70 * f,
+      r: 22,
+    })),
+    { x: cx + 50, y: cy + 16, r: 28 },
+    { x: w - 50, y: h - 14, r: 30 },
+    ...along(w * 0.2 - 60, w * 0.2 + 60, h - 14, 16),
+    { x: w - 50, y: 22, r: 30 },
+  ]);
+  P.tag("B", w - 24, 22, "right");
   // The loop's normal is at θ to B; the loop itself is at right angles to
   // the normal.
   const nx = Math.cos(th),
@@ -495,15 +577,14 @@ export function faraday(ctx, o) {
     { w, h, ctx: g } = P,
     cx = w * 0.52,
     cy = h * 0.5,
-    turns = Math.max(2, Math.min(10, Math.round(Math.sqrt(Math.abs(P.value("N", 4))))));
-  g.strokeStyle = P.col("circuit-current");
-  g.lineWidth = 2;
-  for (let i = 0; i < turns; i++) {
-    const x = cx - 50 + (100 * i) / Math.max(1, turns - 1);
-    g.beginPath();
-    g.ellipse(x, cy, 9, 40, 0, 0, TAU);
-    g.stroke();
-  }
+    N = Math.max(1, Math.round(Math.abs(P.value("N", 4)))),
+    // Every turn is drawn, up to 40; a bigger coil is drawn with 40 and
+    // says so.
+    turns = Math.min(N, 40),
+    coil = P.helix(cx - 55, cy, cx + 55, cy, 38, turns);
+  if (turns < N) P.text(`drawn with 40 of its ${N} turns`, cx, cy - 56);
+  const [sx, sy] = coil.start,
+    [ex, ey] = coil.end;
   P.tag("N", cx, cy + 56);
   // The magnet, moving in.
   P.block(w * 0.2, cy, 70, 26, "charge-positive");
@@ -516,8 +597,8 @@ export function faraday(ctx, o) {
   // A meter across the coil's ends.
   P.line(
     [
-      [cx + 50, cy - 40],
-      [cx + 50, 20],
+      [ex, ey],
+      [ex, 20],
       [w - 60, 20],
       [w - 60, cy - 14],
     ],
@@ -526,8 +607,8 @@ export function faraday(ctx, o) {
   );
   P.line(
     [
-      [cx + 50, cy + 40],
-      [cx + 50, h - 20],
+      [sx, sy],
+      [sx, h - 20],
       [w - 60, h - 20],
       [w - 60, cy + 14],
     ],
@@ -595,54 +676,79 @@ export function motional(ctx, o) {
   P.tag("emf", 62, (top + bottom) / 2, "left");
 }
 
-// A transformer: two coils on one iron core.
+// A transformer: two coils on one soft-iron core, and the magnetic field
+// lines going round inside the core. The coils are drawn with their turns in
+// the true ratio when that fits (at most 24 turns on the bigger one).
 export function transformer(ctx, o) {
   const P = picture(ctx, o),
     { w, h, ctx: g } = P,
     cx = w / 2,
     cy = h / 2,
     cw = Math.min(200, w * 0.36),
-    ch = h * 0.66;
+    ch = h * 0.66,
+    band = 18;
   g.strokeStyle = P.col("structure");
-  g.lineWidth = 16;
+  g.lineWidth = band;
   g.strokeRect(cx - cw / 2, cy - ch / 2, cw, ch);
-  // The coil with more turns is drawn with 12 loops and the other in
-  // proportion (never fewer than 2), so the turns ratio can be seen.
-  const most = Math.max(
-    Math.abs(P.value("Np", 100)),
-    Math.abs(P.value("Ns", 100)),
-    1,
-  );
-  const coil = (x, n, side) => {
-    const shown = Math.max(2, Math.round((12 * Math.abs(n)) / most) || 2),
-      span = ch * 0.6;
-    g.strokeStyle = P.col("circuit-current");
-    g.lineWidth = 2;
-    for (let i = 0; i < shown; i++) {
-      const y = cy - span / 2 + (span * i) / (shown - 1);
-      g.beginPath();
-      g.ellipse(x, y, 16, 4, 0, 0, TAU);
-      g.stroke();
-    }
+  // Field lines: closed loops along the core, clockwise here.
+  for (const inset of [-5, 5]) {
+    const x0 = cx - cw / 2 - inset,
+      y0 = cy - ch / 2 - inset,
+      x1 = cx + cw / 2 + inset,
+      y1 = cy + ch / 2 + inset;
     P.line(
       [
-        [x + side * 16, cy - span / 2],
-        [x + side * 60, cy - span / 2],
+        [x0, y0],
+        [x1, y0],
+        [x1, y1],
+        [x0, y1],
+        [x0, y0],
+      ],
+      "field-magnetic",
+      1.2,
+      [5, 4],
+    );
+    P.arrow(cx - 6, y0, cx + 6, y0, "field-magnetic", 1.4);
+    P.arrow(cx + 6, y1, cx - 6, y1, "field-magnetic", 1.4);
+  }
+  P.text("field lines in the iron core", cx, cy - ch / 2 - 22);
+  const np = Math.max(1, Math.round(Math.abs(P.value("Np", 100)))),
+    ns = Math.max(1, Math.round(Math.abs(P.value("Ns", 100)))),
+    most = Math.max(np, ns),
+    k = Math.min(1, 24 / most),
+    shown = (n) => Math.max(1, Math.round(n * k));
+  const coil = (x, n, side) => {
+    const span = ch * 0.6,
+      c = P.helix(x, cy - span / 2, x, cy + span / 2, 17, shown(n));
+    P.line(
+      [
+        c.start,
+        [x + side * 60, c.start[1]],
       ],
       "ink",
       1.2,
     );
     P.line(
       [
-        [x + side * 16, cy + span / 2],
-        [x + side * 60, cy + span / 2],
+        c.end,
+        [x + side * 60, c.end[1]],
       ],
       "ink",
       1.2,
     );
   };
-  coil(cx - cw / 2, P.value("Np", 100), -1);
-  coil(cx + cw / 2, P.value("Ns", 100), 1);
+  coil(cx - cw / 2, np, -1);
+  coil(cx + cw / 2, ns, 1);
+  if (k < 1) {
+    // In the window of the core, which is otherwise empty.
+    P.text("turns drawn in", cx, cy - 10);
+    P.text(
+      `the ratio ${np} : ${ns}` +
+        (shown(np) * ns !== shown(ns) * np ? " (roughly)" : ""),
+      cx,
+      cy + 10,
+    );
+  }
   P.tag("Np", cx - cw / 2, cy + ch / 2 + 20);
   P.tag("Ns", cx + cw / 2, cy + ch / 2 + 20);
   P.tag("Vp", cx - cw / 2 - 64, cy, "right");
@@ -730,10 +836,12 @@ export function cyclotron(ctx, o) {
   P.tag("m", w - 24, h - 20, "right");
 }
 
-// A velocity selector: E and B forces balance at one speed.
+// A velocity selector: E and B forces balance at one speed. The charge at
+// that speed goes straight through; a faster one is bent towards the qvB
+// side, a slower one towards the qE side.
 export function selector(ctx, o) {
   const P = picture(ctx, o),
-    { w, h } = P,
+    { w, h, ctx: g } = P,
     x0 = w * 0.2,
     x1 = w * 0.75,
     top = 30,
@@ -742,6 +850,23 @@ export function selector(ctx, o) {
   P.bRegion(x0, top + 4, x1, bottom - 4, true);
   P.plate(x0, top, x1, top, 1);
   P.plate(x0, bottom, x1, bottom, -1);
+  // Faster (bent up, magnetic force wins) and slower (bent down, electric
+  // force wins): drawn faintly.
+  for (const [bend, label] of [
+    [-1, "faster: qvB wins"],
+    [1, "slower: qE wins"],
+  ]) {
+    const pts = [];
+    for (let i = 0; i <= 30; i++) {
+      const t = i / 30;
+      pts.push([x0 + (x1 - x0) * t, y + bend * (h * 0.3) * t * t]);
+    }
+    g.globalAlpha = 0.55;
+    P.line([[30, y], ...pts], "vector-velocity", 1.3, [4, 3]);
+    g.globalAlpha = 1;
+    const [ex, ey] = pts[pts.length - 1];
+    P.text(label, ex + 8, ey, "left");
+  }
   P.line(
     [
       [30, y],
@@ -749,19 +874,19 @@ export function selector(ctx, o) {
     ],
     "vector-velocity",
     1.5,
-    [5, 4],
   );
+  P.text("just right: goes straight through", x1 + 8, y - 14, "left");
   const x = (x0 + x1) / 2;
   P.charge(x, y, 1, 9);
-  P.arrow(x, y + 10, x, y + 52);
-  P.text("qE", x + 8, y + 44, "left");
-  P.arrow(x, y - 10, x, y - 52);
-  P.text("qvB", x + 8, y - 44, "left");
-  P.arrow(40, y - 18, 90, y - 18, "vector-velocity");
-  P.tag("v", 64, y - 38);
-  P.tag("E", x1 + 14, top + 14, "left");
-  P.tag("B", x1 + 14, bottom - 14, "left");
-  P.text("B into the screen", x1 + 14, bottom - 38, "left");
+  P.arrow(x + 11, y, x + 60, y, "vector-velocity");
+  P.tag("v", x + 44, y - 16);
+  P.arrow(x, y + 10, x, y + 48);
+  P.text("qE", x - 8, y + 40, "right");
+  P.arrow(x, y - 10, x, y - 48);
+  P.text("qvB", x - 8, y - 40, "right");
+  P.tag("E", x0 - 8, top + 14, "right");
+  P.tag("B", x0 - 8, bottom - 14, "right");
+  P.text("B into the screen", x0 - 8, bottom - 38, "right");
 }
 
 // A mass spectrometer: accelerated through V, then bent through half a
