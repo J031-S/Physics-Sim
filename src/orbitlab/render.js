@@ -32,6 +32,7 @@ export const ORBIT_COLOURS = {
   force: "vector-force",
   kinetic: "energy-kinetic",
   potential: "energy-gravitational",
+  equipotential: "field-equipotential",
   axis: "canvas-grid-major",
 };
 const SATELLITE_COLOURS = [
@@ -51,6 +52,14 @@ export function orbitPalette(dark) {
     // One colour per satellite, in launch order: the site's data colours.
     satellites: SATELLITE_COLOURS.map((name) => color(name, dark)),
   };
+}
+
+// A "#rgb" or "#rrggbb" colour at opacity `a`.
+function withAlpha(hex, a) {
+  let h = hex.slice(1, 7);
+  if (h.length === 3) h = h.replace(/./g, (d) => d + d);
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, a))})`;
 }
 
 // Round step (1, 2 or 5 × 10ⁿ) giving about `count` intervals over `range`.
@@ -185,6 +194,47 @@ export function createOrbitRenderer(ctx, view) {
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillText(joined(distance(length, 3)), x + w / 2, y + 4);
+  }
+
+  // The gravitational potential V = −GM/r round the body: shading that is
+  // deepest at the surface and fades as V rises towards zero far away, and
+  // equipotential circles at equal steps of V. With ten steps from the
+  // surface value to zero, the circles fall at r = R / (1 − k/10).
+  function drawPotential(c) {
+    const [x, y] = screen(0, 0),
+      R = lab.body.radius * view.scale,
+      far = Math.hypot(view.width, view.height);
+    if (!(R > 0)) return;
+    const shade = ctx.createRadialGradient(x, y, R, x, y, Math.max(R + 1, far));
+    // |V| ∝ 1/r: sample the falloff at a few radii.
+    for (const t of [0, 0.05, 0.12, 0.25, 0.5, 1]) {
+      const r = R + t * (far - R);
+      shade.addColorStop(t, withAlpha(c.equipotential, 0.32 * (R / r)));
+    }
+    ctx.fillStyle = shade;
+    ctx.fillRect(0, 0, view.width, view.height);
+    ctx.strokeStyle = c.equipotential;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    for (let k = 1; k < 10; k++) {
+      const r = R / (1 - k / 10);
+      if (r > far + Math.hypot(x, y)) break;
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    if (state.show.labels) {
+      const step = (lab.mu / lab.body.radius) / 10;
+      label(
+        `equipotentials every ${joined(prefixed(step, "J/kg", 3))}`,
+        view.width - 120,
+        view.height - 14,
+        c,
+      );
+    }
   }
 
   function drawBody(c) {
@@ -398,6 +448,7 @@ export function createOrbitRenderer(ctx, view) {
     ctx.setLineDash([]);
     ctx.lineJoin = "round";
     if (options.grid) drawGrid(c);
+    if (state.show.potential) drawPotential(c);
     drawBody(c);
     for (const s of lab.list()) {
       const colour = c.satellites[s.colour];

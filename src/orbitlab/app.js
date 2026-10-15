@@ -62,6 +62,7 @@ const state = {
     prediction: true,
     trails: true,
     areas: false,
+    potential: false,
     labels: true,
   },
 };
@@ -1506,6 +1507,7 @@ document.addEventListener("keydown", (e) => {
   else if (key === "p") toggleShow("show-prediction");
   else if (key === "t") toggleShow("show-trails");
   else if (key === "k") toggleShow("show-areas");
+  else if (key === "e") toggleShow("show-potential");
   else if (key === "a") toggleShow("auto-fit");
   else if (key === "?") togglePanel("keys-panel");
 });
@@ -1516,6 +1518,7 @@ for (const [id, key] of [
   ["show-prediction", "prediction"],
   ["show-trails", "trails"],
   ["show-areas", "areas"],
+  ["show-potential", "potential"],
   ["show-labels", "labels"],
 ])
   $(id).addEventListener("change", (e) => {
