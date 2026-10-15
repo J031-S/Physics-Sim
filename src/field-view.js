@@ -155,8 +155,11 @@ export function drawFields(
     ctx.fillStyle = ctx.strokeStyle;
     ctx.lineWidth = 1.1;
     if (f.strength && f.type === "electric" && f.direction === "parallel") {
+      // Lines sit half a spacing either side of the region's centre line, so
+      // that a body moving along the middle of a region (and its trail and
+      // arrows) is never hidden under a field line.
       for (
-        let y = Math.ceil(top / spacing) * spacing;
+        let y = (Math.ceil(top / spacing - 0.5) + 0.5) * spacing;
         y <= bottom;
         y += spacing
       ) {
@@ -207,10 +210,11 @@ export function drawFields(
         }
       }
     } else if (f.strength) {
-      for (let i = Math.ceil(left / spacing); i * spacing <= right; i++)
-        for (let j = Math.ceil(top / spacing); j * spacing <= bottom; j++) {
-          const x = i * spacing,
-            y = j * spacing,
+      // The markers sit off the centre lines too (see above).
+      for (let i = Math.ceil(left / spacing - 0.5); (i + 0.5) * spacing <= right; i++)
+        for (let j = Math.ceil(top / spacing - 0.5); (j + 0.5) * spacing <= bottom; j++) {
+          const x = (i + 0.5) * spacing,
+            y = (j + 0.5) * spacing,
             sample = fields.sample(f, toWorld(x, y));
           // Every grid point keeps its marker; opacity and size follow the
           // local strength, so weaker field fades out evenly.
