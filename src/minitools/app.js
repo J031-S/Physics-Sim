@@ -8,6 +8,7 @@ import { renderMath, renderAllMath } from "../site/math.js";
 import { onSchemeChange } from "../site/dev-hooks.js";
 import { renderIcons } from "../site/icons.js";
 import { rearrangement, toolById } from "./catalogue.js";
+import { allowedRange } from "./ranges.js";
 import { reviewBadges, toolUrl } from "./card.js";
 import {
   fieldText,
@@ -98,8 +99,8 @@ function build() {
     const given = Number(query.get(v.key));
     if (query.has(v.key) && Number.isFinite(given))
       state.values[v.key] = v.step
-        ? Math.round(Math.min(v.max, Math.max(v.min, given)) / v.step) * v.step
-        : Math.min(v.max, Math.max(v.min, given));
+        ? Math.round(given / v.step) * v.step
+        : given;
   }
   // Every quantity's value, the unknown worked out from the others.
   const values = () => {
@@ -126,6 +127,11 @@ function build() {
       <div class="mt-columns">
         <section class="mt-left" aria-label="Equation and values">
           <div class="mt-equation" aria-label="The equation"></div>
+          <section class="mt-general" aria-labelledby="general-title" hidden>
+            <h2 id="general-title">For any number of resistors</h2>
+            <div class="mt-general-math"></div>
+            <p></p>
+          </section>
           <div class="mt-solve">
             <span id="solve-label">Solve for</span>
             <div class="mt-solve-buttons" role="group" aria-labelledby="solve-label"></div>
@@ -185,6 +191,12 @@ function build() {
     q(".mt-note").textContent = tool.note;
   }
   renderMath(q(".mt-equation"), tool.latex, { display: true });
+  if (tool.general) {
+    q(".mt-general").hidden = false;
+    q("#general-title").textContent = tool.general.title;
+    renderMath(q(".mt-general-math"), tool.general.latex, { display: true });
+    say(q(".mt-general p"), tool.general.say);
+  }
   if (tool.constants.length)
     renderMath(
       q(".mt-constants"),
@@ -211,6 +223,7 @@ function build() {
   }
 
   // One row per known quantity.
+  let held = null;
   const rows = q(".mt-rows"),
     controls = new Map();
   for (const v of tool.variables) {
@@ -228,28 +241,36 @@ function build() {
       "aria-label",
       `${v.name}${v.unit ? ` in ${v.unit}` : ""}`,
     );
-    field.min = v.min;
-    field.max = v.max;
-    const log = v.scale === "log" && v.min > 0;
-    const toSlider = (x) =>
-      Math.round(
-        1000 *
-          (log
-            ? Math.log(x / v.min) / Math.log(v.max / v.min)
-            : (x - v.min) / (v.max - v.min)),
-      );
+    // The slider covers only `range`, the values that work (ranges.js);
+    // the number field takes any value.
+    const control = { row, slider, field, range: [v.min, v.max] };
+    const logOf = ([lo, hi]) => v.scale === "log" && lo > 0 && hi > lo;
+    const toSlider = (x) => {
+      const [lo, hi] = control.range;
+      if (!(hi > lo)) return 500;
+      const t = logOf(control.range)
+        ? Math.log(x / lo) / Math.log(hi / lo)
+        : (x - lo) / (hi - lo);
+      return Math.round(1000 * Math.min(1, Math.max(0, t || 0)));
+    };
+    control.toSlider = toSlider;
     // A quantity that only makes sense in whole steps (a number of turns,
     // a harmonic) is rounded to them.
-    const whole = (x) =>
-      v.step
-        ? Math.min(v.max, Math.max(v.min, Math.round(x / v.step) * v.step))
-        : x;
-    const fromSlider = (n) =>
-      whole(
-        log
-          ? Number((v.min * (v.max / v.min) ** (n / 1000)).toPrecision(3))
-          : Number((v.min + ((v.max - v.min) * n) / 1000).toPrecision(4)),
+    const whole = (x) => (v.step ? Math.round(x / v.step) * v.step : x);
+    const fromSlider = (n) => {
+      const [lo, hi] = control.range;
+      return whole(
+        logOf(control.range)
+          ? Number((lo * (hi / lo) ** (n / 1000)).toPrecision(3))
+          : Number((lo + ((hi - lo) * n) / 1000).toPrecision(4)),
       );
+    };
+    // A slider being dragged keeps its range until it is let go.
+    slider.addEventListener("pointerdown", () => (held = slider));
+    slider.addEventListener("pointerup", () => {
+      held = null;
+      refitRanges();
+    });
     slider.addEventListener("input", () => {
       state.values[v.key] = fromSlider(Number(slider.value));
       changed(false, slider);
@@ -260,10 +281,10 @@ function build() {
         field.value = fieldText(state.values[v.key]);
         return;
       }
-      state.values[v.key] = whole(Math.min(v.max, Math.max(v.min, x)));
+      state.values[v.key] = whole(x);
       changed(false);
     });
-    controls.set(v.key, { row, slider, field, toSlider });
+    controls.set(v.key, control);
     rows.append(row);
   }
 
@@ -364,7 +385,10 @@ function build() {
           simAlive = alive;
           showMeasured();
         },
-      }).then((s) => (sim = s)),
+      }).then((s) => {
+        sim = s;
+        refitRanges();
+      }),
     );
   else {
     simBox.innerHTML = `<p class="mt-wants"></p>`;
@@ -402,7 +426,31 @@ function build() {
   // ---------------------------------------------------------------- updates
 
   let rebuildTimer = null,
-    urlTimer = null;
+    urlTimer = null,
+    rangeTimer = null,
+    rangeRun = 0;
+  // Works out again which values each slider may cover (ranges.js), one
+  // quantity at a time so that the page stays responsive.
+  function refitRanges() {
+    const run = ++rangeRun,
+      all = values(),
+      works = sim?.works ?? (() => true),
+      keys = tool.variables
+        .map((v) => v.key)
+        .filter((k) => k !== state.unknown);
+    const next = () => {
+      if (run !== rangeRun || !keys.length) return;
+      const key = keys.shift(),
+        c = controls.get(key),
+        range = allowedRange(tool, all, state.unknown, key, works);
+      if (range && held !== c.slider) {
+        c.range = range;
+        c.slider.value = c.toSlider(state.values[key]);
+      }
+      setTimeout(next, 0);
+    };
+    next();
+  }
   function changed(structure, source) {
     const all = values();
     // Buttons and rows.
@@ -457,6 +505,8 @@ function build() {
     if (caution) q(".mt-caution").textContent = caution;
     showMeasured();
     drawPictures();
+    clearTimeout(rangeTimer);
+    rangeTimer = setTimeout(refitRanges, structure ? 0 : 200);
     // The simulation is rebuilt for the new values, a little after the
     // last slider movement.
     clearTimeout(rebuildTimer);
