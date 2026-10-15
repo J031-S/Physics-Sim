@@ -1131,16 +1131,19 @@ export class Sandbox {
         b = o.body;
       o.before = s;
       if (!o.lockPosition) {
-        this.fields.advance(o, s, DT);
-        this.applyForce(o.id, s, { x: 0, y: -this.settings.gravity * o.mass });
+        // Damping first, so that it acts on the velocity the body arrived
+        // with and not on this step's electric push: every force (gravity,
+        // springs, fields) then gets the same treatment, and a damped charge
+        // comes to rest where qE balances the other forces.
+        const fade = Math.exp(
+          -(o.linearDamping + this.settings.airResistance) * DT,
+        );
         Body.setVelocity(b, {
-          x:
-            b.velocity.x *
-            Math.exp(-(o.linearDamping + this.settings.airResistance) * DT),
-          y:
-            b.velocity.y *
-            Math.exp(-(o.linearDamping + this.settings.airResistance) * DT),
+          x: b.velocity.x * fade,
+          y: b.velocity.y * fade,
         });
+        this.fields.advance(o, fade === 1 ? s : this.state(o.id), DT);
+        this.applyForce(o.id, s, { x: 0, y: -this.settings.gravity * o.mass });
       }
       if (!o.lockRotation)
         Body.setAngularVelocity(

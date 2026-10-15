@@ -160,7 +160,7 @@ These exist on `Sandbox` and are covered by tests; the UI should call them rathe
 
 ## Order of operations in `step()`
 
-Per body: Lorentz velocity update → gravity force → exponential damping. Then Coulomb pairs, spring forces, grab/lock/resize holds, `mechanisms.beforeStep()`, `solveRestingContacts` (bodies already touching have their pending acceleration constrained before positions move), `solveRods` (an impulse along each rod's start-of-step direction so its length is exact after positions advance; time-symmetric, so pendulums keep their energy), `Engine.update` (whose velocity resolver is ours, handling new impacts), locks again, spring guides (6 passes), `mechanisms.afterStep()` (belts, conveyor contacts, cables). Changing this order changes results; re-run the numerical tests if you touch it.
+Per body: exponential damping → Lorentz velocity update → gravity force (damping first, so it never weakens the field's push within a step). Then Coulomb pairs, spring forces, grab/lock/resize holds, `mechanisms.beforeStep()`, `solveRestingContacts` (bodies already touching have their pending acceleration constrained before positions move), `solveRods` (an impulse along each rod's start-of-step direction so its length is exact after positions advance; time-symmetric, so pendulums keep their energy), `Engine.update` (whose velocity resolver is ours, handling new impacts), locks again, spring guides (6 passes), `mechanisms.afterStep()` (belts, conveyor contacts, cables). Changing this order changes results; re-run the numerical tests if you touch it.
 
 ## Fields tool (`src/fieldlab/`)
 

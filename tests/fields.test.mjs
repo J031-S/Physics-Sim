@@ -298,3 +298,34 @@ test("a charge crossing a field region is deflected by qEL²/2mu²", () => {
     );
   }
 });
+
+test("damping does not weaken an electric force: a damped charge on a spring rests at kx = qE", () => {
+  // The same balance as a damped weight on a spring (kx = mg). The field's
+  // push must not be damped away within the step that it is given.
+  for (const [where, setup] of [
+    ["global field", (s) => s.updateSettings({ electricX: 10 })],
+    [
+      "field region",
+      (s) =>
+        regionOf(s, "electric", {
+          x: 3,
+          y: 20,
+          width: 6,
+          height: 4,
+          strength: 10,
+        }),
+    ],
+  ]) {
+    const s = make();
+    setup(s);
+    const id = s.add("ball", { x: 1, y: 20 });
+    s.updateConstants(id, { charge: 1, mass: 1, linearDamping: 9 });
+    s.setPose(id, { x: 1, y: 20 });
+    const spring = s.connect("spring", null, id, { x: 0, y: 20 }, null);
+    s.updateLink(spring, { k: 20, damping: 0 });
+    run(s, 6);
+    // Expected extension qE/k = 10/20 = 0.5 m beyond the 1 m natural length.
+    near(s.state(id).x - 1, 0.5, 1e-6);
+    s.dispose();
+  }
+});
