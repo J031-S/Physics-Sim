@@ -329,3 +329,26 @@ test("damping does not weaken an electric force: a damped charge on a spring res
     s.dispose();
   }
 });
+
+test("a field region turned through a right angle pushes exactly along its direction", () => {
+  // cos 90° in floating point is 6e-17, which gave a charge held by an
+  // upward field a sideways push of about 1e-16 N.
+  for (const [angle, ux, uy] of [
+    [90, 0, 1],
+    [180, -1, 0],
+    [-90, 0, -1],
+    [270, 0, -1],
+  ]) {
+    const s = make();
+    regionOf(s, "electric", { x: 0, y: 20, width: 4, height: 4, angle, strength: 5 });
+    const id = charge(s, { x: 0, y: 20 });
+    run(s, 0.5);
+    // Across the field: exactly nothing. Along it: qEt/m = 2.5 m/s.
+    const v = s.state(id);
+    if (ux === 0) assert.equal(Math.abs(v.vx), 0);
+    else near(v.vx, ux * 2.5, 1e-9);
+    if (uy === 0) assert.equal(Math.abs(v.vy), 0);
+    else near(v.vy, uy * 2.5, 1e-9);
+    s.dispose();
+  }
+});

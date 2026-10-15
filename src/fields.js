@@ -1,4 +1,21 @@
 // Uniform, prescribed 2D field regions. SI units: E in N/C, Bz in tesla.
+// [cos, sin] of an angle in degrees, exact at whole right angles: in floating
+// point cos 90° is 6e-17, which would give a field pointing straight up a
+// tiny sideways part.
+function turn(degrees) {
+  if (degrees % 90 === 0) {
+    const k = (((degrees / 90) % 4) + 4) % 4;
+    return [
+      [1, 0],
+      [0, 1],
+      [-1, 0],
+      [0, -1],
+    ][k];
+  }
+  const a = (degrees * Math.PI) / 180;
+  return [Math.cos(a), Math.sin(a)];
+}
+
 export class Fields {
   constructor(sim) {
     this.sim = sim;
@@ -81,9 +98,7 @@ export class Fields {
     if (f.shape === "circle") f.width = f.height;
   }
   local(f, p) {
-    const a = (f.angle * Math.PI) / 180,
-      c = Math.cos(a),
-      s = Math.sin(a),
+    const [c, s] = turn(f.angle),
       dx = p.x - f.x,
       dy = p.y - f.y;
     return { x: dx * c + dy * s, y: -dx * s + dy * c };
@@ -126,8 +141,7 @@ export class Fields {
     if (!this.contains(f, p)) return { ex: 0, ey: 0, bz: 0, strength: 0 };
     const strength = f.strength * this.profile(f, p);
     if (f.type === "magnetic") return { ex: 0, ey: 0, bz: strength, strength };
-    let nx = Math.cos((f.angle * Math.PI) / 180),
-      ny = Math.sin((f.angle * Math.PI) / 180);
+    let [nx, ny] = turn(f.angle);
     if (f.direction === "radial") {
       const dx = p.x - f.x - f.gradientX,
         dy = p.y - f.y - f.gradientY,
