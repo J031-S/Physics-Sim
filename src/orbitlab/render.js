@@ -230,8 +230,9 @@ export function createOrbitRenderer(ctx, view) {
       const step = (lab.mu / lab.body.radius) / 10;
       label(
         `equipotentials every ${joined(prefixed(step, "J/kg", 3))}`,
-        view.width - 120,
-        view.height - 14,
+        // Above the scale bar, clear of the clock in the corner.
+        view.width / 2,
+        view.height - 46,
         c,
       );
     }
