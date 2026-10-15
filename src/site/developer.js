@@ -329,7 +329,11 @@ export function schemeOptions(select) {
     option("Default (theme.js)", ""),
     group(
       "Built-in schemes",
-      PRESETS.map((p) => option(p.name, BUILTIN + p.name)),
+      PRESETS.map((p) => {
+        const o = option(p.name, BUILTIN + p.name);
+        o.title = p.description;
+        return o;
+      }),
     ),
     ...(names.length
       ? [group("Your saved schemes", names.map((n) => option(n, n)))]

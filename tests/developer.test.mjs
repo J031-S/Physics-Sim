@@ -182,10 +182,14 @@ test("built-in schemes are valid and readable in both themes", async () => {
     const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
     return (x + 0.05) / (y + 0.05);
   };
-  assert.ok(PRESETS.length >= 8);
+  const { CUSTOM_CSS } = await import("../src/site/theme.js");
+  assert.ok(PRESETS.length >= 20);
   assert.equal(new Set(PRESETS.map((p) => p.name)).size, PRESETS.length);
   for (const preset of PRESETS) {
     const scheme = checkScheme(preset);
+    // Colours only: nothing else about the site changes.
+    assert.deepEqual(scheme.values, {}, `${preset.name} changes more than colour`);
+    assert.equal(scheme.css, CUSTOM_CSS, `${preset.name} adds CSS`);
     for (const mode of ["light", "dark"]) {
       const col = (name) =>
         (preset[mode][name] ??
