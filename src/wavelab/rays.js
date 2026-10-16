@@ -413,6 +413,9 @@ function intersect(s, o, d) {
   return null;
 }
 
+// The angle between a direction and a line (a normal, either way round),
+// from 0 to 90°.
+const angleBetween = (d, n) => Math.atan2(Math.abs(d.x * n.y - d.y * n.x), Math.abs(dot(d, n)));
 const reflect = (d, n) => {
   const k = 2 * dot(d, n);
   return { x: d.x - k * n.x, y: d.y - k * n.y };
@@ -898,8 +901,9 @@ export class RayLab {
         events.push({
           event: s.event,
           element: path[k - 1].element,
-          incidence: Math.acos(Math.min(1, Math.abs(dot(a, n)))),
-          leaving: Math.acos(Math.min(1, Math.abs(dot(b, n)))),
+          // atan2 rather than acos, which loses half its digits near 0°.
+          incidence: angleBetween(a, n),
+          leaving: angleBetween(b, n),
           n1: f.n1,
           n2: f.n2,
         });
@@ -909,7 +913,7 @@ export class RayLab {
       out.push({
         wavelength: first.wavelength,
         events,
-        deviation: Math.acos(Math.max(-1, Math.min(1, dot(a, b)))),
+        deviation: Math.atan2(Math.abs(a.x * b.y - a.y * b.x), dot(a, b)),
         stopped: path.at(-1).end === "absorb",
       });
     }

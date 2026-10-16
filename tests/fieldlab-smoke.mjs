@@ -97,6 +97,7 @@ assert.deepEqual(
     "sims/EMFields",
     "sims/Orbits",
     "sims/Circuits",
+    "sims/Waves",
     "minitools/",
   ].map((path) => new URL("../" + path, import.meta.url).href),
 );

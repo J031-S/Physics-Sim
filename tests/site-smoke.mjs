@@ -84,7 +84,7 @@ for (const page of shellPages) {
   const nav = links.map((a) => [a.getAttribute("href"), a.textContent]);
   referenceNav ??= nav;
   assert.deepEqual(nav, referenceNav, page.id + ": same navigation");
-  assert.equal(nav.length, 6, "home, the four simulations, the minitools");
+  assert.equal(nav.length, 7, "home, the five simulations, the minitools");
   for (const [href] of nav) assert.ok(!href.endsWith(".html"), href);
   const current = links.filter((a) => a.getAttribute("aria-current"));
   if (["home", "simulation", "minitools"].includes(page.group)) {

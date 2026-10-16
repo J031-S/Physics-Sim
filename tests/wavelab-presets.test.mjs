@@ -39,9 +39,16 @@ test("rays presets: angles", () => {
   lab = rays("critical");
   const t = lab.trace(),
     [r41, r43] = lab.list().filter((i) => i.kind === "ray").map((r) => lab.readings(t, r.id)[0]);
-  assert.equal(r41.events[0].event, "refract");
-  close(r41.events[0].leaving / deg, Math.asin(1.5 * Math.sin(41 * deg)) / deg, 1e-9, "79.8°");
-  assert.equal(r43.events[0].event, "tir");
+  // Into the curved face along a radius: no bending there.
+  close(r41.events[0].incidence + 1, 1, 1e-9, "radial entry");
+  assert.equal(r41.events[1].event, "refract");
+  close(r41.events[1].incidence / deg, 41, 1e-9, "41° at the flat face");
+  close(r41.events[1].leaving / deg, Math.asin(1.5 * Math.sin(41 * deg)) / deg, 1e-9, "79.8°");
+  assert.equal(r43.events[1].event, "tir");
+  close(r43.events[1].incidence / deg, 43, 1e-9, "43° at the flat face");
+  // And out again along a radius, undeviated by the curved face.
+  assert.equal(r43.events[2].event, "refract");
+  close(r43.events[2].incidence + 1, 1, 1e-9, "radial exit");
 
   lab = rays("prism-deviation");
   const [p] = lab.readings(lab.trace(), lab.list().find((i) => i.kind === "ray").id);

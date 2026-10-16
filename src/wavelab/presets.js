@@ -24,13 +24,18 @@ const rays = [
   {
     id: "critical",
     title: "Critical angle",
-    text: "Two rays inside glass (n = 1.50) meet its top face: one at 41°, one at 43°. The critical angle is sin⁻¹(1/1.50) = 41.81°.",
-    expect: "the 41° ray leaves (at sin⁻¹(1.50 sin 41°) = 79.8° to the normal) with a faint reflection; the 43° ray is totally reflected, with nothing leaving.",
-    view: { x: 0, y: -0.02, width: 0.4 },
+    text: "A semicircular glass block (n = 1.50; built as a lens with one flat face). Two rays aimed at the middle of its flat face cross the curved face along a radius, so they do not bend there. The critical angle is sin⁻¹(1/1.50) = 41.81°.",
+    expect: "the ray at 41° leaves the flat face at sin⁻¹(1.50 sin 41°) = 79.8° to the normal, with a faint reflection; the ray at 43° is totally reflected and nothing leaves.",
+    view: { x: 0, y: 0, width: 0.4 },
     build(lab) {
-      lab.add("block", { x: 0, y: -0.06, width: 0.36, height: 0.12, material: "fixed", index: 1.5 });
-      lab.add("ray", { x: -0.12, y: -0.1, angle: 90 * deg - 41 * deg });
-      lab.add("ray", { x: -0.08, y: -0.1, angle: 90 * deg - 43 * deg, wavelength: 620e-9 });
+      // Flat face at y = 0 (the axis points down, so the front face is on
+      // top), centre of curvature at the origin.
+      lab.add("lens", { x: 0, y: -0.05, angle: -90 * deg, R1: 0, R2: -0.1, thickness: 0.1, aperture: 0.19, material: "fixed", index: 1.5 });
+      for (const [a, wavelength] of [
+        [41, 550e-9],
+        [43, 620e-9],
+      ])
+        lab.add("ray", { x: -0.15 * Math.sin(a * deg), y: -0.15 * Math.cos(a * deg), angle: 90 * deg - a * deg, wavelength });
     },
     watch: "ray",
   },
@@ -252,10 +257,10 @@ const waves = [
     title: "Refraction at a boundary",
     text: "Plane waves at 30° to the normal pass into a region where the waves travel at half the speed (n = 2).",
     expect: "the wavelength halves and the waves turn towards the normal: sin θ₂ = sin 30° / 2, θ₂ = 14.5°.",
-    tank: { width: 24, height: 16, cell: 0.025 },
+    tank: { width: 18, height: 12, cell: 0.025 },
     build(lab) {
       lab.add("medium", { shape: "rect", x: 20, y: 0, width: 40, height: 40, index: 2 });
-      lab.add("line", { x: -5, y: -5 * Math.tan(30 * deg), angle: 30 * deg, length: 8 });
+      lab.add("line", { x: -4, y: -4 * Math.tan(30 * deg), angle: 30 * deg, length: 6 });
     },
     display: "wave",
   },
@@ -264,10 +269,10 @@ const waves = [
     title: "Total internal reflection",
     text: "Waves in a slow region (n = 2) meet the boundary with a fast one at 45°, beyond the critical angle sin⁻¹(1/2) = 30°.",
     expect: "nothing travels on into the fast region (only a disturbance that dies away within about a wavelength); the waves reflect at 45°.",
-    tank: { width: 24, height: 16, cell: 0.025 },
+    tank: { width: 18, height: 12, cell: 0.025 },
     build(lab) {
       lab.add("medium", { shape: "rect", x: -20, y: 0, width: 40, height: 40, index: 2 });
-      lab.add("line", { x: -5, y: -5, angle: 45 * deg, length: 6 });
+      lab.add("line", { x: -4, y: -4, angle: 45 * deg, length: 5 });
     },
     display: "wave",
   },
@@ -290,11 +295,11 @@ const waves = [
     title: "Doppler effect",
     text: "A source moving to the right at half the wave speed. The probes ahead and behind record what they receive.",
     expect: "ahead the wavelength is λ(1 − v/c) = λ/2 and the probe hears 2f; behind it is 1.5λ and the probe hears 2f/3.",
-    tank: { width: 32, height: 14, cell: 0.025 },
+    tank: { width: 26, height: 10, cell: 0.025 },
     build(lab) {
-      lab.add("moving", { x: -10, y: 0, angle: 0, speed: 0.5 });
+      lab.add("moving", { x: -8, y: 0, angle: 0, speed: 0.5 });
       lab.add("probe", { x: 4, y: 0 });
-      lab.add("probe", { x: -13, y: 0 });
+      lab.add("probe", { x: -11, y: 0 });
     },
     display: "wave",
   },
@@ -303,9 +308,9 @@ const waves = [
     title: "Shock cone",
     text: "A source moving at twice the wave speed outruns its own waves. (On a finer grid: the waves crowd together without limit at the cone.)",
     expect: "the waves pile up on a cone of half-angle sin⁻¹(c/v) = 30°.",
-    tank: { width: 40, height: 18, cell: 0.025 },
+    tank: { width: 34, height: 14, cell: 0.025 },
     build(lab) {
-      lab.add("moving", { x: -18, y: 0, angle: 0, speed: 2 });
+      lab.add("moving", { x: -16, y: 0, angle: 0, speed: 2 });
     },
     display: "wave",
   },
@@ -328,6 +333,7 @@ const waves = [
 const sound = [
   {
     id: "guitar",
+    warp: 0.002,
     title: "Guitar string",
     text: "A string 0.650 m long at a tension of 70.0 N, 1.00 g per metre, plucked a fifth of the way along.",
     expect: "v = √(T/μ) = 264.6 m/s and f₁ = v/2L = 203.5 Hz, with harmonics at whole multiples; plucked at L/5, the 5th, 10th, … are missing.",
@@ -335,6 +341,7 @@ const sound = [
   },
   {
     id: "open-pipe",
+    warp: 0.002,
     title: "Open pipe",
     text: "A pipe 0.500 m long, open at both ends, in air at 20 °C.",
     expect: `v = 331.3√(1 + 20/273.15) = 343.2 m/s; every harmonic, f = nv/2L: ${(speedOfSound(20) / 1).toFixed(1)} Hz, ${(2 * speedOfSound(20)).toFixed(1)} Hz, … (343 Hz at exactly 343 m/s).`,
@@ -342,6 +349,7 @@ const sound = [
   },
   {
     id: "closed-pipe",
+    warp: 0.002,
     title: "Closed pipe",
     text: "The same pipe closed at one end.",
     expect: `odd harmonics only, f = nv/4L: ${(speedOfSound(20) / 2).toFixed(1)} Hz, ${((3 * speedOfSound(20)) / 2).toFixed(1)} Hz, … (171.5 Hz at 343 m/s); a displacement node and pressure antinode at the closed end.`,
@@ -349,6 +357,7 @@ const sound = [
   },
   {
     id: "beats",
+    warp: 1,
     title: "Beats between tuning forks",
     text: "Two tuning forks of 440 Hz and 444 Hz sounding together.",
     expect: "the loudness rises and falls |f₁ − f₂| = 4 times a second (one beat every 0.25 s).",
@@ -356,6 +365,7 @@ const sound = [
   },
   {
     id: "decibels",
+    warp: 1,
     title: "Decibel ladder",
     text: "A point source of 10 mW. Drag the listener away and compare the level with the ladder from a whisper to a jet engine.",
     expect: "I = P/4πr² and β = 10 log₁₀(I/10⁻¹² W/m²): 89.0 dB at 1 m; twice as far is 6.02 dB quieter, ten times as far 20.0 dB quieter.",
@@ -363,6 +373,7 @@ const sound = [
   },
   {
     id: "approach",
+    warp: 0.25,
     title: "Approaching and receding source",
     text: "A 500 Hz source moving at 30 m/s straight towards, then away from, a listener, in air at 19.6 °C, where sound travels at 343.0 m/s.",
     expect: "f′ = f v/(v − v_s) = 547.9 Hz while it approaches and f v/(v + v_s) = 459.8 Hz once it has passed.",
@@ -370,6 +381,7 @@ const sound = [
   },
   {
     id: "ambulance",
+    warp: 0.25,
     title: "Ambulance passing",
     text: "A 700 Hz siren on an ambulance at 25 m/s passing 10 m from the listener, in air at 20 °C.",
     expect: "the pitch falls from 700 × 343.2/(343.2 − 25) = 755.0 Hz to 700 × 343.2/(343.2 + 25) = 652.5 Hz, fastest as it passes, and the level peaks then too.",

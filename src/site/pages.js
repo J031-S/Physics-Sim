@@ -47,6 +47,14 @@ export const pages = [
     group: "simulation",
   },
   {
+    id: "waves",
+    address: "sims/Waves",
+    file: "sims/Waves.html",
+    title: "Waves, light & sound",
+    description: "Rays and lenses, a ripple tank, strings and pipes",
+    group: "simulation",
+  },
+  {
     id: "minitools",
     address: "minitools/",
     file: "minitools/index.html",
