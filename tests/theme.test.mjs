@@ -16,6 +16,14 @@ const root = new URL("../", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
 const LITERAL = /#[0-9a-fA-F]{3,8}\b|rgba?\(|:\s*(white|black)\b/;
 
+test("the favicon is the header mark's colour (npm run tokens)", async () => {
+  const { logoFile } = await import("../src/site/tokens-file.js");
+  const svg = await read("assets/logo.svg");
+  assert.equal(svg, logoFile(svg));
+  assert.ok(svg.includes(color("accent-text", false)));
+  assert.ok(svg.includes(color("accent-text", true)));
+});
+
 test("styles/tokens.css is generated from theme.js (npm run tokens)", async () => {
   const { tokensFile } = await import("../src/site/tokens-file.js");
   assert.equal(await read("styles/tokens.css"), tokensFile());

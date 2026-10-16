@@ -23,3 +23,21 @@ export function tokensFile() {
     "\n"
   );
 }
+
+// assets/logo.svg with its favicon colours set to the header mark's
+// (`accent-text`, which the mark takes as a mask): the style block only
+// applies when the file is shown on its own, as the browser tab's icon, and
+// follows the browser's light or dark setting. Written by `npm run tokens`.
+export function logoFile(svg) {
+  const light = colourValue("accent-text", "light"),
+    dark = colourValue("accent-text", "dark");
+  return svg.replace(
+    /<style>[\s\S]*?<\/style>/,
+    `<style>
+    svg { color: ${light}; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: ${dark}; }
+    }
+  </style>`,
+  );
+}
