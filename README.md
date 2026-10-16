@@ -12,7 +12,7 @@ npm start
 
 Open http://localhost:3000. Running the app needs no package installation or build step. The bundled Matter.js 0.20.0 engine includes its MIT licence. Any ordinary static server also works; opening via `file://` does not.
 
-Physium opens on its **homepage** (`/`): what the site is for, a card for each simulation, a few featured minitools, a note on using it in class or at home, and links to the source on GitHub (beside the main button and in the footer). The drop-down at the left of the top bar goes to the homepage, to the four simulations and to the **minitools** (`/minitools/`): the **Mechanics sandbox** (`/sims/Mechanics`, described first below), **Electric & magnetic fields** (`/sims/EMFields`), **Orbits & gravitation** (`/sims/Orbits`) and **Electric circuits** (`/sims/Circuits`), each of the last three described in its own section. Addresses never end in `.html`; old addresses such as `fields.html` are redirected by the site's page-not-found page. The **Physium** mark at the top left always returns to the homepage. Website preferences (theme, GUI size, grid, angle unit) are in the **Website** section of every page's settings, are the same on every page, and are remembered in this browser.
+Physium opens on its **homepage** (`/`): what the site is for, a short section on its aim and how it works, a card for each simulation, every minitool in a row that scrolls sideways (featured ones first; the arrow buttons or the arrow keys move it along, and on a phone it is swiped), a note on using it in class or at home, and links to the source on GitHub (beside the main button and in the footer). The drop-down at the left of the top bar goes to the homepage, to the four simulations and to the **minitools** (`/minitools/`): the **Mechanics sandbox** (`/sims/Mechanics`, described first below), **Electric & magnetic fields** (`/sims/EMFields`), **Orbits & gravitation** (`/sims/Orbits`) and **Electric circuits** (`/sims/Circuits`), each of the last three described in its own section. Addresses never end in `.html`; old addresses such as `fields.html` are redirected by the site's page-not-found page. The **Physium** mark at the top left always returns to the homepage. Website preferences (theme, GUI size, grid, angle unit) are in the **Website** section of every page's settings, are the same on every page, and are remembered in this browser.
 
 ## Controls
 
@@ -103,7 +103,8 @@ Click **Settings** in the header to open the side panel. It is split into collap
 - **Air resistance:** 0–10 s⁻¹; an isotropic linear velocity and spin damping rate, added to each body's existing damping. Default 0. This is a simple linear drag model rather than a fluid simulation.
 
 - **Snapping (Z):** one persistent toggle for position and group translations (0.5 m), rotation (15°), dimensions (0.5 m), and Alt-refitted connection lengths (0.5 m). The active operation determines what is snapped; physical constraints and walls take priority when exact grid placement is impossible. Shift/Ctrl/Alt can be changed during a drag; Shift wins if Shift and Ctrl are held together. R chooses resizing and works with the snapping toggle, but Ctrl+R and Cmd+R retain browser reload.
-- **Scene boundary walls:** enables four nonselectable static colliders at the world-space scene bounds. New scenes start with walls at the initial visible edges. Panning, zooming and browser resizing do not move them. The ground remains at y = 0.
+- **Floor:** the ground at y = 0 (on by default). Turned off (here, or from the floor's right-click menu), bodies fall past y = 0 and keep going, and can be added and dragged below it; a faint dashed line marks where the floor was, which is still the zero of gravitational potential energy. Right-click empty space to turn it back on. Saved with the scene.
+- **Scene boundary walls:** enables four nonselectable static colliders at the world-space scene bounds. New scenes start with walls at the initial visible edges. Panning, zooming and browser resizing do not move them.
 
 Changes preserve the current scene, velocities and simulation time. **Restore defaults** resets just these settings. Clear scene restores all of these to their defaults (except snapping), as reloading the page does. Website preferences are stored separately and persist. Global electric X/Y fields (N/C) and magnetic Z field (T) each range from −100 to +100 and default to zero. Positive X points right, positive Y up, and positive magnetic Z out of the screen.
 
@@ -191,11 +192,11 @@ It holds two independent scenes, switched with **Electric / Magnetic** in the to
 
 Choose a source in the toolbar and click the scene to place it; the tool then returns to Grab, as in the mechanics sandbox, with the new source selected. With Grab (`G`), drag a source to move it, Ctrl-drag a plate or magnet to turn it, and click a source to edit its values and exact position in the panel at the bottom right. Arrow keys nudge the selected source; `Delete` removes it. Dragging empty space, or the Pan tool (`H`), moves the view; scroll to zoom. `Z` snaps positions to 0.25 m and angles to 15°. Up to 40 sources per scene.
 
-The **Display** panel chooses what is drawn:
+The toggles in the view bar at the bottom left choose what is drawn (hover for their names); the **Display** panel holds the equipotential step, the potential key and the line density:
 
 - **Field lines** (`L`), with arrows along the field. The arrows are arranged round the sources: on rings round a charge or wire where a line runs towards or away from it, and on evenly spaced spokes where a line runs round it (parallel to and square to the face of a plate or magnet). They stay on the same spot of their line when the view is moved.
 - **Field arrows** (`A`) on a grid. Length and opacity grow with the square root of the field strength relative to the strongest tenth on screen: a guide to strength, not a scale.
-- **Equipotentials** (electric scene only), thin green lines at equal steps of a round number of volts shown beside the tick box. The 0 V line is heavier. The scene behind them is shaded by potential: red where V is positive, blue where it is negative, and more opaque the larger |V| is. The opacity is proportional to |V| up to the value shown in the key ("full at ±…"), which is the largest potential outside the 3% of the screen closest to the charges; nearer than that the shading stays at full strength.
+- **Equipotentials** (electric scene only), thin green lines at equal steps of a round number of volts shown in the Display panel. The 0 V line is heavier. The scene behind them is shaded by potential: red where V is positive, blue where it is negative, and more opaque the larger |V| is. The opacity is proportional to |V| up to the value shown in the key ("full at ±…"), which is the largest potential outside the 3% of the screen closest to the charges; nearer than that the shading stays at full strength.
 - **Forces** (`F`): the force on each point charge (in newtons), or on each metre of each wire (N/m), from every other source and the background field. Arrow lengths are in proportion to each other.
 - **Values**: the labels on the sources.
 - **Line density**: half to twice the usual number of lines.
@@ -248,7 +249,9 @@ The **Launch** panel holds the values; each has a slider and a box to type in.
 | Launch speed                | Speed at launch                                                                                       | 0 to 30 000 km/s (a tenth of the speed of light) |
 | Launch angle                | Direction above the local horizontal: 0 is horizontal, 90° straight up, negative below the horizontal | −180° to 180°                                    |
 
-The launch point is at the top of the body, and "horizontal" there points to the right. On the scene, **drag the arrow** on the launch point to set speed and direction together (hold Shift to keep the direction), and **drag the launch point** up or down to change the altitude. The arrow is 64 px long at the circular orbit speed.
+The launch point starts at the top of the body, where "horizontal" points to the right. **Position round** moves it round the body (anticlockwise from the top, −180° to 180°), and everything about the launch turns with it: the launch angle is always measured from the local horizontal there. On the scene, **drag the arrow** on the launch point to set speed and direction together (hold Shift to keep the direction), and **drag the launch point** in or out to change the altitude. The arrow is 64 px long at the circular orbit speed.
+
+**Edit mode** (the **Edit** button, or `B`) stops the clock so that a set-up can be built on the scene: click anywhere outside the body to add a satellite there, moving at the circular orbit speed for that distance; drag a satellite to move it (it keeps its speed and its direction relative to the local horizontal); drag the round handle at the tip of its velocity arrow to aim it (Shift changes only the speed); drag the launch point anywhere round the body. `Delete` removes the selected satellite. Each change launches that satellite afresh from where it now is, keeping its number and colour. **Run** leaves Edit mode and starts the clock.
 
 Beside the speed are the two speeds to compare it with, both for the current distance from the centre: the **circular orbit speed** `√(GM/r)` and the **escape speed** `√(2GM/r)`. **Use** sets the launch speed to exactly that value. The line under them gives your speed as a multiple of each.
 
@@ -268,6 +271,8 @@ The strip at the top of the scene says what the launch will do, and the dashed l
 - **Trails** (`T`) draw the path taken; **Clear trails** (`C`) erases them. A closed orbit retraces itself exactly, so its trail is drawn for one turn.
 
 ### Display
+
+The display toggles are in the view bar at the bottom left (hover for their names); **Keep orbit in view** and **SI base units** stay in the Display panel.
 
 - **Velocity** (`V`) and **Gravity force** (`G`) arrows on each satellite. All velocity arrows share one scale, and so do all force arrows: 64 px for the circular orbit speed, and for the force, at the launch point's distance. A force arrow that would be longer than 190 px is shortened and marked so.
 - **Predicted orbit** (`P`): the conic worked out at launch, as a faint line. The trail then lies on top of it.
@@ -392,6 +397,8 @@ Click a component to see and change its values. The number box is in the unit sh
 
 ### Display
 
+These are toggles in the view bar at the bottom left (hover for their names); the Display panel keeps the potential colour key and says which way the dots run.
+
 - **Current** (`C`): bright dots, each ringed in the page colour so that it stands out from the wire on both themes, along every wire and lead that carries current. They are evenly spaced along each stretch of the circuit between one junction and the next, where the current is the same all the way along, and they fade in and out at the junctions themselves. Their speed is proportional to the current: at any moment the fastest dots are on the branch with the most current (three times the current, three times the speed), and as a capacitor charges they slow in step with it. The speed is scaled to the largest current seen since the last reset, so that milliamps and amps are both visible. The dots also follow the **time scale**: halve it and they move at half the speed, double it and they double, measured from the scale the preset (or saved file) set. At very high time scales the movement in one frame is held to under half the gap between dots, for every branch alike, so that the dots do not appear to freeze or run backwards.
 - **Electron flow** (`E`): the same dots moving the way the electrons do, from the − terminal round to the +. Readings and arrows stay conventional.
 - **Colour by potential** (`P`): each wire and lead is coloured from blue (lowest potential in the circuit) to red (highest). Everything joined by plain wire is one colour; the colour changes only across a component.
@@ -448,7 +455,17 @@ Each tool reads only its own files. A file saved from another tool is refused wi
 
 ## Right-click menu
 
-Right-click the **ground** (anywhere at or below y = 0 that is not an object) for the **Floor** menu: **Surface friction μ** and **Restitution e**, both 0–1 (defaults 0.5 and 0). The scene walls share the floor's material. Where two surfaces touch, the contact uses the lower friction and the higher restitution of the two, so a bouncy ball still bounces on a dead floor. The floor material is saved with the scene and reset by Clear scene.
+Right-click the **ground** (anywhere at or below y = 0 that is not an object) for the **Floor** menu: **Turn the floor off**, **Surface friction μ** and **Restitution e**, both 0–1 (defaults 0.5 and 0). The scene walls share the floor's material. Where two surfaces touch, the contact uses the lower friction and the higher restitution of the two, so a bouncy ball still bounces on a dead floor. The floor material is saved with the scene and reset by Clear scene.
+
+Above the constants, the menu of a body or field has **Copy**, **Duplicate**, **Paste** (once something has been copied) and **Delete**; right-clicking one of several selected things acts on the whole selection. Right-clicking empty space offers **Paste here**, and **Turn the floor on** when it is off.
+
+**Copy and paste.** Ctrl+C copies the selected bodies and fields, with every spring, rod, belt and pulley cable joining copied bodies (a link to something left behind is not copied). Ctrl+V pastes the copy centred on the pointer (snapped when snapping is on), or beside the last paste if the pointer is off the scene; Ctrl+D duplicates the selection just to its right without touching the copy. Pasted bodies keep their constants, locks and velocities, and a paste that would reach into the floor is lifted just clear of it. (⌘ instead of Ctrl on a Mac.)
+
+**Placing several.** Hold Ctrl (⌘) while clicking with a ball, block, wedge, spring, rod, belt, pulley or field tool and the tool stays chosen for the next one; let go of Ctrl to return to Grab.
+
+**Reflect.** The ↔ and ↕ buttons in the selected-item panel reflect the selection left to right or top to bottom, about the middle of it. Positions, angles, velocities and spins are mirrored, so the reflected scene moves as the mirror image of the original. A wedge becomes its mirror image (its width and height change places and it turns through 90°, which is the same triangle the other way round); a magnetic field changes sign, as a magnetic field does in a mirror. Reflection is refused, and nothing changes, for part of an assembly joined by rods or belts (select all of it), for a pulley, or if a body would end up in the floor.
+
+Field labels stay upright however the field is turned.
 
 For a ball, block or wedge, these constants are editable:
 

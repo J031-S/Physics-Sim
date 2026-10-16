@@ -3,7 +3,15 @@
 import { $, isDark, showToast } from "../site/dom.js";
 import { setupSite } from "../site/shell.js";
 import { styleCanvas } from "../site/canvas-style.js";
-import { FieldLab, KINDS, EPS0, MU0, TestCharges } from "./model.js";
+import {
+  FieldLab,
+  KINDS,
+  EPS0,
+  MU0,
+  TestCharges,
+  electricFieldLines,
+  magneticFieldLines,
+} from "./model.js";
 import {
   createFieldRenderer,
   fieldPalette,
@@ -546,11 +554,16 @@ function setMode(mode) {
   for (const b of document.querySelectorAll("[data-for]"))
     b.hidden = b.dataset.for !== mode;
   $("show-equipotentials-label").hidden = !electric;
+  $("equipotentials-toggle").hidden = !electric;
   lastFrame = 0;
   updateTests();
-  $("show-forces-text").textContent = electric
-    ? "Forces on charges"
-    : "Forces on wires";
+  // The forces toggle names what it shows in this field.
+  const forces = electric ? "Forces on charges" : "Forces on wires",
+    toggle = $("show-forces-label");
+  toggle.title = `${forces} (F)`;
+  toggle.querySelector("[data-icon]").dataset.iconLabel = forces;
+  const spoken = toggle.querySelector(".sr-only");
+  if (spoken) spoken.textContent = forces;
   $("probe-field-name").textContent = electric ? "E" : "B";
   for (const el of document.querySelectorAll(".probe-potential"))
     el.hidden = !electric;
@@ -1005,8 +1018,10 @@ function drawPresetPreviews() {
         document.querySelector(`[data-preset="${preset.id}"] .preset-preview`),
         preset,
       );
-    } catch {
-      // A preview is decoration; the preset itself reports its own errors.
+    } catch (e) {
+      // A preview is decoration and must not stop the panel opening, but a
+      // broken one is a bug: say so in the console.
+      console.error(`Preset preview "${preset.id}" failed:`, e);
     }
 }
 function drawPreview(el, preset) {
