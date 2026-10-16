@@ -400,6 +400,16 @@
             data-icon-label="Values"
             data-icon-only="true"
           ></span></label
+        ><label
+          class="icon-toggle"
+          data-for="sandbox"
+          hidden
+          title="Snapping (Z): positions to half a grid square, velocities to 15° and 0.05 of the circular speed"
+          ><input type="checkbox" id="snap-toggle" /><span
+            data-icon="snap"
+            data-icon-label="Snapping"
+            data-icon-only="true"
+          ></span></label
         >
       </div>
       <div class="status">
@@ -478,14 +488,6 @@
           Up and down change the launch speed by 1% of the circular speed; left
           and right turn the launch direction by 1°.
         </dd>
-        <dt>B</dt>
-        <dd>
-          Edit mode: the clock stops. Click outside the body to add a satellite
-          there at the circular speed; drag a satellite to move it; drag the
-          handle on its arrow to aim it (Shift keeps the direction); drag the
-          launch point anywhere round the body. Delete removes the selected
-          satellite. Run leaves Edit mode.
-        </dd>
         <dt>S</dt>
         <dd>
           Switch between Satellites and the Gravity sandbox. In the sandbox:
@@ -494,6 +496,12 @@
           selected body's arrow to set its velocity (Shift keeps the
           direction); Delete removes it; R puts the scene back as it was
           before Run.
+        </dd>
+        <dt>Z</dt>
+        <dd>
+          Gravity sandbox: toggle snapping. Positions snap to half a grid
+          square; velocities to 15° steps from the line to the body each one
+          goes round and to 0.05 of the circular speed.
         </dd>
         <dt>V · G · P · T · K · E</dt>
         <dd>

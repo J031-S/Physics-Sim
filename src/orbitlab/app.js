@@ -1614,6 +1614,10 @@ document.addEventListener("keydown", (e) => {
   if (e.repeat) return;
   // Keys for the satellites only.
   if (sandboxed() && ["l", "g", "k", "e"].includes(key)) return;
+  if (key === "z") {
+    if (sandboxed()) sandbox.setSnapping(!sandbox.snapping());
+    return;
+  }
   if (key === "l") launch();
 
   else if (key === "r") reset();

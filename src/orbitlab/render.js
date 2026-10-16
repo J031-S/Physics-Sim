@@ -141,10 +141,12 @@ export function createOrbitRenderer(ctx, view) {
     ctx.stroke();
   }
 
+  // The spacing of the grid lines, in metres, at the present zoom.
+  const gridStep = () => niceStep(90 / view.scale, 1);
   function drawGrid(c) {
     const lo = world(0, view.height),
       hi = world(view.width, 0),
-      step = niceStep(90 / view.scale, 1);
+      step = gridStep();
     ctx.lineWidth = 1;
     ctx.strokeStyle = c.gridMinor;
     const px = step * view.scale,
@@ -654,5 +656,6 @@ export function createOrbitRenderer(ctx, view) {
     drawSandbox,
     sandboxHandle,
     sandboxRadius,
+    gridStep,
   };
 }

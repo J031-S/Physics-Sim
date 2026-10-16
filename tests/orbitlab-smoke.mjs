@@ -488,8 +488,17 @@ pointer("pointerdown", [300, 300]);
 pointer("pointerup", [300, 300]);
 await frame();
 assert.equal(bodies(), 1);
+// Snapping (Z) belongs to the sandbox; the selected body is reported.
+assert.equal($("snap-toggle").checked, false);
+key("z");
+assert.equal($("snap-toggle").checked, true);
+key("z");
+assert.equal($("snap-toggle").checked, false);
+await frame();
+assert.ok(canvas.dataset.bodyHandle, "body handle reported");
 key("s");
 await frame();
 assert.equal($("launch-panel").hidden, false);
 assert.equal($("system-panel").hidden, true);
+assert.equal($("snap-toggle").closest("label").hidden, true);
 console.log("orbit lab smoke: ok");

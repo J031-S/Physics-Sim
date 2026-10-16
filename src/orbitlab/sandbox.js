@@ -34,6 +34,7 @@ export function createSandbox(page) {
   let selected = null,
     placing = null, // the kind being placed, while Place is armed
     keepPlacing = false,
+    snapping = false,
     ghost = null,
     drag = null,
     // The scene as it was when Run was first pressed after setting up, for
@@ -355,6 +356,17 @@ export function createSandbox(page) {
     });
     syncEditor();
     updatePanels();
+    // Where the selected body and its arrow's handle are, in canvas pixels,
+    // for tests/orbitlab-smoke.mjs (which cannot see the picture).
+    const chosen = lab.get(selected),
+      at = (x, y) => x.toFixed(1) + "," + y.toFixed(1);
+    canvas.dataset.bodyPoint = chosen
+      ? at(...renderer.screen(chosen.x, chosen.y))
+      : "";
+    if (chosen) {
+      const g = renderer.sandboxHandle(lab, chosen.id);
+      canvas.dataset.bodyHandle = at(g.tipX, g.tipY);
+    } else canvas.dataset.bodyHandle = "";
     for (const event of lab.events.splice(0))
       page.toast(`${event.from} hit ${lab.get(event.into)?.name ?? "another body"} and merged with it.`);
     if (lab.list().length !== buildList.count) {
@@ -379,6 +391,27 @@ export function createSandbox(page) {
     }
     return null;
   }
+  // Snapping: positions to half a grid square (the grid follows the zoom);
+  // velocities to 15° steps from the line to the body it goes round (so
+  // 90° is straight across it) and to 0.05 of the circular speed there.
+  const SNAP_ANGLE = Math.PI / 12,
+    SNAP_SPEED = 0.05;
+  function snapPoint(p) {
+    if (!snapping) return p;
+    const step = renderer.gridStep() / 2;
+    return {
+      x: Math.round(p.x / step) * step,
+      y: Math.round(p.y / step) * step,
+    };
+  }
+  function setSnapping(on) {
+    snapping = on;
+    $("snap-toggle").checked = on;
+  }
+  $("snap-toggle").addEventListener("change", (e) =>
+    setSnapping(e.target.checked),
+  );
+
   // Put a new body at world point p, moving on a circular orbit round the
   // body it would go round.
   function place(p, ctrl) {
@@ -409,7 +442,7 @@ export function createSandbox(page) {
     // Building the scene: the view stays put under the pointer.
     page.holdView();
     if (placing) {
-      place(p, e.ctrlKey || e.metaKey);
+      place(snapPoint(p), e.ctrlKey || e.metaKey);
       return true;
     }
     const hit = hitTest(sx, sy);
@@ -425,7 +458,8 @@ export function createSandbox(page) {
   function pointermove(e, sx, sy) {
     const p = renderer.world(sx, sy);
     if (!drag) {
-      if (placing) ghost = { ...p, mass: placing.mass, radius: placing.radius };
+      if (placing)
+        ghost = { ...snapPoint(p), mass: placing.mass, radius: placing.radius };
       else {
         const hit = hitTest(sx, sy);
         canvas.style.cursor = hit ? (hit.type === "aim" ? "pointer" : "move") : "";
@@ -440,7 +474,7 @@ export function createSandbox(page) {
     if (drag.type === "move") {
       // A move that would overlap another body is simply not made.
       try {
-        lab.update(b.id, { x: p.x + drag.dx, y: p.y + drag.dy });
+        lab.update(b.id, snapPoint({ x: p.x + drag.dx, y: p.y + drag.dy }));
         prediction = null;
       } catch {}
     } else {
@@ -451,15 +485,32 @@ export function createSandbox(page) {
         [x, y] = renderer.screen(b.x, b.y),
         dx = sx - x,
         dy = y - sy,
-        size = Math.min((Math.hypot(dx, dy) / ARROW) * frame.unit, LIMITS.speed / 2),
-        now = Math.hypot(frame.vx, frame.vy),
+        ref = frame.ref === null ? lab.centreOfMass() : lab.get(frame.ref),
+        now = Math.hypot(frame.vx, frame.vy);
+      let size = Math.min(
+          (Math.hypot(dx, dy) / ARROW) * frame.unit,
+          LIMITS.speed / 2,
+        ),
         [ux, uy] =
           e.shiftKey && now > 0
             ? [frame.vx / now, frame.vy / now]
             : Math.hypot(dx, dy) > 1
               ? [dx / Math.hypot(dx, dy), dy / Math.hypot(dx, dy)]
-              : [0, 0],
-        ref = frame.ref === null ? lab.centreOfMass() : lab.get(frame.ref);
+              : [0, 0];
+      if (snapping) {
+        if (frame.unit > 0)
+          size =
+            Math.round(size / frame.unit / SNAP_SPEED) *
+            SNAP_SPEED *
+            frame.unit;
+        // Measured from the outward line from the body it goes round.
+        const out =
+            frame.ref === null ? 0 : Math.atan2(b.y - ref.y, b.x - ref.x),
+          turn =
+            Math.round((Math.atan2(uy, ux) - out) / SNAP_ANGLE) * SNAP_ANGLE +
+            out;
+        if ((ux || uy) && !e.shiftKey) [ux, uy] = [Math.cos(turn), Math.sin(turn)];
+      }
       try {
         lab.update(b.id, {
           vx: ref.vx + ux * size,
@@ -534,6 +585,8 @@ export function createSandbox(page) {
     pointerup,
     keydown,
     keyup,
+    setSnapping,
+    snapping: () => snapping,
     running,
     reset,
     load,
