@@ -230,14 +230,18 @@ export function deflection(ctx, o) {
     hits = ratio > 1,
     // Where along the plates the path ends (1 is the far end).
     reach = hits ? Math.sqrt(1 / ratio) : 1,
-    // Positive charges move towards the negative (lower) plate; the sign of
-    // y says which way it is measured.
-    down = (q >= 0 ? 1 : -1) * (yv < 0 ? -1 : 1),
+    // y is measured downwards, from the top plate towards the bottom one
+    // (the direction of E when V is positive), and already carries the
+    // signs of q and V: a positive charge bends towards the − plate and a
+    // negative one towards the + plate. A negative V swaps the plates.
+    fieldDown = P.value("V", 1) >= 0,
+    down = yv < 0 ? -1 : 1,
     pts = [];
-  P.plate(x0, top, x1, top, 1);
-  P.plate(x0, bottom, x1, bottom, -1);
+  P.plate(x0, top, x1, top, fieldDown ? 1 : -1);
+  P.plate(x0, bottom, x1, bottom, fieldDown ? -1 : 1);
   for (let x = x0 + 20; x < x1; x += 40)
-    P.arrow(x, top + 8, x, bottom - 8, "field-electric", 1);
+    if (fieldDown) P.arrow(x, top + 8, x, bottom - 8, "field-electric", 1);
+    else P.arrow(x, bottom - 8, x, top + 8, "field-electric", 1);
   for (let i = 0; i <= 40; i++) {
     const t = (reach * i) / 40;
     pts.push([
