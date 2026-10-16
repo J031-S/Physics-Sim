@@ -277,8 +277,8 @@ test("17. Source at 2c: shock cone half-angle 30° within 1°", (t) => {
   const expected = Math.asin(1 / 2) / deg;
   // Near the cone the arriving crests are squeezed without limit, far
   // below 20 cells per wavelength, and short waves travel slower on the
-  // grid. At 20 cells per (unsqueezed) wavelength the cone measures about
-  // 28.5°; the shock-cone preset uses 40, as this check does.
+  // grid. At 20 cells per (unsqueezed) wavelength the cone measures 28.9°
+  // by this measure; the shock-cone preset uses 40, as this check does.
   const lab = new WaveLab({ width: 40, height: 18, cell: 0.025, speed: 1 });
   lab.add("moving", { x: -18, y: 0, angle: 0, speed: 2, frequency: 1, amplitude: 1 });
   lab.advance(14); // the source is at x = 10
