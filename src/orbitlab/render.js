@@ -511,24 +511,33 @@ export function createOrbitRenderer(ctx, view) {
   // Where a body's velocity arrow ends: its velocity relative to the body
   // it goes round, ARROW pixels at the circular orbit speed there
   // (GravityLab.velocityFrame).
-  function sandboxTip(lab, id) {
+  // A body's velocity arrow: its velocity in the frame of the scene, ARROW
+  // pixels for `unit` m/s (one scale for every body).
+  function sandboxTip(lab, id, unit) {
     const b = lab.get(id),
-      f = lab.velocityFrame(id),
       [x, y] = screen(b.x, b.y),
-      v = Math.hypot(f.vx, f.vy),
-      length = Math.min((ARROW * v) / f.unit, 400);
+      v = Math.hypot(b.vx, b.vy),
+      length = Math.min((ARROW * v) / unit, 400);
     return v > 0
-      ? { x, y, tipX: x + (f.vx / v) * length, tipY: y - (f.vy / v) * length }
-      : { x, y, tipX: x, tipY: y };
+      ? {
+          x,
+          y,
+          tipX: x + (b.vx / v) * length,
+          tipY: y - (b.vy / v) * length,
+          shortened: length < (ARROW * v) / unit,
+        }
+      : { x, y, tipX: x, tipY: y, shortened: false };
   }
-  // options: colours, grid, show (velocity, trails, labels, prediction),
-  // selected (a body id), prediction (points of the selected body's
+  // options: colours, grid, show (velocity, force, trails, labels,
+  // prediction), units ({ speed, force }: m/s and N drawn ARROW pixels
+  // long), selected (a body id), prediction (points of the selected body's
   // two-body orbit, in metres), ghost ({ x, y, radius, mass } of a body
-  // about to be placed), area, format (joined, distance, speedText).
+  // about to be placed), area, format (joined, distance, speedText,
+  // forceText).
   function drawSandbox(lab, options) {
     const c = options.colours,
       show = options.show;
-    ({ joined, distance } = options.format);
+    ({ joined, distance, speedText } = options.format);
     clearArea = () => options.area;
     ctx.setLineDash([]);
     ctx.lineJoin = "round";
@@ -596,24 +605,56 @@ export function createOrbitRenderer(ctx, view) {
       }
       if (show.labels) label(b.name, x, y + r + 11, c);
     }
+    // Net gravitational force on each body, from all the others.
+    if (show.force)
+      for (const b of lab.list()) {
+        const F = lab.force(b.id),
+          size = Math.hypot(F.x, F.y),
+          full = (ARROW * size) / options.units.force,
+          length = Math.min(full, 190);
+        if (length < 1) continue;
+        const [x, y] = screen(b.x, b.y),
+          ux = F.x / size,
+          uy = -F.y / size;
+        arrow(x, y, ux, uy, length, c.force, b.id === options.selected ? 2.4 : 1.6);
+        // Beside the middle of the arrow, clear of whatever it points at.
+        if (show.labels && b.id === options.selected)
+          label(
+            joined(options.format.forceText(size)) +
+              (full > length ? " (arrow shortened)" : ""),
+            x + (ux * length) / 2 + uy * 14,
+            y + (uy * length) / 2 - ux * 14,
+            c,
+          );
+      }
     if (show.velocity)
       for (const b of lab.list()) {
-        const g = sandboxTip(lab, b.id),
+        const g = sandboxTip(lab, b.id, options.units.speed),
           length = Math.hypot(g.tipX - g.x, g.tipY - g.y);
         if (length < 1) continue;
+        const ux = (g.tipX - g.x) / length,
+          uy = (g.tipY - g.y) / length;
         arrow(
           g.x,
           g.y,
-          (g.tipX - g.x) / length,
-          (g.tipY - g.y) / length,
+          ux,
+          uy,
           length,
           c.velocity,
           b.id === options.selected ? 2.4 : 1.6,
         );
+        if (show.labels && b.id === options.selected)
+          label(
+            joined(speedText(Math.hypot(b.vx, b.vy), 3)) +
+              (g.shortened ? " (arrow shortened)" : ""),
+            g.tipX + ux * 40,
+            g.tipY + uy * 40,
+            c,
+          );
       }
     // The handle that aims the selected body.
     if (chosen) {
-      const g = sandboxTip(lab, chosen.id);
+      const g = sandboxTip(lab, chosen.id, options.units.speed);
       ctx.beginPath();
       ctx.arc(g.tipX, g.tipY, 5.5, 0, TAU);
       ctx.fillStyle = c.panel;
@@ -634,8 +675,8 @@ export function createOrbitRenderer(ctx, view) {
     }
     drawScaleBar(c);
   }
-  function sandboxHandle(lab, id) {
-    return sandboxTip(lab, id);
+  function sandboxHandle(lab, id, unit) {
+    return sandboxTip(lab, id, unit);
   }
   // A body's drawn radius, for hit testing.
   const sandboxRadius = (b) => shownRadius(b);

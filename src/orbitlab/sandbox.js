@@ -5,7 +5,7 @@
 // in sandbox mode.
 import { GravityLab, LIMITS } from "./nbody.js";
 import { orbitPath } from "./model.js";
-import { ARROW } from "./render.js";
+import { ARROW, niceStep } from "./render.js";
 
 const km = 1e3,
   AU = 1.496e11,
@@ -40,7 +40,12 @@ export function createSandbox(page) {
     // The scene as it was when Run was first pressed after setting up, for
     // Reset.
     start = null,
-    prediction = null; // two-body orbit of the selected body, in metres
+    prediction = null, // two-body orbit of the selected body, in metres
+    // Every arrow is drawn in the frame of the scene, on one scale for the
+    // whole scene: ARROW pixels for `units.speed` (m/s) and `units.force`
+    // (N). The scales are kept while bodies are edited, so that changing one
+    // body never changes another's arrow; see rescale().
+    units = { speed: 0, force: 0 };
 
   // Distances: kilometres up to a hundredth of an AU, then AU.
   const distance = (m, sig = 4) =>
@@ -49,7 +54,12 @@ export function createSandbox(page) {
       : [f.num(m / km, sig), "km"];
   const speed = (v, sig = 4) => [f.num(v / km, sig), "km/s"];
   const mass = (m) => [f.num(m, 4), "kg"];
-  const format = { joined: f.joined, distance, speedText: speed };
+  const format = {
+    joined: f.joined,
+    distance,
+    speedText: speed,
+    forceText: (F) => f.prefixed(F, "N", 3),
+  };
 
   // ---------------------------------------------------------------- panels
 
@@ -88,6 +98,8 @@ export function createSandbox(page) {
     ["drift", "Total energy change"],
     ["momentum", "Total momentum"],
     ["angular", "Angular momentum"],
+    ["speed-scale", "Velocity arrows"],
+    ["force-scale", "Force arrows"],
   ]);
   rowsOf($("body-grid"), [
     ["mass", "Mass"],
@@ -167,7 +179,7 @@ export function createSandbox(page) {
     lab.clear();
     selected = null;
     start = null;
-    changed();
+    changed(true);
   });
 
   // The selected body's editor: name, mass and radius.
@@ -242,7 +254,37 @@ export function createSandbox(page) {
     buildList();
     syncEditor();
   }
-  function changed() {
+  // The arrow scales: the root mean square of each body's circular speed
+  // round the body it goes round, and of the forces on them. Set afresh for
+  // a new scene (fresh), otherwise only when the scene has changed so much
+  // that arrows on the old scale would be useless (a factor of 4).
+  const rms = (values) => {
+    const used = values.filter((v) => v > 0);
+    return used.length
+      ? Math.sqrt(used.reduce((t, v) => t + v * v, 0) / used.length)
+      : 0;
+  };
+  function rescale(fresh = false) {
+    const bodies = lab.list(),
+      speed =
+        bodies.length > 1
+          ? rms(bodies.map((b) => lab.velocityFrame(b.id).unit))
+          : 0,
+      force = rms(
+        bodies.map((b) => {
+          const F = lab.force(b.id);
+          return Math.hypot(F.x, F.y);
+        }),
+      ),
+      far = (now, then) => !then || now / then > 4 || then / now > 4;
+    if (fresh) units = { speed: 0, force: 0 };
+    if (speed > 0 && far(speed, units.speed)) units.speed = speed;
+    if (force > 0 && far(force, units.force)) units.force = force;
+  }
+  // Metres per second for ARROW pixels (1 km/s until there is a scale).
+  const speedUnit = () => units.speed || 1000;
+  function changed(fresh = false) {
+    rescale(fresh);
     prediction = null;
     buildList();
     syncEditor();
@@ -278,6 +320,14 @@ export function createSandbox(page) {
     ]);
     show("system-grid", "momentum", [f.num(Math.hypot(p.x, p.y), 3), "kg·m/s"]);
     show("system-grid", "angular", [f.num(Math.abs(lab.angularMomentum()), 4), "kg·m²/s"]);
+    // The arrow scales: what an arrow ARROW pixels long stands for.
+    const per = (pair) => [`${ARROW} px = ${f.joined(pair)}`, ""];
+    show("system-grid", "speed-scale", per(speed(speedUnit(), 3)));
+    show(
+      "system-grid",
+      "force-scale",
+      units.force ? per(f.prefixed(units.force, "N", 3)) : ["–", ""],
+    );
     const b = lab.get(selected);
     if (!b) return;
     const force = lab.force(b.id),
@@ -353,6 +403,7 @@ export function createSandbox(page) {
       prediction: prediction?.points ?? null,
       ghost,
       format,
+      units: { speed: speedUnit(), force: units.force || 1 },
     });
     syncEditor();
     updatePanels();
@@ -364,7 +415,7 @@ export function createSandbox(page) {
       ? at(...renderer.screen(chosen.x, chosen.y))
       : "";
     if (chosen) {
-      const g = renderer.sandboxHandle(lab, chosen.id);
+      const g = renderer.sandboxHandle(lab, chosen.id, speedUnit());
       canvas.dataset.bodyHandle = at(g.tipX, g.tipY);
     } else canvas.dataset.bodyHandle = "";
     for (const event of lab.events.splice(0))
@@ -380,7 +431,7 @@ export function createSandbox(page) {
   function hitTest(sx, sy) {
     const chosen = lab.get(selected);
     if (chosen) {
-      const g = renderer.sandboxHandle(lab, chosen.id);
+      const g = renderer.sandboxHandle(lab, chosen.id, speedUnit());
       if (Math.hypot(sx - g.tipX, sy - g.tipY) <= HANDLE)
         return { type: "aim", id: chosen.id };
     }
@@ -392,10 +443,9 @@ export function createSandbox(page) {
     return null;
   }
   // Snapping: positions to half a grid square (the grid follows the zoom);
-  // velocities to 15° steps from the line to the body it goes round (so
-  // 90° is straight across it) and to 0.05 of the circular speed there.
-  const SNAP_ANGLE = Math.PI / 12,
-    SNAP_SPEED = 0.05;
+  // velocities to 15° steps of direction and to a round step of speed,
+  // about a twentieth of the arrow scale.
+  const SNAP_ANGLE = Math.PI / 12;
   function snapPoint(p) {
     if (!snapping) return p;
     const step = renderer.gridStep() / 2;
@@ -416,7 +466,10 @@ export function createSandbox(page) {
   // body it would go round.
   function place(p, ctrl) {
     let id;
-    const count = lab.list().filter((b) => b.name.startsWith(placing.label)).length;
+    // The first number not already in use, so names never repeat.
+    let count = 0;
+    while (lab.list().some((b) => b.name === `${placing.label} ${count + 1}`))
+      count++;
     if (
       !page.attempt(
         () =>
@@ -478,44 +531,32 @@ export function createSandbox(page) {
         prediction = null;
       } catch {}
     } else {
-      // The arrow sets the velocity relative to the body it goes round, in
-      // units of the circular speed there (as it is drawn); Shift keeps the
-      // direction and changes only the speed.
-      const frame = lab.velocityFrame(b.id),
-        [x, y] = renderer.screen(b.x, b.y),
+      // The arrow is the body's velocity in the frame of the scene, ARROW
+      // pixels for the scene's speed unit; Shift keeps the direction and
+      // changes only the speed.
+      const [x, y] = renderer.screen(b.x, b.y),
         dx = sx - x,
         dy = y - sy,
-        ref = frame.ref === null ? lab.centreOfMass() : lab.get(frame.ref),
-        now = Math.hypot(frame.vx, frame.vy);
-      let size = Math.min(
-          (Math.hypot(dx, dy) / ARROW) * frame.unit,
-          LIMITS.speed / 2,
-        ),
+        drawn = Math.hypot(dx, dy),
+        now = Math.hypot(b.vx, b.vy);
+      let size = Math.min((drawn / ARROW) * speedUnit(), LIMITS.speed / 2),
         [ux, uy] =
           e.shiftKey && now > 0
-            ? [frame.vx / now, frame.vy / now]
-            : Math.hypot(dx, dy) > 1
-              ? [dx / Math.hypot(dx, dy), dy / Math.hypot(dx, dy)]
+            ? [b.vx / now, b.vy / now]
+            : drawn > 1
+              ? [dx / drawn, dy / drawn]
               : [0, 0];
       if (snapping) {
-        if (frame.unit > 0)
-          size =
-            Math.round(size / frame.unit / SNAP_SPEED) *
-            SNAP_SPEED *
-            frame.unit;
-        // Measured from the outward line from the body it goes round.
-        const out =
-            frame.ref === null ? 0 : Math.atan2(b.y - ref.y, b.x - ref.x),
-          turn =
-            Math.round((Math.atan2(uy, ux) - out) / SNAP_ANGLE) * SNAP_ANGLE +
-            out;
-        if ((ux || uy) && !e.shiftKey) [ux, uy] = [Math.cos(turn), Math.sin(turn)];
+        const step = niceStep(speedUnit() / 20, 1);
+        size = Math.round(size / step) * step;
+        if ((ux || uy) && !e.shiftKey) {
+          const turn =
+            Math.round(Math.atan2(uy, ux) / SNAP_ANGLE) * SNAP_ANGLE;
+          [ux, uy] = [Math.cos(turn), Math.sin(turn)];
+        }
       }
       try {
-        lab.update(b.id, {
-          vx: ref.vx + ux * size,
-          vy: ref.vy + uy * size,
-        });
+        lab.update(b.id, { vx: ux * size, vy: uy * size });
         prediction = null;
       } catch {}
     }
@@ -562,7 +603,7 @@ export function createSandbox(page) {
     lab.loadScene(data);
     start = null;
     selected = null;
-    changed();
+    changed(true);
   }
   function loadPreset(preset) {
     lab.clear();
@@ -571,7 +612,7 @@ export function createSandbox(page) {
     lab.time = 0;
     start = null;
     selected = null;
-    changed();
+    changed(true);
   }
 
   buildList();

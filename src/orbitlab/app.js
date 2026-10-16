@@ -809,7 +809,7 @@ function draw() {
     put($("tool-name"), "Gravity sandbox");
     put(
       $("tool-help"),
-      "Place bodies from the Bodies panel · drag one to move it · drag the handle on the selected body's arrow to set its velocity · arrows show velocity relative to the body each goes round, 64 px at the circular speed",
+      "Place bodies from the Bodies panel · drag one to move it · drag the handle on the selected body's arrow to set its velocity · every arrow is on one scale for the whole scene (see System)",
     );
     $("reset").disabled = !sandbox.canReset();
     return;
@@ -1613,7 +1613,7 @@ document.addEventListener("keydown", (e) => {
   if (key === "-") return zoomAt(view.width / 2, view.height / 2, 0.8);
   if (e.repeat) return;
   // Keys for the satellites only.
-  if (sandboxed() && ["l", "g", "k", "e"].includes(key)) return;
+  if (sandboxed() && ["l", "k", "e"].includes(key)) return;
   if (key === "z") {
     if (sandboxed()) sandbox.setSnapping(!sandbox.snapping());
     return;

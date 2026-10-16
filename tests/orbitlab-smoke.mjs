@@ -496,6 +496,13 @@ key("z");
 assert.equal($("snap-toggle").checked, false);
 await frame();
 assert.ok(canvas.dataset.bodyHandle, "body handle reported");
+// The force toggle works in the sandbox too, and the scales are shown.
+assert.equal($("show-force").closest("label").hidden, false);
+const forceWas = $("show-force").checked;
+key("g");
+assert.equal($("show-force").checked, !forceWas);
+key("g");
+assert.match(text("system-grid"), /Velocity arrows ?64 px =/);
 key("s");
 await frame();
 assert.equal($("launch-panel").hidden, false);
