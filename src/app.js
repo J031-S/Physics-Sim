@@ -2482,7 +2482,12 @@ function layoutOverlays() {
     energy = $("energy-panel"),
     edit = document.querySelector(".edit-tools").getBoundingClientRect(),
     bar = toolbar.getBoundingClientRect();
-  options.style.top = toolbar.offsetTop + toolbar.offsetHeight + 8 + "px";
+  // offsetTop includes the toolbar's top margin (a floating header gives
+  // every overlay one); the strip has the same margin of its own, so it is
+  // taken off here rather than counted twice.
+  const margin = parseFloat(getComputedStyle(options).marginTop) || 0;
+  options.style.top =
+    toolbar.offsetTop - margin + toolbar.offsetHeight + 8 + "px";
   if (!bar.width) return; // no layout (e.g. the DOM test)
   const left = edit.right - main.left + 8;
   let right = main.width - 8;
