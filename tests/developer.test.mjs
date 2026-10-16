@@ -24,8 +24,9 @@ import { canvasFont } from "../src/site/canvas-style.js";
 import { iconWeights } from "../src/site/icons.js";
 
 const root = new URL("../", import.meta.url);
+// The values the stylesheets are written for (`plain`, else the default).
 const defaults = Object.fromEntries(
-  [...SIZES, ...CHOICES].map((t) => [t.name, t.value]),
+  [...SIZES, ...CHOICES].map((t) => [t.name, t.plain ?? t.value]),
 );
 const colours = (name) => {
   const t = COLOURS.find((c) => c.name === name);
@@ -62,7 +63,7 @@ test("schemes are checked strictly and drop default values", () => {
   const ok = checkScheme({
     physiumScheme: 1,
     name: "Mine",
-    light: { ink: "#354438", line: "#ABCDEF" },
+    light: { ink: COLOURS.find((t) => t.name === "ink").light, line: "#ABCDEF" },
     dark: {},
     values: { "border-width": 1, "icon-weight": "bold" },
   });
@@ -96,7 +97,7 @@ test("every choice's default is one of its options", () => {
   );
 });
 
-test("the defaults add no CSS and leave canvas fonts alone", () => {
+test("the values the stylesheets are written for add no CSS, and canvas fonts are left alone", () => {
   assert.equal(css({}), "");
   setOverrides();
   assert.equal(

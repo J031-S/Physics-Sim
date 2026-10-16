@@ -1,12 +1,45 @@
-// The CSS that applies a developer scheme's size and choice tokens (shape,
-// surface, density, patterns, fonts, icons). No DOM: given the token values,
-// it returns text for a <style> element. A token at its theme.js default adds
-// nothing, so with no scheme the stylesheets are exactly as written; the
-// override rules use !important because each page's own rules are more
-// specific. Colours are applied separately (as custom properties).
+// The CSS that applies the size and choice tokens (shape, surface, density,
+// patterns, fonts, icons). No DOM: given the token values, it returns text
+// for a <style> element. The stylesheets are written for each token's
+// `plain` value (its `value` where there is no `plain`); a token at that
+// value adds nothing. The house style (every token's `value`) is applied
+// the same way, by rules that `npm run tokens` writes into tokens.css, and a
+// developer scheme replaces those with its own. The rules use !important
+// because each page's own rules are more specific. Colours are applied
+// separately (as custom properties).
 import { SIZES, CHOICES, FONTS } from "./theme.js";
 
-const defaults = new Map([...SIZES, ...CHOICES].map((t) => [t.name, t.value]));
+const defaults = new Map(
+  [...SIZES, ...CHOICES].map((t) => [t.name, t.plain ?? t.value]),
+);
+
+// Split a selector list at its top-level commas (not those inside :not()).
+function selectors(list) {
+  const out = [];
+  let depth = 0,
+    start = 0;
+  for (let i = 0; i < list.length; i++) {
+    if (list[i] === "(") depth++;
+    else if (list[i] === ")") depth--;
+    else if (list[i] === "," && depth === 0) {
+      out.push(list.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  out.push(list.slice(start).trim());
+  return out;
+}
+// Every selector in a list limited to pages without a developer scheme
+// (the html element of a page showing one has the class dev-scheme).
+function scoped(list) {
+  return selectors(list)
+    .map((s) =>
+      s.startsWith(":root")
+        ? ":root:not(.dev-scheme)" + s.slice(5)
+        : ":root:not(.dev-scheme) " + s,
+    )
+    .join(", ");
+}
 
 // Groups of elements that share a token.
 export const PARTS = {
@@ -112,10 +145,13 @@ export function fontFaces(ids, fontRoot) {
 
 // `get(name)` gives a token's value in the scheme; `colours(name)` gives
 // { light, dark } for a colour token. Returns the CSS text.
-export function surfaceCss(get, { colours, fontRoot }) {
+// With `scope`, every rule applies only while no developer scheme is shown:
+// that is how the house style is written into tokens.css.
+export function surfaceCss(get, { colours, fontRoot, scope = false }) {
   const changed = (name) => get(name) !== defaults.get(name);
   const rules = [];
-  const rule = (selector, body) => rules.push(`${selector} { ${body} }`);
+  const rule = (selector, body) =>
+    rules.push(`${scope ? scoped(selector) : selector} { ${body} }`);
   const imp = (decls) =>
     decls
       .filter(Boolean)

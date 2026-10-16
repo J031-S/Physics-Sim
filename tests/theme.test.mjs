@@ -17,7 +17,14 @@ const read = (path) => readFile(new URL(path, root), "utf8");
 const LITERAL = /#[0-9a-fA-F]{3,8}\b|rgba?\(|:\s*(white|black)\b/;
 
 test("styles/tokens.css is generated from theme.js (npm run tokens)", async () => {
-  assert.equal(await read("styles/tokens.css"), tokensCss());
+  const { tokensFile } = await import("../src/site/tokens-file.js");
+  assert.equal(await read("styles/tokens.css"), tokensFile());
+  // Every house-style rule stands aside while a developer scheme is shown.
+  const house = tokensFile().slice(tokensCss().length);
+  for (const line of house.split("\n").filter((l) => l.includes("{")))
+    if (!line.startsWith("@font-face"))
+      for (const selector of line.slice(0, line.indexOf("{")).split(/,(?![^(]*\))/))
+        assert.match(selector.trim(), /^:root:not\(\.dev-scheme\)/, line);
 });
 
 test("every colour token has a name, a known group, a description and two hex values", () => {
@@ -71,13 +78,14 @@ test("every var(--token) a stylesheet uses is defined", async () => {
 });
 
 test("color() follows the theme and developer overrides", () => {
-  assert.equal(color("ink", false), "#354438");
-  assert.equal(color("ink", true), "#ebe5d6");
+  const ink = COLOURS.find((t) => t.name === "ink");
+  assert.equal(color("ink", false), ink.light);
+  assert.equal(color("ink", true), ink.dark);
   setOverrides({ dark: { ink: "#ffffff" } });
   assert.equal(color("ink", true), "#ffffff");
-  assert.equal(color("ink", false), "#354438");
+  assert.equal(color("ink", false), ink.light);
   setOverrides();
-  assert.equal(color("ink", true), "#ebe5d6");
+  assert.equal(color("ink", true), ink.dark);
   assert.throws(() => color("no-such-token"));
 });
 
