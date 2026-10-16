@@ -6,6 +6,9 @@ export const FORMATS = {
   "physics-sim-orbits": "Orbits & gravitation",
   "physium-gravity": "Orbits & gravitation (gravity sandbox)",
   "physics-sim-circuit": "Electric circuits",
+  "physium-rays": "Waves, light & sound (Rays view)",
+  "physium-waves": "Waves, light & sound (Waves view)",
+  "physium-sound": "Waves, light & sound (Sound view)",
 };
 export const NOT_OURS = "This file is not a Physium scene.";
 export function checkFormat(data, format) {
