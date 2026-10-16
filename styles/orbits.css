@@ -308,3 +308,9 @@
     flex-basis: 100%;
   }
 }
+/* Edit mode: the Edit button stays lit while it is on. */
+#edit-toggle[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--ink);
+}

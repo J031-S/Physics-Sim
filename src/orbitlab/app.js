@@ -44,11 +44,16 @@ const aim = {
   radius: lab.body.radius + 400 * km,
   speed: circularSpeed(lab.mu, lab.body.radius + 400 * km),
   angle: 0,
+  // Where round the body the launch point is: anticlockwise from the top.
+  bearing: 0,
 };
 // Pixels per metre and the screen position of the body's centre.
 const view = { scale: 1e-5, x: 0, y: 0, width: 0, height: 0 };
 const state = {
   running: false,
+  // Edit mode: the clock stops, and satellites are added, moved and aimed
+  // on the scene itself.
+  editing: false,
   warp: 500,
   // Simulated seconds per real second actually achieved over recent frames.
   achieved: 0,
@@ -291,6 +296,7 @@ function reset() {
   fitted = false;
 }
 function setRunning(on) {
+  if (on && state.editing) setEditing(false);
   state.running = on;
   state.achieved = state.warp;
   last = 0;
@@ -572,6 +578,28 @@ function buildForms() {
     }),
     slide: (v) => setAim({ angle: wrapAngle(v * perUnit) }),
   });
+  addRow($("launch-form"), {
+    key: "bearing",
+    label: "Position round",
+    title:
+      "Where round the body the launch point is: 0 is straight above the centre, increasing anticlockwise. In Edit mode, drag the launch point to move it.",
+    unit: radians ? "rad" : "°",
+    read: () => tidy(aim.bearing / perUnit, 2),
+    write: (v) => {
+      if (!Number.isFinite(v) || Math.abs(v * perUnit) > Math.PI + 1e-9)
+        throw new Error(
+          `Position round must be between ${radians ? "−3.14 rad and 3.14 rad" : "−180° and 180°"}.`,
+        );
+      setAim({ bearing: wrapAngle(v * perUnit) });
+    },
+    slider: () => ({
+      min: radians ? -3.14 : -180,
+      max: radians ? 3.14 : 180,
+      step: radians ? 0.01 : 1,
+      value: aim.bearing / perUnit,
+    }),
+    slide: (v) => setAim({ bearing: wrapAngle(v * perUnit) }),
+  });
   syncForms();
 }
 
@@ -655,7 +683,7 @@ function sceneBox() {
       for (const [x, y] of path) if (x * x + y * y <= limit * limit) add(x, y);
     },
     p = preview();
-  add(0, aim.radius);
+  add(-aim.radius * Math.sin(aim.bearing), aim.radius * Math.cos(aim.bearing));
   // An escaping path is shown out to three launch radii before launch, and
   // then for as far as the satellite has gone.
   addPath(p.path, p.elements.bound ? Infinity : 3 * aim.radius);
@@ -744,7 +772,9 @@ function draw() {
   renderer.drawScene(lab, {
     colours: c,
     grid: prefs.grid,
-    show: state.show,
+    // Velocity arrows carry the handles that aim satellites in Edit mode.
+    show: state.editing ? { ...state.show, velocity: true } : state.show,
+    editing: state.editing,
     selected: state.selected,
     aim,
     preview: preview(),
@@ -1276,8 +1306,19 @@ function updatePanels(c) {
   const s = selected(),
     el = s ? s.elements : preview().elements,
     [heading, sentence] = describe(el, s);
-  put($("tool-name"), (s ? `Satellite ${s.id}: ` : "This launch: ") + heading);
-  put($("tool-help"), sentence);
+  put(
+    $("tool-name"),
+    (state.editing ? "Edit · " : "") +
+      (s ? `Satellite ${s.id}: ` : "This launch: ") +
+      heading,
+  );
+  put(
+    $("tool-help"),
+    state.editing
+      ? "Click outside the body to add a satellite there (at the circular speed) · drag a satellite to move it · drag the handle on its arrow to aim it (Shift: speed only) · Delete removes the selected one · Run to start. " +
+          sentence
+      : sentence,
+  );
   updateReadouts();
   drawGraphs(c);
   updateAreas();
@@ -1332,13 +1373,25 @@ function frame(now) {
 
 // ---------------------------------------------------------------- input
 
+// A satellite's handles while editing, in canvas pixels.
+const satelliteTip = (s) =>
+  renderer.satelliteHandle(
+    { model: lab, aim, preview: preview(), format: {} },
+    s,
+  );
 function hitTest(sx, sy) {
   const g = ghostGeometry();
+  if (state.editing)
+    for (const s of [...lab.list()].reverse()) {
+      if (s.status !== "flying") continue;
+      const [x, y] = satelliteTip(s);
+      if (Math.hypot(sx - x, sy - y) <= HANDLE) return { type: "satAim", id: s.id };
+    }
   if (Math.hypot(sx - g.tipX, sy - g.tipY) <= HANDLE) return { type: "aim" };
   for (const s of [...lab.list()].reverse()) {
     const [x, y] = screen(s.x, s.y);
     if (Math.hypot(sx - x, sy - y) <= SATELLITE + 6)
-      return { type: "satellite", id: s.id };
+      return { type: state.editing ? "satMove" : "satellite", id: s.id };
   }
   if (Math.hypot(sx - g.x, sy - g.y) <= SATELLITE + 6) return { type: "point" };
   return null;
@@ -1356,6 +1409,10 @@ canvas.addEventListener("pointerdown", (e) => {
     buildList();
     return;
   }
+  if (hit?.type === "satMove" || hit?.type === "satAim") {
+    state.selected = hit.id;
+    buildList();
+  }
   drag = hit ?? { type: "pan", sx, sy, x: view.x, y: view.y, moved: false };
   e.preventDefault();
   capture(e);
@@ -1365,10 +1422,14 @@ canvas.addEventListener("pointermove", (e) => {
   if (!drag) {
     const hit = hitTest(sx, sy);
     canvas.style.cursor = hit
-      ? hit.type === "point"
+      ? hit.type === "point" && !state.editing
         ? "ns-resize"
-        : "pointer"
-      : "";
+        : hit.type === "satMove" || hit.type === "point"
+          ? "move"
+          : "pointer"
+      : state.editing
+        ? "crosshair"
+        : "";
     return;
   }
   if (drag.type === "pan") {
@@ -1388,22 +1449,126 @@ canvas.addEventListener("pointermove", (e) => {
         LIMITS.speed,
       ),
       patch = { speed: Number(speed.toPrecision(4)) };
-    if (!e.shiftKey && Math.hypot(dx, dy) > 2) {
-      // Whole degrees, so that horizontal is easy to find again.
-      patch.angle =
-        (Math.round((Math.atan2(dy, dx) * 180) / Math.PI) * Math.PI) / 180;
-    }
+    if (!e.shiftKey && Math.hypot(dx, dy) > 2)
+      patch.angle = wholeDegrees(Math.atan2(dy, dx) - aim.bearing);
     if (attempt(() => setAim(patch))) syncForms();
+  } else if (drag.type === "point" && state.editing) {
+    // Anywhere round the body, on or above its surface.
+    const p = world(sx, sy),
+      r = Math.max(lab.body.radius, Math.hypot(p.x, p.y));
+    if (
+      attempt(() =>
+        setAim({
+          radius: Number(r.toPrecision(5)),
+          bearing: Math.atan2(-p.x, p.y),
+        }),
+      )
+    )
+      syncForms();
+  } else if (drag.type === "satMove") {
+    // The satellite starts again from here, with the same speed and the
+    // same direction relative to the local horizontal.
+    const s = lab.get(drag.id),
+      p = world(sx, sy);
+    if (s) {
+      const r = Math.max(lab.body.radius, Math.hypot(p.x, p.y)),
+        b = Math.atan2(-s.x, s.y),
+        speed = Math.hypot(s.vx, s.vy),
+        angle = wrapAngle(Math.atan2(s.vy, s.vx) - b);
+      relaunch(drag.id, {
+        radius: r,
+        bearing: Math.atan2(-p.x, p.y),
+        speed,
+        angle: speed > 0 ? angle : 0,
+      });
+    }
+  } else if (drag.type === "satAim") {
+    const s = lab.get(drag.id);
+    if (s) {
+      const [x, y] = screen(s.x, s.y),
+        dx = sx - x,
+        dy = y - sy,
+        b = Math.atan2(-s.x, s.y),
+        was = wrapAngle(Math.atan2(s.vy, s.vx) - b),
+        speed = Math.min(
+          (Math.hypot(dx, dy) / ARROW) * preview().circularSpeed,
+          LIMITS.speed,
+        );
+      relaunch(drag.id, {
+        radius: Math.hypot(s.x, s.y),
+        bearing: b,
+        speed: Number(speed.toPrecision(4)),
+        angle:
+          !e.shiftKey && Math.hypot(dx, dy) > 2
+            ? wholeDegrees(Math.atan2(dy, dx) - b)
+            : was,
+      });
+    }
   } else if (drag.type === "point") {
-    const radius = Math.max(lab.body.radius, world(sx, sy).y),
+    // Outside Edit mode the launch point moves only straight out from the
+    // centre or back towards it; its altitude is what changes.
+    const p = world(sx, sy),
+      up = -p.x * Math.sin(aim.bearing) + p.y * Math.cos(aim.bearing),
+      radius = Math.max(lab.body.radius, up),
       altitude = Number((radius - lab.body.radius).toPrecision(4));
     if (attempt(() => setAim({ radius: lab.body.radius + altitude })))
       syncForms();
   }
 });
-function endDrag() {
+function endDrag(e) {
+  // In Edit mode a click (not a drag) on empty space adds a satellite there.
+  if (
+    e?.type === "pointerup" &&
+    state.editing &&
+    drag?.type === "pan" &&
+    !drag.moved
+  ) {
+    const p = world(...Object.values(eventPoint(e))),
+      r = Math.hypot(p.x, p.y);
+    if (r < lab.body.radius)
+      toast("Click outside the body to add a satellite there.");
+    else {
+      let id;
+      if (
+        attempt(
+          () =>
+            (id = lab.launch({
+              radius: r,
+              bearing: Math.atan2(-p.x, p.y),
+              speed: circularSpeed(lab.mu, r),
+              angle: 0,
+            })),
+        )
+      ) {
+        const s = lab.get(id);
+        paths.set(id, orbitPath(s.elements, { maxRadius: s.range }));
+        state.selected = id;
+        buildList();
+      }
+    }
+  }
+  if (drag?.type === "satMove" || drag?.type === "satAim") buildList();
   drag = null;
 }
+// Whole degrees, so that horizontal is easy to find again.
+const wholeDegrees = (a) =>
+  wrapAngle((Math.round((a * 180) / Math.PI) * Math.PI) / 180);
+// Launch satellite `id` again from new launch values, in its own place in
+// the list, keeping its number and colour.
+function relaunch(id, params) {
+  if (!attempt(() => lab.launch(params, { replace: id }))) return;
+  const s = lab.get(id);
+  paths.set(id, orbitPath(s.elements, { maxRadius: s.range }));
+}
+function setEditing(on) {
+  state.editing = on;
+  if (on && state.running) setRunning(false);
+  $("edit-toggle").setAttribute("aria-pressed", String(on));
+  document.body.classList.toggle("editing", on);
+  // Fitting the view would move the scene under the pointer while editing.
+  if (on) setAutoFit(false);
+}
+$("edit-toggle").addEventListener("click", () => setEditing(!state.editing));
 canvas.addEventListener("pointerup", endDrag);
 canvas.addEventListener("pointercancel", endDrag);
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -1500,6 +1665,15 @@ document.addEventListener("keydown", (e) => {
   if (key === "-") return zoomAt(view.width / 2, view.height / 2, 0.8);
   if (e.repeat) return;
   if (key === "l") launch();
+  else if (key === "b") setEditing(!state.editing);
+  else if (
+    (e.key === "Delete" || e.key === "Backspace") &&
+    state.editing &&
+    state.selected !== null
+  ) {
+    e.preventDefault();
+    removeSatellite(state.selected);
+  }
   else if (key === "r") reset();
   else if (key === "c") lab.clearTrails();
   else if (key === "v") toggleShow("show-velocity");
@@ -1632,6 +1806,7 @@ setupSceneFiles({
         radius: data.aim.radius,
         speed: data.aim.speed,
         angle: data.aim.angle,
+        bearing: data.aim.bearing ?? 0,
       });
     } catch {
       const radius = Math.max(aim.radius, lab.body.radius);
@@ -1639,6 +1814,7 @@ setupSceneFiles({
         radius,
         speed: Math.min(circularSpeed(lab.mu, radius), LIMITS.speed),
         angle: 0,
+        bearing: 0,
       });
     }
     if (WARPS.includes(data.warp)) setWarp(data.warp);
@@ -1657,7 +1833,7 @@ setupSceneFiles({
 function loadPreset(preset) {
   attempt(() => {
     changeBody({ key: preset.body, ...BODIES[preset.body] }, false, true);
-    setAim(preset.launch(lab.mu, lab.body.radius));
+    setAim({ bearing: 0, ...preset.launch(lab.mu, lab.body.radius) });
     setWarp(preset.warp);
     setAutoFit(true);
     syncForms();
@@ -1746,8 +1922,10 @@ function drawPresetPreviews() {
       g.arc(...at(0, launched.radius), 2.4, 0, TAU);
       g.fillStyle = c.satellites[0];
       g.fill();
-    } catch {
-      // A preview is decoration; the preset itself reports its own errors.
+    } catch (e) {
+      // A preview is decoration and must not stop the panel opening, but a
+      // broken one is a bug: say so in the console.
+      console.error(`Preset preview "${preset.id}" failed:`, e);
     }
 }
 

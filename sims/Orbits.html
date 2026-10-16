@@ -46,6 +46,14 @@
         ></select
         ><span class="header-divider" aria-hidden="true"></span
         ><button
+          id="edit-toggle"
+          title="Edit: stop the clock and build your own set-up on the scene (B)"
+          aria-pressed="false"
+          data-icon="edit"
+          data-icon-label="Edit"
+        >
+          Edit</button
+        ><button
           id="presets-toggle"
           title="Ready-made launches"
           aria-expanded="false"
@@ -128,40 +136,6 @@
           <details id="display-panel" class="ol-panel" open>
             <summary>Display</summary>
             <div class="ol-checks">
-              <label class="fl-check"
-                ><input id="show-velocity" type="checkbox" checked /> Velocity
-                <span class="swatch velocity" aria-hidden="true"></span
-              ></label>
-              <label
-                class="fl-check"
-                title="The gravitational force on the satellite, F = GMm/r² (G)"
-                ><input id="show-force" type="checkbox" /> Gravity force
-                <span class="swatch force" aria-hidden="true"></span
-              ></label>
-              <label class="fl-check"
-                ><input id="show-prediction" type="checkbox" checked />
-                Predicted orbit</label
-              >
-              <label class="fl-check"
-                ><input id="show-trails" type="checkbox" checked />
-                Trails</label
-              >
-              <label
-                class="fl-check"
-                title="Kepler's second law: shade the areas swept in equal times (K)"
-                ><input id="show-areas" type="checkbox" /> Equal areas</label
-              >
-              <label
-                class="fl-check"
-                title="Shade the gravitational potential and draw equipotentials at equal steps of it (E)"
-                ><input id="show-potential" type="checkbox" /> Equipotentials</label
-              >
-              <label
-                class="fl-check"
-                title="Numbers beside the arrows and names on the scene"
-                ><input id="show-labels" type="checkbox" checked />
-                Values</label
-              >
               <label
                 class="fl-check"
                 title="Keep the whole orbit in view as it changes (A)"
@@ -245,8 +219,51 @@
         ><span id="zoom-level"></span
         ><button id="zoom-in" title="Zoom in (+)">+</button
         ><button id="fit-scene" title="Fit the orbits in view">
-          Fit scene
-        </button>
+          Fit scene</button
+        ><span class="cluster-divider" aria-hidden="true"></span
+        ><label class="icon-toggle" title="Velocity (V)"
+          ><input type="checkbox" id="show-velocity" checked /><span
+            data-icon="velocity"
+            data-icon-label="Velocity"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="The gravitational force on the satellite, F = GMm/r² (G)"
+          ><input type="checkbox" id="show-force" /><span
+            data-icon="force"
+            data-icon-label="Gravity force"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="Predicted orbit (P)"
+          ><input type="checkbox" id="show-prediction" checked /><span
+            data-icon="prediction"
+            data-icon-label="Predicted orbit"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="Trails (T)"
+          ><input type="checkbox" id="show-trails" checked /><span
+            data-icon="trails"
+            data-icon-label="Trails"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="Kepler's second law: shade the areas swept in equal times (K)"
+          ><input type="checkbox" id="show-areas" /><span
+            data-icon="areas"
+            data-icon-label="Equal areas"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="Shade the gravitational potential and draw equipotentials at equal steps of it (E)"
+          ><input type="checkbox" id="show-potential" /><span
+            data-icon="equipotentials"
+            data-icon-label="Equipotentials"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="Numbers beside the arrows and names on the scene"
+          ><input type="checkbox" id="show-labels" checked /><span
+            data-icon="values"
+            data-icon-label="Values"
+            data-icon-only="true"
+          ></span></label
+        >
       </div>
       <div class="status">
         <span id="scene-status"></span><span id="time"></span>
@@ -323,6 +340,14 @@
         <dd>
           Up and down change the launch speed by 1% of the circular speed; left
           and right turn the launch direction by 1°.
+        </dd>
+        <dt>B</dt>
+        <dd>
+          Edit mode: the clock stops. Click outside the body to add a satellite
+          there at the circular speed; drag a satellite to move it; drag the
+          handle on its arrow to aim it (Shift keeps the direction); drag the
+          launch point anywhere round the body. Delete removes the selected
+          satellite. Run leaves Edit mode.
         </dd>
         <dt>V · G · P · T · K · E</dt>
         <dd>

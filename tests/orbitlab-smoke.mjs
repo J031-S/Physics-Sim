@@ -465,4 +465,24 @@ $("settings-toggle").click();
 assert.equal($("settings-panel").hidden, false);
 $("close-settings").click();
 assert.equal($("settings-panel").hidden, true);
+// Edit mode: B or the Edit button; it stops the clock, a click well outside
+// the body adds a satellite there, and Run leaves Edit mode.
+key("b");
+assert.equal($("edit-toggle").getAttribute("aria-pressed"), "true");
+await frame();
+assert.match(text("tool-name"), /^Edit/);
+{
+  const [lx, ly] = spot("launchPoint");
+  // The launch point is 400 km up, straight above the centre: twice as far
+  // above it again is clear of the body.
+  pointer("pointerdown", [lx, ly - 60]);
+  pointer("pointerup", [lx, ly - 60]);
+  await frame();
+  assert.equal(chips(), 1);
+}
+key(" ");
+assert.equal($("edit-toggle").getAttribute("aria-pressed"), "false");
+key(" ");
+key("r");
+await frame();
 console.log("orbit lab smoke: ok");

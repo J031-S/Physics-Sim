@@ -363,17 +363,36 @@ export function createOrbitRenderer(ctx, view) {
 
   // The launch that is set up: its point, the local horizontal, the velocity
   // arrow with its drag handle, and the path it would follow.
+  // The launch point may be anywhere round the body (`aim.bearing`,
+  // anticlockwise from the top); everything about it turns with it.
   function ghostGeometry() {
     const p = preview(),
-      [x, y] = screen(0, aim.radius),
-      length = (ARROW * aim.speed) / p.circularSpeed;
+      bearing = aim.bearing ?? 0,
+      [x, y] = screen(
+        -aim.radius * Math.sin(bearing),
+        aim.radius * Math.cos(bearing),
+      ),
+      length = (ARROW * aim.speed) / p.circularSpeed,
+      direction = aim.angle + bearing;
     return {
       x,
       y,
+      bearing,
       length,
-      tipX: x + Math.cos(aim.angle) * length,
-      tipY: y - Math.sin(aim.angle) * length,
+      tipX: x + Math.cos(direction) * length,
+      tipY: y - Math.sin(direction) * length,
     };
+  }
+  // Where a satellite's velocity arrow ends, in canvas pixels: the handle
+  // that re-aims it while the scene is being edited.
+  function velocityTip(s) {
+    const p = preview(),
+      [x, y] = screen(s.x, s.y),
+      v = Math.hypot(s.vx, s.vy),
+      length = v > 0 ? Math.min((ARROW * v) / p.circularSpeed, 400) : 0;
+    return v > 0
+      ? [x + (s.vx / v) * length, y - (s.vy / v) * length]
+      : [x + 14, y];
   }
   function drawGhost(c) {
     const p = preview(),
@@ -388,33 +407,41 @@ export function createOrbitRenderer(ctx, view) {
       ctx.globalAlpha = 1;
     }
     // Local horizontal through the launch point, and the altitude below it.
+    const fx = Math.cos(g.bearing),
+      fy = -Math.sin(g.bearing),
+      direction = aim.angle + g.bearing;
     ctx.strokeStyle = c.soft;
     ctx.lineWidth = 1;
     ctx.setLineDash([2, 3]);
     ctx.beginPath();
-    ctx.moveTo(g.x - 46, g.y);
-    ctx.lineTo(g.x + 46, g.y);
+    ctx.moveTo(g.x - 46 * fx, g.y - 46 * fy);
+    ctx.lineTo(g.x + 46 * fx, g.y + 46 * fy);
     ctx.moveTo(g.x, g.y);
-    ctx.lineTo(...screen(0, lab.body.radius));
+    ctx.lineTo(
+      ...screen(
+        -lab.body.radius * Math.sin(g.bearing),
+        lab.body.radius * Math.cos(g.bearing),
+      ),
+    );
     ctx.stroke();
     ctx.setLineDash([]);
     if (Math.abs(aim.angle) > 0.02 && g.length > 24) {
       ctx.beginPath();
-      ctx.arc(g.x, g.y, 20, 0, -aim.angle, aim.angle > 0);
+      ctx.arc(g.x, g.y, 20, -g.bearing, -direction, aim.angle > 0);
       ctx.stroke();
       if (state.show.labels)
         label(
           angleText(aim.angle),
-          g.x + 34 * Math.cos(aim.angle / 2),
-          g.y - 34 * Math.sin(aim.angle / 2),
+          g.x + 34 * Math.cos(g.bearing + aim.angle / 2),
+          g.y - 34 * Math.sin(g.bearing + aim.angle / 2),
           c,
         );
     }
     arrow(
       g.x,
       g.y,
-      Math.cos(aim.angle),
-      -Math.sin(aim.angle),
+      Math.cos(direction),
+      -Math.sin(direction),
       g.length,
       c.velocity,
       2.6,
@@ -478,7 +505,24 @@ export function createOrbitRenderer(ctx, view) {
     }
     drawGhost(c);
     for (const s of lab.list()) drawSatellite(s, c);
+    // While the scene is being edited, each satellite's arrow has a handle.
+    if (options.editing)
+      for (const s of lab.list())
+        if (s.status === "flying") {
+          const [hx, hy] = velocityTip(s);
+          ctx.beginPath();
+          ctx.arc(hx, hy, 5.5, 0, TAU);
+          ctx.fillStyle = c.panel;
+          ctx.fill();
+          ctx.strokeStyle = c.satellites[s.colour];
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
     drawScaleBar(c);
+  }
+  function satelliteHandle(options, s) {
+    use(options);
+    return velocityTip(s);
   }
   // Where the launch point and the arrow's tip are, in canvas pixels.
   function launchGeometry(options) {
@@ -493,5 +537,6 @@ export function createOrbitRenderer(ctx, view) {
     strokePoints,
     drawScene,
     launchGeometry,
+    satelliteHandle,
   };
 }

@@ -828,3 +828,57 @@ test("presets: every one launches and matches the numbers it quotes", () => {
   assert.equal(cannon.angle, 0);
   close(cannon.radius - BODIES.earth.radius, 100 * km, 1e-9);
 });
+
+test("a launch from any bearing is the top launch turned: same orbit, same period, same landing", () => {
+  const top = new OrbitLab(),
+    side = new OrbitLab(),
+    R = top.body.radius,
+    // An ellipse: 7.9 km/s at 400 km, 10° above the horizontal.
+    launch = { radius: R + 400e3, speed: 7900, angle: (10 * Math.PI) / 180 },
+    bearing = (130 * Math.PI) / 180;
+  const a = top.launch(launch),
+    b = side.launch({ ...launch, bearing });
+  const sa = top.get(a),
+    sb = side.get(b);
+  // Launch point at 130° round from the top, anticlockwise.
+  near(sb.x, -(R + 400e3) * Math.sin(bearing), 1e-6);
+  near(sb.y, (R + 400e3) * Math.cos(bearing), 1e-6);
+  for (const key of ["energy", "angularMomentum", "eccentricity", "period"])
+    near(sb.elements[key], sa.elements[key], 1e-9 * Math.abs(sa.elements[key]));
+  // Fly both for most of an orbit: the turned one stays exactly the turned
+  // copy of the other.
+  top.advance(0.8 * sa.elements.period);
+  side.advance(0.8 * sa.elements.period);
+  const c = Math.cos(bearing),
+    s = Math.sin(bearing);
+  near(sb.x, sa.x * c - sa.y * s, 1e-3);
+  near(sb.y, sa.x * s + sa.y * c, 1e-3);
+  // Saved and loaded with its bearing.
+  const copy = OrbitLab.fromScene(side.exportScene());
+  near(copy.list()[0].x, sb.x, 1e-3);
+  assert.throws(() => top.launch({ ...launch, bearing: 4 }));
+});
+
+test("replacing a satellite keeps its number and colour and launches it afresh", () => {
+  const lab = new OrbitLab(),
+    R = lab.body.radius,
+    first = lab.launch({ radius: R + 400e3, speed: 7670, angle: 0 }),
+    second = lab.launch({ radius: R + 800e3, speed: 7450, angle: 0 });
+  lab.advance(600);
+  const before = lab.get(second).colour,
+    id = lab.launch(
+      { radius: R + 2000e3, speed: 6900, angle: 0, bearing: Math.PI / 2 },
+      { replace: second },
+    );
+  assert.equal(id, second);
+  assert.equal(lab.list().length, 2);
+  assert.equal(lab.list()[1].colour, before);
+  assert.equal(lab.list()[1].launchedAt, lab.time);
+  // A quarter of the way round, anticlockwise: on −x.
+  near(lab.get(second).x, -(R + 2000e3), 1e-6);
+  near(lab.get(second).y, 0, 1e-6);
+  assert.ok(lab.get(first));
+  assert.throws(() =>
+    lab.launch({ radius: R + 400e3, speed: 7000, angle: 0 }, { replace: 99 }),
+  );
+});
