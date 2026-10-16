@@ -1,6 +1,9 @@
 // Developer options: for the site's author, not students. Developer mode is
-// turned on by ?dev in the address or by the switch at the foot of the
-// Website section, and is remembered. With it off, nothing here shows and
+// turned on only by ?physium-dev in the address (DEV_PARAM), and is then
+// remembered in this browser until the switch at the foot of the Website
+// section turns it off; the switch itself shows only while it is on, so a
+// visitor who has not used the address never sees any of it. With it off,
+// nothing here shows and
 // the site uses the theme.js defaults; with it on, the Developer group
 // appears above the switch, the current developer scheme is applied, and the
 // theme tweaker (tweaker.js, loaded when first opened) can edit it.
@@ -15,6 +18,9 @@ import { iconWeights } from "./icons.js";
 
 const root = new URL("../../", import.meta.url);
 export const DEV_KEY = "physium-developer";
+// The address parameter that turns developer mode on (=0 or =off turns it
+// off). src/site/boot.js reads the same name.
+export const DEV_PARAM = "physium-dev";
 export const SCHEMES_KEY = "physium-schemes";
 const CSS_KEY = "physium-scheme-css";
 const forget = (key) => {
@@ -146,7 +152,11 @@ function colourCss(scheme) {
 // returns everything to the theme.js defaults.
 function applyToPage(scheme) {
   let style = document.getElementById(styleId);
-  if (!scheme || isDefault(scheme)) {
+  // The house style in tokens.css stands aside while a scheme is shown (the
+  // scheme's own CSS includes everything it keeps of it).
+  const shown = !!scheme && !isDefault(scheme);
+  document.documentElement.classList.toggle("dev-scheme", shown);
+  if (!shown) {
     setOverrides();
     style?.remove();
     forget(CSS_KEY);
@@ -285,12 +295,16 @@ function turnOn(on) {
   dev.on = on;
   write(DEV_KEY, dev);
   if (on) enable();
-  else disable();
+  else {
+    disable();
+    // Off, the switch goes too: the address is the only way back.
+    document.querySelector(".dev-switch")?.remove();
+  }
 }
 
 function setupSwitch() {
   const section = $("website-settings");
-  if (!section) return;
+  if (!section || !dev.on) return;
   const label = document.createElement("label");
   label.className = "setting-toggle dev-switch";
   label.innerHTML = `<input id="ui-developer" type="checkbox" /> Developer options`;
@@ -848,7 +862,7 @@ function setupPreferencesTools() {
 export function setupDeveloper(preferences) {
   prefs = preferences;
   dev = { on: false, tools: {}, ...read(DEV_KEY, {}) };
-  const asked = new URLSearchParams(window.location.search).get("dev");
+  const asked = new URLSearchParams(window.location.search).get(DEV_PARAM);
   if (asked !== null) {
     dev.on = asked !== "0" && asked !== "off";
     write(DEV_KEY, dev);

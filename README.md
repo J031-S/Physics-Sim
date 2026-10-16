@@ -502,7 +502,7 @@ Equations are typeset with KaTeX 0.16.22, vendored in `vendor/katex/` (no CDN, s
 
 ## Developer options
 
-For the site's author, not for students. Turn developer mode on with `?dev` at the end of any address (for example `/sims/Mechanics?dev`; `?dev=0` turns it off) or with the small **Developer options** switch at the foot of the Website section. It is remembered in this browser. With it off, none of the following shows and every page uses the built-in look from `src/site/theme.js`; a developer scheme never reaches anyone else.
+For the site's author, not for students. Turn developer mode on with `?physium-dev` at the end of any address (for example `/sims/Mechanics?physium-dev`; `?physium-dev=0` turns it off). It is then remembered in this browser, and a **Developer options** switch appears at the foot of the Website section to turn it off again; nothing of it, not even the switch, shows to anyone who has not used the address. With it off, none of the following shows and every page uses the built-in look from `src/site/theme.js`; a developer scheme never reaches anyone else.
 
 With it on, a **Developer** group appears at the bottom of the Website section of every page:
 

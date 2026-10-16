@@ -127,18 +127,23 @@ for (const page of shellPages) {
   assert.ok(brand.querySelector(".brand-mark"));
 }
 
-// Developer mode: off by default (only the switch shows, no scheme is
-// applied); ?dev turns it on and shows the Developer group.
+// Developer mode: off by default, with nothing of it showing (not even the
+// switch) and no scheme applied; ?physium-dev turns it on and shows the
+// switch and the Developer group.
 {
   const gallery = pageById("gallery");
   let doc = await load(gallery.file, gallery.address, "?off");
-  assert.ok(doc.getElementById("ui-developer"), "developer switch");
-  assert.equal(doc.getElementById("ui-developer").checked, false);
+  assert.equal(doc.getElementById("ui-developer"), null, "no switch");
   assert.equal(doc.getElementById("developer-settings"), null);
   assert.equal(doc.getElementById("ui-icons"), null);
   assert.equal(doc.getElementById("physium-scheme"), null);
-  doc = await load(gallery.file, gallery.address + "?dev", "?on");
-  assert.ok(doc.getElementById("developer-settings"), "?dev shows the group");
+  doc = await load(gallery.file, gallery.address + "?dev", "?dev");
+  assert.equal(doc.getElementById("ui-developer"), null, "?dev is not enough");
+  doc = await load(gallery.file, gallery.address + "?physium-dev", "?on");
+  assert.ok(
+    doc.getElementById("developer-settings"),
+    "?physium-dev shows the group",
+  );
   assert.equal(doc.getElementById("ui-developer").checked, true);
   assert.equal(
     doc.getElementById("ui-developer").closest("#website-settings"),
