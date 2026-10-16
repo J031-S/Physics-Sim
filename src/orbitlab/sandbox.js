@@ -175,12 +175,14 @@ export function createSandbox(page) {
     changed();
     page.toast("The centre of mass is now at rest.");
   });
-  $("clear-bodies").addEventListener("click", () => {
+  // Remove every body and set the clock to zero.
+  function clear() {
     lab.clear();
     selected = null;
     start = null;
     changed(true);
-  });
+  }
+  $("clear-bodies").addEventListener("click", clear);
 
   // The selected body's editor: name, mass and radius.
   const nameInput = $("body-name"),
@@ -626,6 +628,7 @@ export function createSandbox(page) {
     pointerup,
     keydown,
     keyup,
+    clear,
     setSnapping,
     snapping: () => snapping,
     running,

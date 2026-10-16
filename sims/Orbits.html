@@ -60,7 +60,16 @@
           type="file"
           accept="application/json,.json"
           hidden
-        />
+        /><button
+          id="clear"
+          title="Clear this scene"
+          aria-expanded="false"
+          aria-controls="clear-confirm"
+          data-icon="clear"
+          data-icon-label="Clear scene"
+        >
+          Clear scene
+        </button>
       </div>
     </header>
     <main>
@@ -445,6 +454,20 @@
         <small id="mass-note"></small>
       </details>
       <details id="website-settings" class="settings-section" open></details>
+    </section>
+    <section
+      id="clear-confirm"
+      role="alertdialog"
+      aria-labelledby="clear-confirm-title"
+      aria-describedby="clear-confirm-text"
+      hidden
+    >
+      <strong id="clear-confirm-title">Clear the scene?</strong>
+      <p id="clear-confirm-text"></p>
+      <div class="button-row">
+        <button id="clear-no">Cancel</button
+        ><button id="clear-yes" class="danger">Clear scene</button>
+      </div>
     </section>
     <section id="presets-panel" hidden aria-labelledby="presets-title">
       <div class="menu-header">

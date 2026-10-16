@@ -1527,6 +1527,7 @@ const PANELS = {
   "settings-panel": "settings-toggle",
   "keys-panel": "shortcuts",
   "presets-panel": "presets-toggle",
+  "clear-confirm": "clear",
 };
 function closePanels(except) {
   let closed = false;
@@ -1718,6 +1719,26 @@ $("settings-toggle").addEventListener("click", () =>
   togglePanel("settings-panel"),
 );
 $("close-settings").addEventListener("click", () => closePanels());
+// Clear scene: the view showing is emptied and its clock set to zero. In
+// the satellites view the central body and the launch being set up stay,
+// since they are the set-up rather than the scene.
+$("clear").addEventListener("click", () => {
+  $("clear-confirm-text").textContent = sandboxed()
+    ? "Every body is removed from the gravity sandbox and the clock is set to zero. The satellites view is not affected."
+    : "Every satellite, trail and third-law point is removed and the clock is set to zero. The central body and the launch set-up are kept. The gravity sandbox is not affected.";
+  if (togglePanel("clear-confirm")) $("clear-no").focus();
+});
+$("clear-no").addEventListener("click", () => closePanels());
+$("clear-yes").addEventListener("click", () => {
+  closePanels();
+  if (sandboxed()) {
+    setRunning(false);
+    sandbox.clear();
+    return;
+  }
+  reset();
+  lab.clearThirdLaw();
+});
 $("shortcuts").addEventListener("click", () => togglePanel("keys-panel"));
 $("close-keys").addEventListener("click", () => closePanels());
 $("presets-toggle").addEventListener("click", () => {

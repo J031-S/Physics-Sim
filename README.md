@@ -267,6 +267,7 @@ The strip at the top of the scene says what the launch will do, and the dashed l
 - **Run / Pause** (`Space`). Run with nothing in flight launches the satellite that is set up.
 - **Step** (`.`) advances one frame of simulated time while paused: the time warp × 1/60 s.
 - **Reset** (`R`) removes every satellite and sets the clock to zero. The launch values and the third-law points are kept.
+- **Clear scene** (top bar, after a confirmation) empties the view that is showing and sets its clock to zero. In the satellites view it removes every satellite, trail and third-law point but keeps the central body and the launch set-up; in the gravity sandbox it removes every body. The other view is not affected.
 - **Time warp** (`[` and `]`): simulated seconds per real second, from 1× to 10 000 000×. A low orbit takes 92 minutes and the Moon 27 days, so the presets choose a warp that shows an orbit in ten or twenty seconds. If a warp asks for more than the computer can do accurately in a frame, the simulation runs slower than asked, and says so beside the clock, rather than taking longer steps.
 - **View**: drag empty space to pan, scroll or `+` / `−` to zoom. **Keep orbit in view** (`A`) follows the whole scene as orbits grow; panning or zooming turns it off, and **Fit scene** fits once.
 - **Trails** (`T`) draw the path taken; **Clear trails** (`C`) erases them. A closed orbit retraces itself exactly, so its trail is drawn for one turn.
