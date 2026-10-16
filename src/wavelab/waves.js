@@ -604,6 +604,30 @@ export class WaveLab {
   history(id) {
     return this.histories.get(id) ?? { t: [], u: [] };
   }
+  /**
+   * What a probe has recorded lately: the frequency from the times its
+   * signal last crossed zero going up (the mean spacing of up to the last
+   * nine crossings, each placed by interpolation) and the amplitude (half
+   * the range over the last whole cycle). Null until three crossings have
+   * been recorded.
+   */
+  probeReading(id) {
+    const h = this.histories.get(id);
+    if (!h) return null;
+    const { t, u } = h,
+      times = [];
+    for (let i = t.length - 1; i > 0 && times.length < 10; i--)
+      if (u[i - 1] < 0 && u[i] >= 0) times.push(t[i] - ((t[i] - t[i - 1]) * u[i]) / (u[i] - u[i - 1]));
+    if (times.length < 3) return null;
+    const period = (times[0] - times.at(-1)) / (times.length - 1);
+    let lo = Infinity,
+      hi = -Infinity;
+    for (let i = t.length - 1; i >= 0 && t[i] >= times[1]; i--) {
+      lo = Math.min(lo, u[i]);
+      hi = Math.max(hi, u[i]);
+    }
+    return { frequency: 1 / period, amplitude: (hi - lo) / 2 };
+  }
   // Is the cell at a point a wall?
   wallAt(x, y) {
     const h = this.cell,

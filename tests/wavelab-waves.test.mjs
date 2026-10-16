@@ -369,3 +369,28 @@ test("scene files round-trip", (t) => {
   copy.advance(3);
   assert.equal(copy.value(2, 1), lab.value(2, 1));
 });
+
+test("probe readings: measured frequency and amplitude, as the page shows them", (t) => {
+  // As check 16: what fixed probes ahead of and behind a source at c/2
+  // receive is 2f and 2f/3, measured from the probe's own record.
+  const lab = new WaveLab({ width: 34, height: 10, cell: 0.025, speed: 1 });
+  lab.add("moving", { x: -10, y: 0, angle: 0, speed: 0.5, frequency: 1, amplitude: 1 });
+  const ahead = lab.add("probe", { x: 0.5, y: 0 }),
+    behind = lab.add("probe", { x: -14, y: 0 });
+  lab.advance(16);
+  within(lab.probeReading(ahead).frequency, 2, 2 * 0.02, "ahead");
+  within(lab.probeReading(behind).frequency, 2 / 3, (2 / 3) * 0.02, "behind");
+  // A plane wave of amplitude 1 from a line source: long, and read before
+  // the waves from its ends arrive (they interfere with it by about ±9% at
+  // 6λ from an 18λ line, Fresnel diffraction from the ends).
+  const plane = new WaveLab({ width: 12, height: 62, cell: 0.05, speed: 1 });
+  plane.add("line", { x: -2, y: 0, angle: 0, length: 60, frequency: 1, amplitude: 1 });
+  const p = plane.add("probe", { x: 0, y: 0 });
+  plane.advance(10);
+  const r = plane.probeReading(p);
+  within(r.frequency, 1, 0.01, "frequency");
+  within(r.amplitude, 1, 0.03, "amplitude");
+  t.diagnostic(`plane-wave amplitude ${r.amplitude.toFixed(4)} (set 1); f ${r.frequency.toFixed(4)}`);
+  // Too short a record gives no reading rather than a wrong one.
+  assert.equal(new WaveLab({ width: 4, height: 4 }).probeReading(99), null);
+});
