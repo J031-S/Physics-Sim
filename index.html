@@ -24,6 +24,12 @@
       {
         "goal": "A place for physics students to test their intuition against what the equations really predict: change something, watch what happens, and compare it with the formula.",
         "mainButton": "Open the simulations",
+        "aboutTitle": "What Physium is for",
+        "about": [
+          "Physium is a free set of physics simulations and small equation tools for high-school and introductory physics. It is built for testing intuition: predict what will happen, try it, then compare what you see with what the textbook formula says.",
+          "Every simulation runs on its own physics engine, and each engine is checked against textbook results, so what moves on the screen is what the physics predicts, not an animation drawn to look right. Where a model leaves something out (air resistance, a central body that does not move, ideal components), the page says so.",
+          "It runs in any modern browser, with nothing to install and no account. Nothing you do is stored anywhere except your display settings, in your own browser; save a scene to a file to keep it."
+        ],
         "githubButton": "Source on GitHub",
         "simulationsTitle": "Simulations",
         "simulationsIntro": "Four simulations, each built on its own physics engine and checked against textbook results.",
@@ -36,6 +42,8 @@
         "minitoolsTitle": "Minitools",
         "minitoolsIntro": "Small pages for one equation at a time: pick the unknown, move the sliders, and see the working, a graph and, where a simulation can show it, the measured value beside the formula's.",
         "minitoolsLink": "All the minitools",
+        "carouselPrevious": "Previous minitools",
+        "carouselNext": "More minitools",
         "featured": [
           "kepler-third-law",
           "projectile-range",
@@ -86,6 +94,10 @@
           ></a>
         </div>
       </section>
+      <section class="home-section home-about" aria-labelledby="about-title">
+        <h2 id="about-title" data-copy="aboutTitle"></h2>
+        <div class="home-about-text"></div>
+      </section>
       <section
         id="simulations"
         class="home-section"
@@ -98,7 +110,30 @@
       <section class="home-section" aria-labelledby="minitools-title">
         <h2 id="minitools-title" data-copy="minitoolsTitle"></h2>
         <p data-copy="minitoolsIntro"></p>
-        <div class="mt-grid home-featured"></div>
+        <div class="home-carousel">
+          <button
+            type="button"
+            class="carousel-step"
+            data-step="-1"
+            data-icon="back"
+            data-copy-label="carouselPrevious"
+            data-icon-only="true"
+          ></button>
+          <div
+            class="home-featured"
+            tabindex="0"
+            role="region"
+            aria-label="Minitools: scroll sideways for more"
+          ></div>
+          <button
+            type="button"
+            class="carousel-step"
+            data-step="1"
+            data-icon="forward"
+            data-copy-label="carouselNext"
+            data-icon-only="true"
+          ></button>
+        </div>
         <p>
           <a
             class="button-link home-more"
