@@ -323,3 +323,28 @@ test("scene files round-trip", () => {
   assert.deepEqual(copy.trace().segments, lab.trace().segments);
   assert.throws(() => RayLab.fromScene({ format: "physics-sim-circuit", version: 1 }), /circuits/i);
 });
+
+test("angle readouts come from the trace: incidence, refraction and deviation", () => {
+  const lab = new RayLab();
+  lab.add("block", { x: 0, y: -0.5, width: 2, height: 1, material: "fixed", index: 1.5 });
+  const id = lab.add("ray", { x: -Math.tan(30 * deg) * 0.5, y: 0.5, angle: -60 * deg });
+  const [r] = lab.readings(lab.trace(), id);
+  close(r.events[0].incidence / deg, 30, 1e-9, "incidence");
+  close(r.events[0].leaving / deg, Math.asin(Math.sin(30 * deg) / 1.5) / deg, 1e-9, "refraction");
+  assert.equal(r.events[0].n1, 1);
+  assert.equal(r.events[0].n2, 1.5);
+  // Through the far face of a parallel-sided block it leaves parallel to
+  // how it came in.
+  assert.ok(Math.abs(r.deviation) < 1e-7, `deviation ${r.deviation} rad`);
+  assert.equal(r.events.length, 2);
+});
+
+test("an object at the focal point of a magnifier: upright image at infinity, angular size h/f", () => {
+  const lab = new RayLab();
+  lab.add("thinLens", { x: 0, y: 0, angle: 0, f: 0.1, aperture: 0.1 });
+  const id = lab.add("object", { x: -0.1, y: 0, angle: 0, height: 0.01 });
+  const image = lab.images().find((i) => i.source === id);
+  assert.equal(image.distance, Infinity);
+  assert.equal(image.upright, true);
+  close(image.angularSize, 1 / 0.1, 1e-3, "h/f per metre of height");
+});

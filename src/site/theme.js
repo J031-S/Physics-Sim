@@ -1089,3 +1089,29 @@ export function tokensCss() {
     "",
   ].join("\n");
 }
+
+// The colour of light of one wavelength (in metres), for rays drawn in the
+// colour they are: an approximation of the visible spectrum in sRGB (after
+// Dan Bruton's piecewise fit), fading at the violet and red ends where the
+// eye is less sensitive. On the light theme it is darkened so that yellow
+// and green rays stay visible on a pale canvas. Not part of a scheme: it is
+// physics, like the charge colours' meanings.
+export function spectralColour(wavelength, dark = pageIsDark()) {
+  const nm = wavelength * 1e9;
+  let r = 0,
+    g = 0,
+    b = 0;
+  if (nm < 440) [r, g, b] = [(440 - nm) / 60, 0, 1];
+  else if (nm < 490) [r, g, b] = [0, (nm - 440) / 50, 1];
+  else if (nm < 510) [r, g, b] = [0, 1, (510 - nm) / 20];
+  else if (nm < 580) [r, g, b] = [(nm - 510) / 70, 1, 0];
+  else if (nm < 645) [r, g, b] = [1, (645 - nm) / 65, 0];
+  else [r, g, b] = [1, 0, 0];
+  const fade = nm < 420 ? 0.3 + (0.7 * (nm - 380)) / 40 : nm > 700 ? 0.3 + (0.7 * (780 - nm)) / 80 : 1,
+    light = dark ? 1 : 0.72,
+    hex = (v) =>
+      Math.round(255 * Math.max(0, Math.min(1, v * fade * light)) ** 0.8)
+        .toString(16)
+        .padStart(2, "0");
+  return "#" + hex(r) + hex(g) + hex(b);
+}

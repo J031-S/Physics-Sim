@@ -549,7 +549,7 @@ export class RayLab {
     let n = hit.normal;
     // Turn the normal to face the incoming ray.
     if (dot(n, d) > 0) n = { x: -n.x, y: -n.y };
-    if (s.role === "mirror") return [{ d: reflect(d, n), share: 1, event: "reflect" }];
+    if (s.role === "mirror") return [{ d: reflect(d, n), share: 1, event: "reflect", normal: n }];
     if (s.role === "thin") {
       // The ideal thin lens: in its own frame, with the ray travelling in
       // the +axis direction, the slope dv/du drops by h/f, which sends every
@@ -577,14 +577,14 @@ export class RayLab {
     const ci = -dot(d, n),
       eta = n1 / n2,
       k = 1 - eta * eta * (1 - ci * ci);
-    if (k < 0) return [{ d: reflect(d, n), share: 1, event: "tir" }];
+    if (k < 0) return [{ d: reflect(d, n), share: 1, event: "tir", normal: n, n1, n2 }];
     const ct = Math.sqrt(k),
       t = { x: eta * d.x + (eta * ci - ct) * n.x, y: eta * d.y + (eta * ci - ct) * n.y },
       len = Math.hypot(t.x, t.y),
       R = fresnel(n1, n2, Math.acos(Math.min(1, ci))).R;
     return [
-      { d: { x: t.x / len, y: t.y / len }, share: 1 - R, event: "refract" },
-      { d: reflect(d, n), share: R, event: "partial" },
+      { d: { x: t.x / len, y: t.y / len }, share: 1 - R, event: "refract", normal: n, n1, n2 },
+      { d: reflect(d, n), share: R, event: "partial", normal: n, n1, n2 },
     ];
   }
 
@@ -632,6 +632,9 @@ export class RayLab {
         event: ray.event,
         end: hit ? hit.s.role : "escape",
         element: hit ? hit.s.el.id : null,
+        // Where it began: the surface's normal (facing back along the ray
+        // that arrived) and the indices either side, for angle readouts.
+        surface: ray.surface ?? null,
       };
       segments.push(seg);
       if (!hit) continue;
@@ -659,6 +662,7 @@ export class RayLab {
           parent: index,
           depth: ray.depth + 1,
           event: o.event,
+          surface: o.normal ? { nx: o.normal.x, ny: o.normal.y, n1: o.n1 ?? null, n2: o.n2 ?? null } : null,
         });
       }
     }
@@ -747,14 +751,19 @@ export class RayLab {
       // Parallel rays leave the system: the image is at infinity. Its
       // angular size against that of the object seen from the first
       // element (an eyepiece used this way).
-      const theta = Math.atan2(dot(atTip.d, p) - dot(atBase.d, p), dot(atBase.d, a));
+      // The eye looks back along the rays, so the image is seen in the
+      // direction opposite to the one they turn: rays from the object's tip
+      // turned upwards come from an image seen below the axis (inverted).
+      const turned = Math.atan2(dot(atTip.d, p) - dot(atBase.d, p), dot(atBase.d, a)),
+        seen = -turned;
       return {
         source: src.id,
         distance: Infinity,
         magnification: null,
-        angularSize: theta / eps,
+        // Radians the image subtends per metre of object height.
+        angularSize: seen / eps,
         real: false,
-        upright: theta > 0,
+        upright: seen > 0,
         objectDistance: u,
         last: last.id,
         formula,
@@ -777,28 +786,134 @@ export class RayLab {
     };
   }
 
+  // A parallel beam: two paraxial rays a little either side of its middle
+  // ray, in its own direction. If they leave parallel the system is afocal
+  // and the reading is its angular magnification (output angle over input
+  // angle, both measured from the axis of the first element met, as a
+  // telescope's is); otherwise where they cross: the paraxial focus. With
+  // the beam's two outermost rays, where they cross too (the marginal
+  // focus), which differs from the paraxial one by the spherical
+  // aberration.
   #beamReading(src, surfaces) {
     const wavelength = src.wavelength === "white" ? GREEN : src.wavelength,
+      a = unit(src.angle),
+      p = { x: -a.y, y: a.x },
       start = { x: src.x, y: src.y },
-      // The axis: that of the first element the beam's central ray meets.
-      centre = this.#follow(start, unit(src.angle), wavelength, surfaces);
+      centre = this.#follow(start, a, wavelength, surfaces);
     if (!centre.met.length || centre.stopped) return null;
-    const axis = centre.met[0].angle,
-      d = 1e-6,
-      // A ray along the axis and one at a small angle to it, both through
-      // the first element's reference point.
-      through = (theta) => {
-        const dir = unit(axis + theta),
-          r = refPoint(centre.met[0]);
-        return this.#follow(add(r, dir, -1), dir, wavelength, surfaces);
+    const first = centre.met[0],
+      last = centre.met.at(-1),
+      eps = 1e-6,
+      pair = (h) => [-1, 1].map((k) => this.#follow(add(start, p, k * h), a, wavelength, surfaces)),
+      cross = ([A, B]) => {
+        const den = A.d.x * B.d.y - A.d.y * B.d.x;
+        if (Math.abs(den) < 1e-12) return null;
+        const t = ((B.o.x - A.o.x) * B.d.y - (B.o.y - A.o.y) * B.d.x) / den;
+        return { point: add(A.o, A.d, t), real: t > 0 };
       };
-    const along = through(0),
-      tilted = through(d);
-    if (along.stopped || tilted.stopped) return null;
-    const angleOf = (v) => Math.atan2(v.y, v.x);
-    let out = angleOf(tilted.d) - angleOf(along.d);
-    out = Math.atan2(Math.sin(out), Math.cos(out));
-    return { source: src.id, angularMagnification: out / d };
+    const near = pair(eps);
+    if (near.some((r) => r.stopped)) return null;
+    const focus = cross(near);
+    if (!focus) {
+      // Afocal: compare a ray along the first element's axis with one at a
+      // small angle to it, both through its reference point.
+      const axis = first.angle,
+        d = 1e-6,
+        through = (theta) => {
+          const dir = unit(axis + theta);
+          return this.#follow(add(refPoint(first), dir, -1), dir, wavelength, surfaces);
+        };
+      const along = through(0),
+        tilted = through(d);
+      if (along.stopped || tilted.stopped) return null;
+      let out = Math.atan2(tilted.d.y, tilted.d.x) - Math.atan2(along.d.y, along.d.x);
+      out = Math.atan2(Math.sin(out), Math.cos(out));
+      return { source: src.id, afocal: true, angularMagnification: out / d };
+    }
+    const outward = near[0].d,
+      distance = dot({ x: focus.point.x - refPoint(last).x, y: focus.point.y - refPoint(last).y }, outward);
+    let marginal = null;
+    if (src.count > 1 && src.width > 0) {
+      const edge = pair(src.width / 2);
+      if (!edge.some((r) => r.stopped)) {
+        const m = cross(edge);
+        if (m)
+          marginal = {
+            point: m.point,
+            distance: dot({ x: m.point.x - refPoint(last).x, y: m.point.y - refPoint(last).y }, outward),
+          };
+      }
+    }
+    const f = centre.met.length === 1 ? focalLength(first) : null;
+    return {
+      source: src.id,
+      afocal: false,
+      focus: focus.point,
+      real: focus.real,
+      distance: focus.real ? Math.abs(distance) : -Math.abs(distance),
+      marginal,
+      last: last.id,
+      formula: f === null ? null : { focalLength: f },
+    };
+  }
+
+  /**
+   * Angle readouts along the main path of each ray of a source (the first
+   * ray of each wavelength): at every surface met, the angle of incidence
+   * and the angle of the ray leaving, both from the normal, the indices
+   * either side and what happened; and the total deviation from the
+   * starting direction. From a trace's segments.
+   */
+  readings(trace, sourceId) {
+    const segs = trace.segments,
+      out = [],
+      seen = new Set(),
+      dir = (s) => {
+        const dx = s.x2 - s.x1,
+          dy = s.y2 - s.y1,
+          l = Math.hypot(dx, dy);
+        return { x: dx / l, y: dy / l };
+      };
+    for (const first of segs.filter((s) => s.source === sourceId && s.parent < 0)) {
+      if (seen.has(first.wavelength)) continue;
+      seen.add(first.wavelength);
+      const path = [first];
+      for (;;) {
+        const i = segs.indexOf(path.at(-1)),
+          next = segs.find((s) => s.parent === i && s.event !== "partial");
+        if (!next) break;
+        path.push(next);
+      }
+      const events = [];
+      for (let k = 1; k < path.length; k++) {
+        const s = path[k],
+          f = s.surface;
+        if (!f) {
+          events.push({ event: s.event, element: path[k - 1].element });
+          continue;
+        }
+        const a = dir(path[k - 1]),
+          b = dir(s),
+          n = { x: f.nx, y: f.ny };
+        events.push({
+          event: s.event,
+          element: path[k - 1].element,
+          incidence: Math.acos(Math.min(1, Math.abs(dot(a, n)))),
+          leaving: Math.acos(Math.min(1, Math.abs(dot(b, n)))),
+          n1: f.n1,
+          n2: f.n2,
+        });
+      }
+      const a = dir(first),
+        b = dir(path.at(-1));
+      out.push({
+        wavelength: first.wavelength,
+        events,
+        deviation: Math.acos(Math.max(-1, Math.min(1, dot(a, b)))),
+        stopped: path.at(-1).end === "absorb",
+      });
+    }
+    return out;
   }
 
   // -------------------------------------------------------------- files
