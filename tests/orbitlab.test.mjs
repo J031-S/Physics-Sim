@@ -858,27 +858,3 @@ test("a launch from any bearing is the top launch turned: same orbit, same perio
   near(copy.list()[0].x, sb.x, 1e-3);
   assert.throws(() => top.launch({ ...launch, bearing: 4 }));
 });
-
-test("replacing a satellite keeps its number and colour and launches it afresh", () => {
-  const lab = new OrbitLab(),
-    R = lab.body.radius,
-    first = lab.launch({ radius: R + 400e3, speed: 7670, angle: 0 }),
-    second = lab.launch({ radius: R + 800e3, speed: 7450, angle: 0 });
-  lab.advance(600);
-  const before = lab.get(second).colour,
-    id = lab.launch(
-      { radius: R + 2000e3, speed: 6900, angle: 0, bearing: Math.PI / 2 },
-      { replace: second },
-    );
-  assert.equal(id, second);
-  assert.equal(lab.list().length, 2);
-  assert.equal(lab.list()[1].colour, before);
-  assert.equal(lab.list()[1].launchedAt, lab.time);
-  // A quarter of the way round, anticlockwise: on −x.
-  near(lab.get(second).x, -(R + 2000e3), 1e-6);
-  near(lab.get(second).y, 0, 1e-6);
-  assert.ok(lab.get(first));
-  assert.throws(() =>
-    lab.launch({ radius: R + 400e3, speed: 7000, angle: 0 }, { replace: 99 }),
-  );
-});

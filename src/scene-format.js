@@ -4,6 +4,7 @@ export const FORMATS = {
   "physics-sim-scene": "Mechanics sandbox",
   "physics-sim-fields": "Electric & magnetic fields",
   "physics-sim-orbits": "Orbits & gravitation",
+  "physium-gravity": "Orbits & gravitation (gravity sandbox)",
   "physics-sim-circuit": "Electric circuits",
 };
 export const NOT_OURS = "This file is not a Physium scene.";

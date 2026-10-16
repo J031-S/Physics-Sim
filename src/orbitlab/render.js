@@ -34,6 +34,7 @@ export const ORBIT_COLOURS = {
   potential: "energy-gravitational",
   equipotential: "field-equipotential",
   axis: "canvas-grid-major",
+  star: "body-ball",
 };
 const SATELLITE_COLOURS = [
   "field-electric",
@@ -383,17 +384,6 @@ export function createOrbitRenderer(ctx, view) {
       tipY: y - Math.sin(direction) * length,
     };
   }
-  // Where a satellite's velocity arrow ends, in canvas pixels: the handle
-  // that re-aims it while the scene is being edited.
-  function velocityTip(s) {
-    const p = preview(),
-      [x, y] = screen(s.x, s.y),
-      v = Math.hypot(s.vx, s.vy),
-      length = v > 0 ? Math.min((ARROW * v) / p.circularSpeed, 400) : 0;
-    return v > 0
-      ? [x + (s.vx / v) * length, y - (s.vy / v) * length]
-      : [x + 14, y];
-  }
   function drawGhost(c) {
     const p = preview(),
       g = ghostGeometry();
@@ -505,25 +495,149 @@ export function createOrbitRenderer(ctx, view) {
     }
     drawGhost(c);
     for (const s of lab.list()) drawSatellite(s, c);
-    // While the scene is being edited, each satellite's arrow has a handle.
-    if (options.editing)
-      for (const s of lab.list())
-        if (s.status === "flying") {
-          const [hx, hy] = velocityTip(s);
-          ctx.beginPath();
-          ctx.arc(hx, hy, 5.5, 0, TAU);
-          ctx.fillStyle = c.panel;
-          ctx.fill();
-          ctx.strokeStyle = c.satellites[s.colour];
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
     drawScaleBar(c);
   }
-  function satelliteHandle(options, s) {
-    use(options);
-    return velocityTip(s);
+
+  // ------------------------------------------------------ gravity sandbox
+
+  // Smallest drawn radius of a body, in pixels: stars (over 10²⁹ kg) a
+  // little bigger, so that they stand out at any zoom.
+  const shownRadius = (b) =>
+    Math.max(b.radius * view.scale, b.mass > 1e29 ? 6 : 3.5);
+  const bodyColour = (b, c) =>
+    b.mass > 1e29 ? c.star : c.satellites[b.colour % c.satellites.length];
+  // Where a body's velocity arrow ends: its velocity relative to the body
+  // it goes round, ARROW pixels at the circular orbit speed there
+  // (GravityLab.velocityFrame).
+  function sandboxTip(lab, id) {
+    const b = lab.get(id),
+      f = lab.velocityFrame(id),
+      [x, y] = screen(b.x, b.y),
+      v = Math.hypot(f.vx, f.vy),
+      length = Math.min((ARROW * v) / f.unit, 400);
+    return v > 0
+      ? { x, y, tipX: x + (f.vx / v) * length, tipY: y - (f.vy / v) * length }
+      : { x, y, tipX: x, tipY: y };
   }
+  // options: colours, grid, show (velocity, trails, labels, prediction),
+  // selected (a body id), prediction (points of the selected body's
+  // two-body orbit, in metres), ghost ({ x, y, radius, mass } of a body
+  // about to be placed), area, format (joined, distance, speedText).
+  function drawSandbox(lab, options) {
+    const c = options.colours,
+      show = options.show;
+    ({ joined, distance } = options.format);
+    clearArea = () => options.area;
+    ctx.setLineDash([]);
+    ctx.lineJoin = "round";
+    if (options.grid) drawGrid(c);
+    if (show.trails)
+      for (const b of lab.list()) {
+        ctx.strokeStyle = bodyColour(b, c);
+        ctx.globalAlpha = 0.6;
+        ctx.lineWidth = 1.5;
+        strokePoints([...b.trail, [b.x, b.y]]);
+        ctx.globalAlpha = 1;
+      }
+    const chosen = lab.get(options.selected);
+    if (chosen && show.prediction && options.prediction) {
+      ctx.strokeStyle = c.ink;
+      ctx.globalAlpha = 0.45;
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([5, 4]);
+      strokePoints(options.prediction);
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+    // The centre of mass of the whole system.
+    const com = lab.centreOfMass();
+    if (lab.list().length > 1) {
+      const [x, y] = screen(com.x, com.y);
+      ctx.strokeStyle = c.soft;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, TAU);
+      ctx.moveTo(x - 8, y);
+      ctx.lineTo(x + 8, y);
+      ctx.moveTo(x, y - 8);
+      ctx.lineTo(x, y + 8);
+      ctx.stroke();
+      // Named unless it is inside a body (a star much heavier than the rest).
+      const inside = lab
+        .list()
+        .some((b) => {
+          const [bx, by] = screen(b.x, b.y);
+          return Math.hypot(bx - x, by - y) < shownRadius(b) + 14;
+        });
+      if (show.labels && !inside) label("centre of mass", x, y + 16, c);
+    }
+    for (const b of lab.list()) {
+      const [x, y] = screen(b.x, b.y),
+        r = shownRadius(b);
+      ctx.fillStyle = bodyColour(b, c);
+      ctx.strokeStyle = c.ink;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 0.5;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      if (b.id === options.selected) {
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = c.ink;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(x, y, r + 5, 0, TAU);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (show.labels) label(b.name, x, y + r + 11, c);
+    }
+    if (show.velocity)
+      for (const b of lab.list()) {
+        const g = sandboxTip(lab, b.id),
+          length = Math.hypot(g.tipX - g.x, g.tipY - g.y);
+        if (length < 1) continue;
+        arrow(
+          g.x,
+          g.y,
+          (g.tipX - g.x) / length,
+          (g.tipY - g.y) / length,
+          length,
+          c.velocity,
+          b.id === options.selected ? 2.4 : 1.6,
+        );
+      }
+    // The handle that aims the selected body.
+    if (chosen) {
+      const g = sandboxTip(lab, chosen.id);
+      ctx.beginPath();
+      ctx.arc(g.tipX, g.tipY, 5.5, 0, TAU);
+      ctx.fillStyle = c.panel;
+      ctx.fill();
+      ctx.strokeStyle = c.velocity;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    if (options.ghost) {
+      const g = options.ghost,
+        [x, y] = screen(g.x, g.y);
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = g.mass > 1e29 ? c.star : c.ink;
+      ctx.beginPath();
+      ctx.arc(x, y, shownRadius(g), 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    drawScaleBar(c);
+  }
+  function sandboxHandle(lab, id) {
+    return sandboxTip(lab, id);
+  }
+  // A body's drawn radius, for hit testing.
+  const sandboxRadius = (b) => shownRadius(b);
+
   // Where the launch point and the arrow's tip are, in canvas pixels.
   function launchGeometry(options) {
     use(options);
@@ -537,6 +651,8 @@ export function createOrbitRenderer(ctx, view) {
     strokePoints,
     drawScene,
     launchGeometry,
-    satelliteHandle,
+    drawSandbox,
+    sandboxHandle,
+    sandboxRadius,
   };
 }

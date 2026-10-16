@@ -92,3 +92,178 @@ export const presets = [
     },
   },
 ];
+
+// ---------------------------------------------------------------- sandbox
+
+// Ready-made scenes for the gravity sandbox (nbody.js). Each `build(lab)`
+// adds bodies through the lab's own API and then puts the centre of mass at
+// rest at the origin, so the system does not drift off the screen; `warp`
+// suits it, and `check` is how long tests/gravitylab.test.mjs runs it.
+const AU = 1.496e11,
+  SUN = { mass: 1.989e30, radius: 6.957e8 };
+
+// The centre of mass to the origin and at rest: every body is shifted by
+// the same position and velocity, which changes nothing in their motion
+// relative to one another.
+function balance(lab) {
+  const c = lab.centreOfMass();
+  for (const b of lab.list())
+    lab.update(b.id, {
+      x: b.x - c.x,
+      y: b.y - c.y,
+      vx: b.vx - c.vx,
+      vy: b.vy - c.vy,
+    });
+}
+// A body on a circular orbit round `about`, at `distance` and `angle`
+// (radians anticlockwise from +x round it), going anticlockwise.
+function orbiting(lab, about, distance, angle, props) {
+  const centre = lab.get(about),
+    id = lab.add({
+      ...props,
+      x: centre.x + distance * Math.cos(angle),
+      y: centre.y + distance * Math.sin(angle),
+    }),
+    v = lab.circularVelocity(id, about);
+  lab.update(id, { vx: v.vx, vy: v.vy });
+  return id;
+}
+const deg = Math.PI / 180;
+
+export const sandboxPresets = [
+  {
+    id: "sun-earth-moon",
+    title: "Sun, Earth and Moon",
+    text: "The real masses and distances. Zoom in on the Earth to see the Moon.",
+    expect:
+      "The Earth goes round the Sun in a year; the Moon goes round the Earth every 27.3 days. Seen from the Sun, the Moon's path is a slightly wavy circle that never loops back.",
+    warp: 1e6,
+    check: 365.25 * day,
+    build(lab) {
+      const sun = lab.add({ name: "Sun", ...SUN, x: 0, y: 0 }),
+        earth = orbiting(lab, sun, AU, 0, {
+          name: "Earth",
+          mass: 5.972e24,
+          radius: 6.371e6,
+        });
+      orbiting(lab, earth, 3.844e8, 90 * deg, {
+        name: "Moon",
+        mass: 7.342e22,
+        radius: 1.737e6,
+      });
+      balance(lab);
+    },
+  },
+  {
+    id: "inner-planets",
+    title: "The inner planets",
+    text: "Mercury, Venus, Earth and Mars on circular orbits at their mean distances from the Sun.",
+    expect:
+      "Periods 88, 225, 365 and 687 days: the further out, the slower, with T² ∝ a³ (Kepler's third law).",
+    warp: 2e6,
+    check: 365.25 * day,
+    build(lab) {
+      const sun = lab.add({ name: "Sun", ...SUN, x: 0, y: 0 });
+      for (const [name, a, mass, radius, angle] of [
+        ["Mercury", 0.387, 3.301e23, 2.44e6, 30],
+        ["Venus", 0.723, 4.867e24, 6.052e6, 150],
+        ["Earth", 1, 5.972e24, 6.371e6, 260],
+        ["Mars", 1.524, 6.417e23, 3.39e6, 340],
+      ])
+        orbiting(lab, sun, a * AU, angle * deg, { name, mass, radius });
+      balance(lab);
+    },
+  },
+  {
+    id: "binary-stars",
+    title: "Binary stars",
+    text: "Two stars like the Sun, 1 AU apart, each going round the point midway between them.",
+    expect:
+      "Neither star is fixed: both go round their centre of mass, on opposite sides of it. Period T = 2π√(a³/G(m₁+m₂)) = 258 days.",
+    warp: 1e6,
+    check: 258 * day,
+    build(lab) {
+      const a = lab.add({ name: "Star A", ...SUN, x: -AU / 2, y: 0 }),
+        b = lab.add({ name: "Star B", ...SUN, x: AU / 2, y: 0 }),
+        v = lab.circularVelocity(b, a);
+      lab.update(b, { vx: v.vx, vy: v.vy });
+      balance(lab);
+    },
+  },
+  {
+    id: "star-and-planet",
+    title: "A star's wobble",
+    text: "A star with a planet ten times the mass of Jupiter, 1 AU out. Zoom in on the star.",
+    expect:
+      "The star moves on a small circle of its own, of radius 1.4 million km (about twice its own radius), at 283 m/s, once per orbit of the planet. Astronomers find planets round other stars from this wobble.",
+    warp: 1e6,
+    check: 365.25 * day,
+    build(lab) {
+      const star = lab.add({ name: "Star", ...SUN, x: 0, y: 0 });
+      orbiting(lab, star, AU, 0, {
+        name: "Planet",
+        mass: 10 * 1.898e27,
+        radius: 7e7,
+      });
+      balance(lab);
+    },
+  },
+  {
+    id: "figure-eight",
+    title: "Three stars in a figure of eight",
+    text: "Three equal stars chasing one another round one figure-of-eight path (Chenciner and Montgomery, 2000).",
+    expect:
+      "Each star follows the same figure of eight, a third of a period behind the next. The total momentum stays zero and the energy constant; nudge one star and the pattern soon breaks up.",
+    warp: 1e6,
+    check: 2.45e7,
+    build(lab) {
+      // In units with G = m = 1 and a length of 10¹¹ m.
+      const L = 1e11,
+        M = 1e30,
+        V = L / Math.sqrt(L ** 3 / (6.674e-11 * M)),
+        p = [0.97000436, -0.24308753],
+        v3 = [-0.93240737, -0.86473146];
+      for (const [name, x, y, vx, vy] of [
+        ["Star A", p[0], p[1], -v3[0] / 2, -v3[1] / 2],
+        ["Star B", -p[0], -p[1], -v3[0] / 2, -v3[1] / 2],
+        ["Star C", 0, 0, v3[0], v3[1]],
+      ])
+        lab.add({
+          name,
+          mass: M,
+          radius: 7e8,
+          x: x * L,
+          y: y * L,
+          vx: vx * V,
+          vy: vy * V,
+        });
+      balance(lab);
+    },
+  },
+  {
+    id: "jupiter-moons",
+    title: "Jupiter and its moons",
+    text: "Jupiter with Io, Europa, Ganymede and Callisto at their real distances and masses.",
+    expect:
+      "Periods 1.77, 3.55, 7.15 and 16.7 days. Io goes round four times while Europa goes round twice and Ganymede once: they are locked in step.",
+    warp: 1e5,
+    check: 17 * day,
+    build(lab) {
+      const jupiter = lab.add({
+        name: "Jupiter",
+        mass: 1.898e27,
+        radius: 6.991e7,
+        x: 0,
+        y: 0,
+      });
+      for (const [name, a, mass, radius, angle] of [
+        ["Io", 4.217e8, 8.932e22, 1.822e6, 0],
+        ["Europa", 6.709e8, 4.8e22, 1.561e6, 120],
+        ["Ganymede", 1.0704e9, 1.4819e23, 2.634e6, 200],
+        ["Callisto", 1.8827e9, 1.0759e23, 2.41e6, 300],
+      ])
+        orbiting(lab, jupiter, a, angle * deg, { name, mass, radius });
+      balance(lab);
+    },
+  },
+];

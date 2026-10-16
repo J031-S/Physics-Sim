@@ -236,7 +236,10 @@ The screen is a flat slice through a three-dimensional arrangement.
 
 ## Orbits & gravitation tool
 
-A separate page for Newton's law of gravitation, `F = GMm/r²`. A central body (the Earth to begin with) sits at the centre. You choose where a satellite starts, how fast and in which direction it is launched, and watch the path it takes. Raising the launch speed takes it from falling to the ground, through an ellipse, a circle and a larger ellipse, to escape. Open it from the drop-down at the left of the top bar.
+A separate page for Newton's law of gravitation, `F = GMm/r²`. Open it from the drop-down at the left of the top bar. It has two views, chosen with the **Satellites** and **Gravity sandbox** buttons at the top of the scene (or `S`):
+
+- **Satellites**: a central body (the Earth to begin with) sits still at the centre. You choose where a satellite starts, how fast and in which direction it is launched, and watch the path it takes. Raising the launch speed takes it from falling to the ground, through an ellipse, a circle and a larger ellipse, to escape. Most of this section is about this view.
+- **Gravity sandbox**: any number of bodies (up to 40), every one pulling on every other, all free to move: a solar system, binary stars, a planet with moons. See [Gravity sandbox](#gravity-sandbox) below.
 
 ### Setting up a launch
 
@@ -250,8 +253,6 @@ The **Launch** panel holds the values; each has a slider and a box to type in.
 | Launch angle                | Direction above the local horizontal: 0 is horizontal, 90° straight up, negative below the horizontal | −180° to 180°                                    |
 
 The launch point starts at the top of the body, where "horizontal" points to the right. **Position round** moves it round the body (anticlockwise from the top, −180° to 180°), and everything about the launch turns with it: the launch angle is always measured from the local horizontal there. On the scene, **drag the arrow** on the launch point to set speed and direction together (hold Shift to keep the direction), and **drag the launch point** in or out to change the altitude. The arrow is 64 px long at the circular orbit speed.
-
-**Edit mode** (the **Edit** button, or `B`) stops the clock so that a set-up can be built on the scene: click anywhere outside the body to add a satellite there, moving at the circular orbit speed for that distance; drag a satellite to move it (it keeps its speed and its direction relative to the local horizontal); drag the round handle at the tip of its velocity arrow to aim it (Shift changes only the speed); drag the launch point anywhere round the body. `Delete` removes the selected satellite. Each change launches that satellite afresh from where it now is, keeping its number and colour. **Run** leaves Edit mode and starts the clock.
 
 Beside the speed are the two speeds to compare it with, both for the current distance from the centre: the **circular orbit speed** `√(GM/r)` and the **escape speed** `√(2GM/r)`. **Use** sets the launch speed to exactly that value. The line under them gives your speed as a multiple of each.
 
@@ -314,6 +315,30 @@ The path is then the conic `r = p/(1 + e cos ν)`, periapsis is `p/(1 + e)`, apo
 Any of these is an **impact** instead if the path meets the surface: periapsis is inside the body and the satellite is bound, or already heading inward. The satellite stops where its path meets the surface and the strip reports when, how far round from the launch point, and how fast.
 
 The motion itself is integrated numerically, in SI units, with `G = 6.674 × 10⁻¹¹ N·m²/kg²`. The integrator is a leapfrog (drift, kick, drift), which is symplectic and time-reversible, so energy and angular momentum do not drift as they do with a simple Euler step. Its step is not a fixed number of seconds: it is fixed in a stretched time `s` with `dt = (r/μ) ds`, so a step lasts longer when the satellite is far away and slow, and is short when it is close and fast. The step size is chosen at launch so that the satellite never moves more than 0.2% of its distance from the centre in one step (about 3100 steps round a circular orbit, 7500 round an ellipse of eccentricity 0.7). For a single attracting body this scheme has a useful exact property: every step ends on the true conic, whatever its length, so the only numerical error is a small one in timing. The steps do not depend on the frame rate or the time warp; at low warps, where a frame is shorter than a step, a step is cut short to end on the frame, which is still on the conic.
+
+### Gravity sandbox
+
+Every body attracts every other with `F = Gm₁m₂/r²`, and every body moves, so the Sun wobbles as its planets go round, two stars circle their common centre of mass, and moons are tugged by both their planet and the Sun.
+
+**Adding bodies.** In the **Bodies** panel, choose a kind (star like the Sun, gas giant like Jupiter, planet like the Earth, moon like the Moon, asteroid like Ceres, spacecraft, or custom), adjust its mass and radius if you like, press **Place** and click the scene. A new body starts moving on a circular orbit round the body whose pull dominates where you click (of the bodies at least as heavy as it, the one with the largest `M/r³`); if there is none, it starts at rest. Hold `Ctrl` while clicking to keep placing; `Escape` stops. The chips under the panel list the bodies: click one to select it, × removes it. **Remove all** empties the scene.
+
+**Changing a body.** Click a body to select it. Drag it to move it (paused or running). Drag the round handle at the tip of its arrow to set its velocity (Shift keeps the direction and changes only the speed). The **Selected body** panel sets its name, mass and radius; **Circular orbit** gives it exactly the circular speed round the body it goes round; **Delete** (or the `Delete` key) removes it.
+
+**Arrows are relative.** Each body's arrow shows its velocity relative to the body it goes round (the one whose pull dominates on it), at 64 px for the circular orbit speed there, so a moon's arrow is about its planet, not the Sun. The dashed line is the conic the body would follow if only that one body pulled on it; it is a guide, and the real path departs from it wherever other bodies matter.
+
+**Readouts.** The **System** panel shows the time, kinetic and gravitational potential energy, their total and how much it has changed since Run (a check on the calculation: it should stay near 10⁻¹⁰ % or smaller), and the total momentum and angular momentum, which stay constant. **Stop drift** gives the whole system zero total momentum and puts its centre of mass (the small cross) at the origin, so it stays in view. The **Selected body** panel shows the gravitational force on the body and the orbit round the body it goes round: distance, relative speed, orbit type, semi-major axis, eccentricity and the period `2π√(a³/G(M + m))`.
+
+**Collisions.** Two bodies that touch merge into one: mass and momentum are kept, the volume is the sum of the two, and a message says so. Energy is not kept in a merger (it becomes heat), so the total energy readout changes then.
+
+**Running it.** Run, Step, the time warp, trails, `C` (clear trails) and the view work as in the satellites view. **Reset** puts every body back where it was when Run was first pressed after the last Reset, preset or loaded file.
+
+**Presets** (the lower half of the Presets list): the Sun, Earth and Moon at their real masses and distances; the four inner planets; two equal stars in a binary; a star wobbling as a heavy planet goes round it; three equal stars chasing each other round a figure of eight (Chenciner and Montgomery's solution); and Jupiter with its four large moons.
+
+**How it is calculated.** Each step moves every body with a fourth-order symplectic method (Yoshida's), which keeps energy from drifting over long runs. The step length is set afresh each step as a fiftieth of the shortest orbital time scale `√(r³/G(m₁ + m₂))` between any pair, and shorter still when two bodies are closing on each other, so close passes are taken in small steps and wide orbits in large ones. Checked against: a binary star over 10 periods (positions within 10⁻⁵ of the separation, energy within 10⁻¹⁰), the Earth's year (within 0.01 day of `2π√(r³/G(M + m))`), an orbit of eccentricity 0.7 over 100 turns (energy within 10⁻⁵, angular momentum within 10⁻⁹) and the figure of eight (back to its start within 10⁻⁴ of its size after one period).
+
+**Limits.** Bodies are points for gravity and spheres for collisions; there is no spin, no tidal effect, no relativity, and no friction or drag. Everything is in one plane. A merger is perfectly inelastic: there is no bouncing or breaking up.
+
+**Saving and loading.** In the sandbox, **Save scene** downloads `physium-gravity.json` with every body's name, mass, radius, position and velocity, and the time. **Load scene** recognises such a file and switches to the sandbox to open it.
 
 ### Where it stops being exact
 

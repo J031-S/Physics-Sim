@@ -12,7 +12,7 @@ export function setupSceneFiles({ filename, save, load, toast }) {
       }),
       link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = filename;
+    link.download = typeof filename === "function" ? filename() : filename;
     document.body.append(link);
     link.click();
     link.remove();

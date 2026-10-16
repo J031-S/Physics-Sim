@@ -7,6 +7,8 @@ import { FieldLab } from "../src/fieldlab/model.js";
 import { presets as fieldPresets } from "../src/fieldlab/presets.js";
 import { OrbitLab, BODIES, circularSpeed } from "../src/orbitlab/model.js";
 import { presets as orbitPresets } from "../src/orbitlab/presets.js";
+import { GravityLab } from "../src/orbitlab/nbody.js";
+import { sandboxPresets } from "../src/orbitlab/presets.js";
 import { CircuitLab } from "../src/circuitlab/model.js";
 import { presets as circuitPresets } from "../src/circuitlab/presets.js";
 
@@ -20,6 +22,7 @@ const OTHERS = {
   sandbox: { format: "physics-sim-scene", version: 1 },
   fields: new FieldLab().exportScene(),
   orbits: new OrbitLab().exportScene(),
+  gravity: new GravityLab().exportScene(),
   circuits: new CircuitLab().exportScene(),
 };
 // Files that are not ours, or are damaged.
@@ -154,6 +157,21 @@ const readings = (lab) =>
         return [i.name, [r.flow, r.voltage, r.power]];
       }),
   );
+test("gravity sandbox: a saved system carries on exactly as the original", () => {
+  for (const preset of sandboxPresets) {
+    const lab = new GravityLab();
+    preset.build(lab);
+    lab.advance(preset.check / 10);
+    const saved = viaFile(lab.exportScene()),
+      copy = GravityLab.fromScene(saved);
+    assert.deepEqual(copy.exportScene(), saved, preset.id);
+    // Same state, same integrator: the two must stay identical.
+    lab.advance(preset.check / 10);
+    copy.advance(preset.check / 10);
+    assert.deepEqual(copy.exportScene(), lab.exportScene(), preset.id);
+  }
+});
+
 test("circuits: every preset survives a save and load with the same readings", () => {
   for (const preset of circuitPresets) {
     const lab = new CircuitLab();
@@ -223,6 +241,7 @@ test("a file from another tool, or not ours at all, is refused readably", () => 
   const tools = {
     fields: (data) => new FieldLab().loadScene(data),
     orbits: (data) => new OrbitLab().loadScene(data),
+    gravity: (data) => new GravityLab().loadScene(data),
     circuits: (data) => new CircuitLab().loadScene(data),
   };
   for (const [tool, load] of Object.entries(tools)) {
@@ -252,6 +271,27 @@ test("a damaged file changes nothing in the scene that was open", () => {
   ]) {
     assert.throws(() => fields.loadScene({ ...fieldsBefore, ...bad }), Error);
     assert.deepEqual(fields.exportScene(), fieldsBefore);
+  }
+  const gravity = new GravityLab();
+  gravity.add({ name: "Sun", mass: 2e30, radius: 7e8, x: 0, y: 0 });
+  gravity.add({
+    name: "Earth",
+    mass: 6e24,
+    radius: 6.4e6,
+    x: 1.5e11,
+    y: 0,
+    vy: 3e4,
+  });
+  const gravityBefore = gravity.exportScene();
+  for (const bad of [
+    { bodies: "many" },
+    { bodies: [gravityBefore.bodies[0], { mass: -1, radius: 1, x: 0, y: 0 }] },
+    { bodies: [gravityBefore.bodies[0], { ...gravityBefore.bodies[0] }] },
+    { bodies: [null] },
+    { time: -5 },
+  ]) {
+    assert.throws(() => gravity.loadScene({ ...gravityBefore, ...bad }), Error);
+    assert.deepEqual(gravity.exportScene(), gravityBefore);
   }
   const orbits = new OrbitLab();
   orbits.launch({ altitude: 4e5, speed: 7600, angle: 0 });

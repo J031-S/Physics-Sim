@@ -465,24 +465,31 @@ $("settings-toggle").click();
 assert.equal($("settings-panel").hidden, false);
 $("close-settings").click();
 assert.equal($("settings-panel").hidden, true);
-// Edit mode: B or the Edit button; it stops the clock, a click well outside
-// the body adds a satellite there, and Run leaves Edit mode.
-key("b");
-assert.equal($("edit-toggle").getAttribute("aria-pressed"), "true");
+// The gravity sandbox: its own panels, presets and placing.
+document.querySelector('[data-mode="sandbox"]').click();
 await frame();
-assert.match(text("tool-name"), /^Edit/);
-{
-  const [lx, ly] = spot("launchPoint");
-  // The launch point is 400 km up, straight above the centre: twice as far
-  // above it again is clear of the body.
-  pointer("pointerdown", [lx, ly - 60]);
-  pointer("pointerup", [lx, ly - 60]);
-  await frame();
-  assert.equal(chips(), 1);
-}
-key(" ");
-assert.equal($("edit-toggle").getAttribute("aria-pressed"), "false");
-key(" ");
-key("r");
+assert.equal($("system-panel").hidden, false);
+assert.equal($("bodies-panel").hidden, false);
+assert.equal($("launch-panel").hidden, true);
+const bodies = () => document.querySelectorAll("#body-list .ol-chip").length;
+$("presets-toggle").click();
+document.querySelector('[data-preset="binary-stars"]').click();
 await frame();
+assert.equal(bodies(), 2);
+steps(5);
+await frame();
+assert.ok(!/^t = 0 s/.test(text("time")), text("time"));
+assert.match(text("system-grid"), /Total energy/);
+$("clear-bodies").click();
+await frame();
+assert.equal(bodies(), 0);
+$("place-body").click();
+pointer("pointerdown", [300, 300]);
+pointer("pointerup", [300, 300]);
+await frame();
+assert.equal(bodies(), 1);
+key("s");
+await frame();
+assert.equal($("launch-panel").hidden, false);
+assert.equal($("system-panel").hidden, true);
 console.log("orbit lab smoke: ok");

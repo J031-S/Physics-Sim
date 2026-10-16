@@ -308,9 +308,18 @@
     flex-basis: 100%;
   }
 }
-/* Edit mode: the Edit button stays lit while it is on. */
-#edit-toggle[aria-pressed="true"] {
+/* Satellites or the gravity sandbox, above the outcome strip. The strip
+   and the switch take pointer input; the space round them does not. */
+.ol-modes {
+  pointer-events: auto;
+  align-self: center;
+}
+/* Place stays lit while it is armed. */
+#place-body[aria-pressed="true"] {
   background: var(--accent-soft);
   border-color: var(--accent-border);
   color: var(--ink);
+}
+#body-name {
+  width: 9em;
 }

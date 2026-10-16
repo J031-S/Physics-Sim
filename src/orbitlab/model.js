@@ -378,14 +378,9 @@ export class OrbitLab {
     };
   }
 
-  // Launch a satellite now. With `replace` (the id of one in the scene) the
-  // new launch takes that satellite's place, number and colour instead: how
-  // a satellite is moved or re-aimed while the scene is being set up.
-  launch(params, { replace = null } = {}) {
-    const state = this.launchState(params),
-      old = replace === null ? null : this.get(replace);
-    if (replace !== null && !old) throw new Error("That satellite has gone.");
-    if (!old && this.satellites.length >= LIMITS.satellites)
+  launch(params) {
+    const state = this.launchState(params);
+    if (this.satellites.length >= LIMITS.satellites)
       throw new Error(
         `There are already ${LIMITS.satellites} satellites. Remove one, or press Reset.`,
       );
@@ -394,8 +389,8 @@ export class OrbitLab {
       el = orbitElements(mu, state, R),
       r0 = el.radius,
       used = new Set(this.satellites.map((s) => s.colour));
-    let colour = old ? old.colour : 0;
-    while (!old && used.has(colour)) colour++;
+    let colour = 0;
+    while (used.has(colour)) colour++;
     // Step size (see #advance). The fastest the satellite will ever go is
     // at its lowest point outside the body.
     const lowest = Math.max(el.periapsis, R),
@@ -414,7 +409,7 @@ export class OrbitLab {
       // Equal time intervals for the swept areas.
       interval = span / this.sectorCount,
       s = {
-        id: old ? old.id : this.nextId++,
+        id: this.nextId++,
         colour,
         launch: {
           radius: r0,
@@ -457,8 +452,7 @@ export class OrbitLab {
       };
     s.trail.push(s.x, s.y);
     s.history.push(0, r0, s.launch.speed);
-    if (old) this.satellites[this.satellites.indexOf(old)] = s;
-    else this.satellites.push(s);
+    this.satellites.push(s);
     return s.id;
   }
 
