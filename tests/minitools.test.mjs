@@ -17,6 +17,9 @@ const engines = {
   orbitlab: await import("../src/orbitlab/model.js"),
   fieldlab: await import("../src/fieldlab/model.js"),
   circuitlab: await import("../src/circuitlab/model.js"),
+  rays: await import("../src/wavelab/rays.js"),
+  waves: await import("../src/wavelab/waves.js"),
+  sound: await import("../src/wavelab/sound.js"),
 };
 const defaults = (t) =>
   Object.fromEntries([

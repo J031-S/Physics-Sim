@@ -1201,7 +1201,7 @@ export const tools = [
       v: "@f·@lambda",
       f: "\\frac{@v}{@lambda}",
     },
-    wants: "waves",
+    related: "waves",
   }),
   tool({
     id: "period-frequency",
@@ -1217,7 +1217,7 @@ export const tools = [
     solveFor: ["T", "f"],
     solve: { T: ({ f }) => 1 / f, f: ({ T }) => 1 / T },
     forms: { T: "\\frac{1}{@f}", f: "\\frac{1}{@T}" },
-    wants: "waves",
+    related: "waves",
   }),
   tool({
     id: "snells-law",
@@ -1246,7 +1246,7 @@ export const tools = [
       n2: "\\frac{@n1\\sin @theta1}{\\sin @theta2}",
       theta1: "\\arcsin\\left(\\frac{@n2\\sin @theta2}{@n1}\\right)",
     },
-    wants: "waves",
+    related: "waves",
   }),
   tool({
     id: "standing-waves",
@@ -1272,7 +1272,7 @@ export const tools = [
       v: "\\frac{2·@L·@f}{@n}",
       L: "\\frac{@n·@v}{2·@f}",
     },
-    wants: "waves",
+    related: "waves",
   }),
   tool({
     id: "inverse-square-intensity",
@@ -1297,7 +1297,11 @@ export const tools = [
       P: "4\\pi·@r^{2}·@I",
       r: "\\sqrt{\\frac{@P}{4\\pi·@I}}",
     },
-    wants: "waves",
+    // The waves tool's tank is 2D, where a point source's waves spread over
+    // circles (intensity falls as 1/r, not 1/r²), so it cannot show this; it
+    // waits for a simulation of waves in 3D.
+    wants: "waves-3d",
+    related: "waves",
   }),
 
   // ---------------------------------------------------------------- modern physics

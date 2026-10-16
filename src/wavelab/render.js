@@ -668,7 +668,8 @@ export function drawSound(ctx, lab, o) {
       text("plucked here", px, mid - A.height * 0.25, c.soft, "center");
     } else text("struck here", x0 + (x1 - x0) * s.string.position, mid - A.height * 0.25, c.soft, "center");
     text(single ? `L = ${L} m · harmonic ${n} drawn at a set height` : `L = ${L} m · sideways displacement drawn ${Math.round(gain / ((x1 - x0) / L))} times larger than the length`, x0, A.top + A.height - 16, c.soft);
-    // The spectrum: amplitude of each mode.
+    // The spectrum: amplitude of each mode (left out where there is no room).
+    if (o.spectrum === false) return;
     const modes = string.modes().slice(0, 16),
       biggest = Math.max(...modes.map((m) => Math.abs(m.amplitude)), 1e-30),
       by = A.top + A.height * 0.82,

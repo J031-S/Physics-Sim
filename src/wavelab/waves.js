@@ -31,11 +31,14 @@ const SPREAD = 3; // cells either side covered by a point source
 const WEIGHTS = new Float64Array((2 * SPREAD + 1) ** 2);
 
 const deg = Math.PI / 180;
+// The scheme is scale-free, so a tank may be any size in metres (light's
+// wavelengths are 10⁻⁷ m, sound's up to tens of metres); what limits a
+// tank is its number of cells (MAX_CELLS).
 export const LIMITS = {
-  size: { min: 1, max: 200 }, // tank width and height
-  cell: { min: 1e-3, max: 1 },
+  size: { min: 1e-9, max: 1e6 }, // tank width and height
+  cell: { min: 1e-12, max: 1e5 },
   speed: { min: 1e-3, max: 1e9 },
-  frequency: { min: 1e-3, max: 1e9 },
+  frequency: { min: 1e-3, max: 1e16 },
   amplitude: { min: 0, max: 100 },
   index: { min: 1, max: 4 },
   damping: { min: 0, max: 10 }, // γ, per second
@@ -93,11 +96,11 @@ function check(key, value) {
     case "slitWidth":
     case "separation":
       num();
-      if (!(value > 0 && value <= 1000)) bad(`The ${key} must be more than 0 and at most 1000 m.`);
+      if (!(value > 0 && value <= 1e7)) bad(`The ${key} must be more than 0.`);
       return;
     case "thickness":
       num();
-      if (!(value >= 0 && value <= 1000)) bad("The thickness must be between 0 and 1000 m.");
+      if (!(value >= 0 && value <= 1e7)) bad("The thickness cannot be negative.");
       return;
     case "frequency":
       num();
@@ -202,34 +205,66 @@ export class WaveLab {
       [width, LIMITS.size, "width"],
       [height, LIMITS.size, "height"],
     ])
-      if (!(v >= lim.min && v <= lim.max)) bad(`The tank's ${name} must be between 1 and 200 m.`);
-    if (!(cell >= LIMITS.cell.min && cell <= LIMITS.cell.max)) bad("The cell size must be between 1 mm and 1 m.");
+      if (!(v >= lim.min && v <= lim.max)) bad(`The tank's ${name} must be between 1 nm and 1000 km.`);
+    if (!(cell >= LIMITS.cell.min && cell <= LIMITS.cell.max)) bad("The cell size is out of range.");
+    if (cell > Math.min(width, height) / 4) bad("The cells must be smaller than a quarter of the tank.");
     if (!(speed >= LIMITS.speed.min && speed <= LIMITS.speed.max)) bad("The wave speed is out of range.");
     if (!["absorb", "wall"].includes(edges)) bad("The tank's edges either absorb or reflect.");
     if (!(damping >= LIMITS.damping.min && damping <= LIMITS.damping.max)) bad("The damping must be between 0 and 10 per second.");
-    if (!(absorber >= 0.5 && absorber <= 20)) bad("The absorbing layer must be between 0.5 and 20 m thick.");
+    if (!(absorber > 0 && absorber <= 1e6)) bad("The absorbing layer's thickness is out of range.");
     const pad = edges === "absorb" ? Math.max(8, Math.round(absorber / cell)) : 1,
       nx = Math.round(width / cell) + 2 * pad,
       ny = Math.round(height / cell) + 2 * pad;
     if (nx * ny > MAX_CELLS) bad("That grid would have too many cells: make the tank smaller or the cells larger.");
     Object.assign(this, { width, height, cell, speed, edges, damping, absorber, pad, nx, ny });
     this.dt = (COURANT * cell) / speed;
-    const n = nx * ny;
-    this.u0 = new Float32Array(n);
-    this.u1 = new Float32Array(n);
-    this.u2 = new Float32Array(n);
-    this.avg = new Float32Array(n);
-    this.sum = new Float32Array(n);
-    this.c2 = new Float32Array(n);
-    this.keep = new Float32Array(n); // 1/(1 + γdt/2), 0 in walls
-    this.back = new Float32Array(n); // 1 − γdt/2
+    // The grid is allocated and laid out on first use (#ready), so that
+    // building a tank only to check its settings costs nothing.
+    this._u0 = this._u1 = this._u2 = this._avg = this._sum = this._c2 = this._keep = this._back = null;
+    this.stale = true;
     this.steps = 0;
     this.carry = 0;
     this.samples = 0;
     this.tracking = true;
     this.sources = [];
     this.histories = new Map();
-    this.#build();
+  }
+  #ready() {
+    if (!this._u1) {
+      const n = this.nx * this.ny;
+      this._u0 = new Float32Array(n);
+      this._u1 = new Float32Array(n);
+      this._u2 = new Float32Array(n);
+      this._avg = new Float32Array(n);
+      this._sum = new Float32Array(n);
+      this._c2 = new Float32Array(n); // (c dt/h)²
+      this._keep = new Float32Array(n); // 1/(1 + γdt/2), 0 in walls
+      this._back = new Float32Array(n); // 1 − γdt/2
+      this.stale = true;
+    }
+    if (this.stale) this.#build();
+  }
+  // The grid's arrays, one value per cell (row by row from the bottom left,
+  // nx to a row, the absorbing layer included).
+  get u0() {
+    this.#ready();
+    return this._u0;
+  }
+  get u1() {
+    this.#ready();
+    return this._u1;
+  }
+  get avg() {
+    this.#ready();
+    return this._avg;
+  }
+  get c2() {
+    this.#ready();
+    return this._c2;
+  }
+  get keep() {
+    this.#ready();
+    return this._keep;
   }
   get time() {
     return this.steps * this.dt;
@@ -238,7 +273,7 @@ export class WaveLab {
   // kept up to date; it costs a third of each step. Turning it back on
   // starts it afresh.
   trackIntensity(on) {
-    if (on && !this.tracking) this.avg.fill(0);
+    if (on && !this.tracking && this._avg) this._avg.fill(0);
     this.tracking = !!on;
   }
   // Left edge and bottom edge of the grid (the tank and its absorbing
@@ -266,7 +301,7 @@ export class WaveLab {
     item.start = this.time; // when its clock (ramp, motion) began
     this.items.set(item.id, item);
     if (kind === "probe") this.histories.set(item.id, { t: [], u: [] });
-    this.#build();
+    this.#changed();
     return item.id;
   }
   update(id, patch) {
@@ -282,12 +317,12 @@ export class WaveLab {
     this.#cells(this.tank, this.list().map((i) => (i.id === id ? next : i)));
     this.items.set(id, next);
     if (next.kind === "probe") this.histories.set(id, { t: [], u: [] });
-    this.#build();
+    this.#changed();
   }
   remove(id) {
     this.items.delete(id);
     this.histories.delete(id);
-    this.#build();
+    this.#changed();
   }
   clear() {
     this.items.clear();
@@ -327,8 +362,13 @@ export class WaveLab {
       );
   }
 
+  #changed() {
+    this.stale = true;
+    this.sources = this.list().filter((i) => isSource(i.kind));
+  }
   // Lays the walls, media, sponge and sources onto the grid.
   #build() {
+    this.stale = false;
     const { nx, ny, cell: h, pad, dt } = this,
       walls = this.list().filter((i) => i.kind === "wall"),
       media = this.list().filter((i) => i.kind === "medium");
@@ -344,7 +384,7 @@ export class WaveLab {
           k = j * nx + i;
         let n = 1;
         for (const m of media) if (inMedium(m, x, y)) n = m.index;
-        this.c2[k] = base / (n * n);
+        this._c2[k] = base / (n * n);
         let gamma = this.damping;
         if (this.edges === "absorb") {
           const d = Math.max(pad - i - 0.5, i + 0.5 - (nx - pad), pad - j - 0.5, j + 0.5 - (ny - pad), 0) / pad;
@@ -354,9 +394,9 @@ export class WaveLab {
         let wall = false;
         if (this.edges === "wall" && (i === 0 || j === 0 || i === nx - 1 || j === ny - 1)) wall = true;
         for (const w of walls) if (!wall && inWall(w, x, y, 0.71 * h)) wall = true;
-        this.keep[k] = wall ? 0 : 1 / (1 + s);
-        this.back[k] = 1 - s;
-        if (wall) this.u0[k] = this.u1[k] = 0;
+        this._keep[k] = wall ? 0 : 1 / (1 + s);
+        this._back[k] = 1 - s;
+        if (wall) this._u0[k] = this._u1[k] = 0;
       }
     }
     this.sources = this.list().filter((i) => isSource(i.kind));
@@ -366,10 +406,11 @@ export class WaveLab {
 
   // Clears the waves and the clock; the tank is kept.
   reset() {
-    this.u0.fill(0);
-    this.u1.fill(0);
-    this.avg.fill(0);
-    this.sum.fill(0);
+    this.#ready();
+    this._u0.fill(0);
+    this._u1.fill(0);
+    this._avg.fill(0);
+    this._sum.fill(0);
     this.samples = 0;
     this.steps = 0;
     this.carry = 0;
@@ -382,16 +423,17 @@ export class WaveLab {
   // A still Gaussian bump of displacement (for the energy check and for a
   // pulse to watch).
   pulse({ x, y, width = 0.5, amplitude = 1 }) {
+    this.#ready();
     const { nx, ny, cell: h } = this;
     for (let j = 0; j < ny; j++)
       for (let i = 0; i < nx; i++) {
         const k = j * nx + i;
-        if (!this.keep[k]) continue;
+        if (!this._keep[k]) continue;
         const dx = this.x0 + (i + 0.5) * h - x,
           dy = this.y0 + (j + 0.5) * h - y,
           v = amplitude * Math.exp(-(dx * dx + dy * dy) / (2 * width * width));
-        this.u0[k] += v;
-        this.u1[k] += v;
+        this._u0[k] += v;
+        this._u1[k] += v;
       }
   }
 
@@ -410,11 +452,11 @@ export class WaveLab {
           b = fy - j;
         if (i < 1 || j < 1 || i >= this.nx - 2 || j >= this.ny - 2) return false;
         const k = j * this.nx + i;
-        const K = this.keep;
-        this.u2[k] += s * (1 - a) * (1 - b) * K[k];
-        this.u2[k + 1] += s * a * (1 - b) * K[k + 1];
-        this.u2[k + this.nx] += s * (1 - a) * b * K[k + this.nx];
-        this.u2[k + this.nx + 1] += s * a * b * K[k + this.nx + 1];
+        const K = this._keep;
+        this._u2[k] += s * (1 - a) * (1 - b) * K[k];
+        this._u2[k + 1] += s * a * (1 - b) * K[k + 1];
+        this._u2[k + this.nx] += s * (1 - a) * b * K[k + this.nx];
+        this._u2[k + this.nx + 1] += s * a * b * K[k + this.nx + 1];
         return true;
       },
       // A point term spread as a Gaussian one cell wide (normalised over
@@ -440,7 +482,7 @@ export class WaveLab {
         for (let dj = -R, q = 0; dj <= R; dj++)
           for (let di = -R; di <= R; di++, q++) {
             const k = (cj + dj) * this.nx + ci + di;
-            this.u2[k] += ((s * w[q]) / total) * this.keep[k];
+            this._u2[k] += ((s * w[q]) / total) * this._keep[k];
           }
         return true;
       };
@@ -491,7 +533,8 @@ export class WaveLab {
   // The running mean of u² is updated in the same pass (memory, not
   // arithmetic, is what limits this loop).
   step() {
-    const { nx, ny, u0, u1, u2, c2, keep, back, avg, sum } = this;
+    this.#ready();
+    const { nx, ny, _u0: u0, _u1: u1, _u2: u2, _c2: c2, _keep: keep, _back: back, _avg: avg, _sum: sum } = this;
     let f = Infinity;
     for (const s of this.sources) f = Math.min(f, s.frequency);
     // Running mean of u² over about two periods of the slowest source.
@@ -537,9 +580,9 @@ export class WaveLab {
       }
     }
     // Rotate the three time levels.
-    this.u0 = u1;
-    this.u1 = u2;
-    this.u2 = u0;
+    this._u0 = u1;
+    this._u1 = u2;
+    this._u2 = u0;
     this.steps++;
     if (averaging) this.samples++;
     for (const [id, h] of this.histories) {
@@ -568,6 +611,7 @@ export class WaveLab {
   // -------------------------------------------------------------- reading
 
   #sample(field, x, y) {
+    this.#ready();
     const h = this.cell,
       fx = (x - this.x0) / h - 0.5,
       fy = (y - this.y0) / h - 0.5,
@@ -594,12 +638,32 @@ export class WaveLab {
   }
   // The exact mean of u² since startAverage().
   startAverage() {
-    this.sum.fill(0);
+    this.#ready();
+    this._sum.fill(0);
     this.samples = 0;
     this.averaging = true;
   }
   averageAt(x, y) {
-    return this.samples ? this.#sample(this.sum, x, y) / this.samples : 0;
+    this.#ready();
+    return this.samples ? this.#sample(this._sum, x, y) / this.samples : 0;
+  }
+  /**
+   * The wavelength along a line at this instant: the mean spacing of the
+   * places where the field crosses zero going up, from (x, y) for `length`
+   * metres in the direction `angle`, sampled every hundredth of a cell.
+   * Null with fewer than three crossings.
+   */
+  wavelengthAlong(x, y, angle, length) {
+    const a = unit(angle),
+      ds = this.cell / 100,
+      out = [];
+    let prev = this.value(x, y);
+    for (let s = ds; s <= length; s += ds) {
+      const u = this.value(x + a.x * s, y + a.y * s);
+      if (prev < 0 && u >= 0) out.push(s - (ds * u) / (u - prev));
+      prev = u;
+    }
+    return out.length < 3 ? null : (out.at(-1) - out[0]) / (out.length - 1);
   }
   history(id) {
     return this.histories.get(id) ?? { t: [], u: [] };
@@ -652,7 +716,8 @@ export class WaveLab {
    * per unit density, summed over the grid (walls are u = 0).
    */
   energy() {
-    const { nx, ny, u0, u1, dt, cell: h } = this;
+    this.#ready();
+    const { nx, ny, _u0: u0, _u1: u1, dt, cell: h } = this;
     let kinetic = 0,
       strain = 0;
     const cdt = COURANT; // c₀ dt / h
@@ -662,7 +727,7 @@ export class WaveLab {
           v = (u1[k] - u0[k]) / dt;
         // 1/c² = (dt/h)² / c2 with c2 = (c dt/h)²; in units of c₀ = 1 after
         // dividing by (c₀dt/h)².
-        if (this.keep[k]) kinetic += (v * v * cdt * cdt) / this.c2[k];
+        if (this._keep[k]) kinetic += (v * v * cdt * cdt) / this._c2[k];
         if (i < nx - 1) strain += (u1[k + 1] - u1[k]) * (u0[k + 1] - u0[k]);
         if (j < ny - 1) strain += (u1[k + nx] - u1[k]) * (u0[k + nx] - u0[k]);
       }

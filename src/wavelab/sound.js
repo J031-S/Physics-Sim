@@ -90,7 +90,9 @@ export class SoundString {
     if (!(length > 0 && length <= 100)) bad("The string's length must be more than 0 and at most 100 m.");
     if (!(tension > 0 && tension <= 1e5)) bad("The tension must be more than 0 and at most 100 kN.");
     if (!(density > 0 && density <= 10)) bad("The mass per unit length must be more than 0 and at most 10 kg/m.");
-    if (!(pluck.position > 0 && pluck.position < 1)) bad("Pluck the string somewhere between its ends.");
+    if (pluck.kind === "mode") {
+      if (!Number.isInteger(pluck.n) || pluck.n < 1 || pluck.n > modes) bad("The harmonic must be a whole number from 1 up.");
+    } else if (!(pluck.position > 0 && pluck.position < 1)) bad("Pluck the string somewhere between its ends.");
     if (!Number.isInteger(modes) || modes < 1 || modes > 2000) bad("Use between 1 and 2000 modes.");
     if (!(damping >= 0)) bad("The decay time cannot be negative.");
     Object.assign(this, { length, tension, density, pluck: { ...pluck }, modeCount: modes, damping });
@@ -109,7 +111,10 @@ export class SoundString {
         w = 2 * Math.PI * this.frequency(n);
       let b = 0,
         c = 0;
-      if (this.pluck.kind === "pluck") {
+      if (this.pluck.kind === "mode") {
+        // Set going in one harmonic: sin(nπx/L) of the given height.
+        b = n === this.pluck.n ? this.pluck.height : 0;
+      } else if (this.pluck.kind === "pluck") {
         // (2/L) ∫ triangle · sin(kx) dx.
         b = ((2 * this.pluck.height * L * L) / (n * n * Math.PI * Math.PI * p * (L - p))) * Math.sin(k * p);
       } else {
@@ -135,7 +140,7 @@ export class SoundString {
     return this.terms.map((m) => ({
       n: m.n,
       frequency: m.w / (2 * Math.PI),
-      amplitude: this.pluck.kind === "pluck" ? m.b : m.c,
+      amplitude: this.pluck.kind === "strike" ? m.c : m.b,
     }));
   }
   // What the page plays: the force the string puts on its end support,
@@ -146,6 +151,42 @@ export class SoundString {
     const list = this.terms.slice(0, count).map((m) => ({ frequency: m.w / (2 * Math.PI), weight: Math.abs(m.n * (m.b || m.c)) }));
     const total = list.reduce((s, h) => s + h.weight, 0) || 1;
     return { harmonics: list.map((h) => ({ frequency: h.frequency, amplitude: h.weight / total })), decay: this.damping };
+  }
+}
+
+/**
+ * A string watched through time, for the minitools: the SoundString's
+ * shape at the clock's time, and a record of the displacement at one point
+ * taken at every `advance`, from which its frequency is measured.
+ */
+export class StringScene {
+  constructor(options, watchAt) {
+    this.string = new SoundString(options);
+    this.time = 0;
+    this.watchAt = watchAt ?? options.length / 2;
+    this.record = { t: [0], y: [this.string.shape(this.watchAt, 0)] };
+    this.tags = {};
+  }
+  advance(dt) {
+    if (!(dt > 0)) return 0;
+    this.time += dt;
+    this.record.t.push(this.time);
+    this.record.y.push(this.string.shape(this.watchAt, this.time));
+    if (this.record.t.length > 4000) {
+      this.record.t.splice(0, 1000);
+      this.record.y.splice(0, 1000);
+    }
+    return dt;
+  }
+  // The frequency of the watched point's motion: the mean spacing of its
+  // downward zero crossings (it starts at a crest), each placed by
+  // interpolation. Null before two whole cycles.
+  measuredFrequency() {
+    const { t, y } = this.record,
+      times = [];
+    for (let i = 1; i < t.length; i++)
+      if (y[i - 1] > 0 && y[i] <= 0) times.push(t[i] - ((t[i] - t[i - 1]) * y[i]) / (y[i] - y[i - 1]));
+    return times.length < 3 ? null : (times.length - 1) / (times.at(-1) - times[0]);
   }
 }
 

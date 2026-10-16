@@ -47,6 +47,13 @@ function turning(rate) {
     );
 }
 
+// The wavelength measured on a ripple tank's grid at the end of the run,
+// between upward zero crossings along the middle (null until then).
+const waveLength = (m) =>
+  m.time >= 12 / m.tags.f ? m.wavelengthAlong(-2.5 * m.tags.l, 0, 0, 5 * m.tags.l) : null;
+// The first surface a rays scene's ray meets: what happened there.
+const surface = (m) => m.readings(m.trace(), m.tags.ray)[0]?.events[0] ?? null;
+
 // What an engine says when it cannot take a value, in plain words.
 const LIMITS = [
   [/setting: gravity/, "gravity in the sandbox goes up to 50 m/s²."],
@@ -1443,6 +1450,117 @@ export const sims = {
     speed: (v) => paced(2 * Math.PI * Math.sqrt(v.L / v.g), 3),
     watch: { T: (m) => period(m, "T", ball(m).x, 0, m.time) },
   },
+  // ---------------------------------------------------------------- waves
+
+  "wave-equation": {
+    engine: "waves",
+    caption:
+      "A ripple tank set to the wave speed v and driven at the frequency f, 30 grid cells to a wavelength. The wavelength is measured on the grid (the spacing of the waves' upward zero crossings), the frequency by a probe, and v = fλ from those.",
+    build: (v, E) => {
+      const l = v.v / v.f,
+        lab = new E.WaveLab({ width: 10 * l, height: 12 * l, cell: l / 30, speed: v.v, absorber: 2 * l });
+      // A line source running through the absorbing layer: plane waves.
+      lab.add("line", { x: -4 * l, y: 0, angle: 0, length: 16.5 * l, frequency: v.f, amplitude: 1 });
+      lab.tags = { probe: lab.add("probe", { x: l, y: 0 }), l, f: v.f };
+      return lab;
+    },
+    // Twelve periods: the waves have filled the tank and those sent while
+    // the source was switched on have gone by.
+    duration: (v) => 12.5 / v.f,
+    speed: (v) => 2 / v.f,
+    watch: {
+      lambda: (m) => waveLength(m),
+      v: (m) => {
+        const l = waveLength(m),
+          r = m.probeReading(m.tags.probe);
+        return l && r ? l * r.frequency : null;
+      },
+      f: (m) => (m.time >= 12 / m.tags.f ? (m.probeReading(m.tags.probe)?.frequency ?? null) : null),
+    },
+  },
+  "period-frequency": {
+    engine: "waves",
+    caption:
+      "A source of frequency f in a ripple tank; the probe times its waves' cycles (the spacing of their upward zero crossings), giving the period T and its frequency.",
+    build: (v, E) => {
+      const f = v.f,
+        lab = new E.WaveLab({ width: 6, height: 6, cell: 0.05, speed: f });
+      // Waves of 1 m: the speed is f metres per second.
+      lab.add("point", { x: -1, y: 0, frequency: f, amplitude: 1 });
+      lab.tags = { probe: lab.add("probe", { x: 1, y: 0 }), f };
+      return lab;
+    },
+    // In 2D a point source's switching on leaves a slowly fading tail that
+    // shifts the zero crossings (0.4% after 7 periods); by 15 it is gone.
+    duration: (v) => 16 / v.f,
+    speed: (v) => 2 / v.f,
+    watch: {
+      T: (m) => {
+        const r = m.time >= 15 / m.tags.f ? m.probeReading(m.tags.probe) : null;
+        return r ? 1 / r.frequency : null;
+      },
+      f: (m) => (m.time >= 15 / m.tags.f ? (m.probeReading(m.tags.probe)?.frequency ?? null) : null),
+    },
+  },
+  "snells-law": {
+    engine: "rays",
+    caption:
+      "A ray in a medium of index n₁ meets a flat surface of a block of index n₂ at θ₁ to the normal. The angles are measured from the traced ray, which follows Snell's law in vector form; beyond the critical angle it is totally reflected.",
+    build: (v, E) => {
+      const lab = new E.RayLab();
+      lab.setMedium(v.n1);
+      lab.add("block", { x: 0, y: -0.5, width: 2, height: 1, material: "fixed", index: v.n2 });
+      const a = v.theta1 * deg;
+      lab.tags = {
+        ray: lab.add("ray", { x: -0.4 * Math.sin(a), y: 0.4 * Math.cos(a), angle: a - Math.PI / 2 }),
+        view: { x: 0, y: 0, width: 1.1 },
+        n1: v.n1,
+      };
+      return lab;
+    },
+    watch: {
+      theta2: (m) => {
+        const e = surface(m);
+        return e?.event === "refract" ? e.leaving / deg : null;
+      },
+      theta1: (m) => {
+        const e = surface(m);
+        return e ? e.incidence / deg : null;
+      },
+      n2: (m) => {
+        const e = surface(m);
+        return e?.event === "refract" ? (m.tags.n1 * Math.sin(e.incidence)) / Math.sin(e.leaving) : null;
+      },
+    },
+  },
+  "standing-waves": {
+    engine: "sound",
+    caption:
+      "A string of length L with waves travelling along it at v, set going in harmonic n alone: n half-wavelengths fit between its fixed ends. The frequency is timed at an antinode (the spacing of its zero crossings).",
+    build: (v, E) => {
+      // Tension for the wave speed v on a string of 1 g per metre.
+      const scene = new E.StringScene(
+        { length: v.L, tension: v.v * v.v * 1e-3, density: 1e-3, pluck: { kind: "mode", n: v.n, height: v.L / 40 }, modes: v.n },
+        v.L / (2 * v.n),
+      );
+      scene.tags = { n: v.n, L: v.L, f: v.f };
+      return scene;
+    },
+    duration: (v) => 3 / v.f,
+    speed: (v) => 1 / v.f,
+    watch: {
+      f: (m) => (m.time >= 2.5 / m.tags.f ? m.measuredFrequency() : null),
+      v: (m) => {
+        const f = m.time >= 2.5 / m.tags.f ? m.measuredFrequency() : null;
+        return f ? (2 * m.tags.L * f) / m.tags.n : null;
+      },
+      L: (m) => {
+        const f = m.time >= 2.5 / m.tags.f ? m.measuredFrequency() : null;
+        return f ? (m.tags.n * m.string.speed) / (2 * f) : null;
+      },
+    },
+  },
+
   "collisions-1d": {
     engine: "sandbox",
     bars: "momentum",

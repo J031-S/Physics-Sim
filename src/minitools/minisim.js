@@ -58,6 +58,28 @@ const ENGINES = {
     ]);
     return { E, R, ...circuitDriver };
   },
+  // The waves, light & sound tool's three models share one renderer.
+  async rays() {
+    const [E, R] = await Promise.all([
+      import("../wavelab/rays.js"),
+      import("../wavelab/render.js"),
+    ]);
+    return { E, R, ...raysDriver };
+  },
+  async waves() {
+    const [E, R] = await Promise.all([
+      import("../wavelab/waves.js"),
+      import("../wavelab/render.js"),
+    ]);
+    return { E, R, ...wavesDriver };
+  },
+  async sound() {
+    const [E, R] = await Promise.all([
+      import("../wavelab/sound.js"),
+      import("../wavelab/render.js"),
+    ]);
+    return { E, R, ...soundDriver };
+  },
 };
 
 // ---------------------------------------------------------------- sandbox
@@ -363,6 +385,79 @@ const circuitDriver = {
       current: true,
       electrons: shown.electrons,
       phase,
+    });
+  },
+};
+
+// ---------------------------------------------------------------- waves tool
+
+const noArrows = () => ({ velocity: false, force: false, electrons: false });
+// The view that shows a region { x, y (its middle), width } of the world.
+function showRegion(view, size, x, y, width, height) {
+  view.scale = Math.min(size.width / width, size.height / height);
+  view.x = size.width / 2 - x * view.scale;
+  view.y = size.height / 2 + y * view.scale;
+  view.width = size.width;
+  view.height = size.height;
+}
+const raysDriver = {
+  // A ray tracing is worked out at once: nothing moves.
+  still: true,
+  arrows: noArrows,
+  renderer: (R, ctx, view) => R.createWaveRenderer(ctx, view),
+  draw(model, renderer, view, size, prefs, R) {
+    const r = model.tags.view;
+    showRegion(view, size, r.x, r.y, r.width, r.width * (size.height / size.width));
+    renderer.drawRays(model, {
+      colours: R.wavePalette(isDark()),
+      grid: prefs.grid,
+      trace: model.trace(),
+      images: model.images(),
+      selected: null,
+      foci: true,
+    });
+  },
+};
+const wavesDriver = {
+  still: false,
+  arrows: noArrows,
+  renderer: (R, ctx, view) => R.createWaveRenderer(ctx, view),
+  draw(model, renderer, view, size, prefs, R) {
+    showRegion(view, size, 0, 0, model.width, model.height);
+    // Only the wave is shown, so the running mean need not be kept.
+    model.trackIntensity(false);
+    let amp = 0;
+    for (const s of model.list()) if (s.amplitude) amp = Math.max(amp, s.amplitude);
+    renderer.drawWaves(model, {
+      colours: R.wavePalette(isDark()),
+      grid: false,
+      display: "wave",
+      gain: 1.2 * (amp || 1),
+      selected: null,
+      readings: new Map(),
+      fringes: new Map(),
+    });
+  },
+};
+const soundDriver = {
+  still: false,
+  arrows: noArrows,
+  renderer: () => null,
+  draw(model, renderer, view, size, prefs, R, E, ctx) {
+    // The string drawn as the sound view draws it, showing harmonic n alone.
+    const st = model.string,
+      lab = {
+        state: {
+          mode: "string",
+          string: { length: st.length, kind: "pluck", position: 0.5, height: st.pluck.height, harmonic: st.pluck.n },
+        },
+      };
+    R.drawSound(ctx, lab, {
+      colours: R.wavePalette(isDark()),
+      area: { left: 0, top: 0, width: size.width, height: size.height },
+      time: model.time,
+      string: st,
+      spectrum: false,
     });
   },
 };

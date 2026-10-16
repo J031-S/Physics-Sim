@@ -23,7 +23,7 @@ const blend = (a, b, f) => {
  */
 export function startRun(sim, E, values, unknown) {
   const model = sim.build(values(), E),
-    still = sim.engine === "fieldlab",
+    still = sim.engine === "fieldlab" || sim.engine === "rays",
     time = () => (still ? 0 : model.time),
     end = () => (sim.duration ? sim.duration(values(), model) : null),
     speed = () => (sim.speed ? sim.speed(values(), model) : 1);
