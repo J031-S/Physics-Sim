@@ -868,7 +868,24 @@ function wavesReadings() {
       const fr = w.fringes(chosen.id);
       if (fr) rows.push(["Marks", `${fr.kind} fringes, ${fr.rule}`]);
     }
-    if (chosen.kind === "probe") rows.push(["Displacement now", fmt(w.value(chosen.x, chosen.y), 3), "probe"]);
+  }
+  // Every probe: what it measures, beside what the formula says for a
+  // moving source (the Doppler shift) where there is one.
+  const mover = w.list().find((i) => i.kind === "moving" && i.speed < 1);
+  for (const p of w.list().filter((i) => i.kind === "probe")) {
+    if (chosen && chosen.id !== p.id && chosen.kind === "probe") continue;
+    const r = w.probeReading(p.id);
+    rows.push(`Probe at (${fmt(p.x, 3)}, ${fmt(p.y, 3)}) λ`);
+    rows.push(["Frequency (measured)", r ? `${fmt(r.frequency, 4)} f₀` : "waiting for waves", `probe-${p.id}-f`]);
+    rows.push(["Amplitude (measured)", r ? fmt(r.amplitude, 3) : "—", `probe-${p.id}-a`]);
+    if (mover) {
+      // Ahead of the source (the probe on the side it is heading for) or
+      // behind it, along its line of motion.
+      const at = w.sourcePosition(mover),
+        a = { x: Math.cos(mover.angle), y: Math.sin(mover.angle) },
+        ahead = (p.x - at.x) * a.x + (p.y - at.y) * a.y > 0;
+      rows.push([ahead ? "Formula ahead, f/(1 − v/c)" : "Formula behind, f/(1 + v/c)", `${fmt(mover.frequency / (ahead ? 1 - mover.speed : 1 + mover.speed), 4)} f₀`]);
+    }
   }
   readingsHtml(rows);
   put($("readings-note"), "A 2D tank: a point source's waves spread over circles, so their amplitude falls as 1/√r (not 1/r as in 3D); no inverse-square readings here. Scalar waves only. The grid makes waves of 20 cells per wavelength travel about 0.3% slow along the grid (0.06% diagonally).");
@@ -1166,8 +1183,9 @@ function frame(now) {
     const took = performance.now() - t0;
     if (state.mode === "waves") {
       // The model stops short rather than take longer steps; how many it may
-      // take in a frame is set to what this computer does in about 6 ms.
-      if (took > 7 || simulated < 0.5 * wanted) budget = clamp(budget * clamp(6 / Math.max(took, 0.5), 0.7, 1.3), 1, 20000);
+      // take in a frame is set to what this computer does in about 9 ms,
+      // which leaves time to draw within a 60 Hz frame on most machines.
+      if (took > 10 || simulated < 0.5 * wanted) budget = clamp(budget * clamp(9 / Math.max(took, 0.5), 0.7, 1.3), 1, 20000);
       state.achieved += (simulated / elapsed - state.achieved) * 0.1;
     }
   }

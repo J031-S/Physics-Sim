@@ -7,7 +7,7 @@
 //
 // Everything in the rays and waves scenes is placed in world coordinates,
 // so panning and zooming move the picture without changing it.
-import { paletteOf, spectralColour } from "../site/theme.js";
+import { paletteOf, spectralColour, value } from "../site/theme.js";
 import { arrowheadScale, endGrid, gridDash, vectorWeight } from "../site/canvas-style.js";
 import { focalLength, frame, isSource as isRaySource, outlineOf } from "./rays.js";
 import { slitOffsets } from "./waves.js";
@@ -57,7 +57,13 @@ export function createWaveRenderer(ctx, view) {
       px = step * view.scale,
       major = (v) => Math.abs(v / (step * 5) - Math.round(v / (step * 5))) < 1e-6;
     ctx.lineWidth = 1;
+    // The dotted grid's dots are set from the world origin, not from the
+    // canvas edge where each line starts, so that they move with the scene
+    // (the shared helper leaves their phase at the edge).
+    const dotted = value("grid-style") === "dotted",
+      period = 5; // gridDash's dotted pattern: 1.5 on, 3.5 off
     gridDash(ctx, px, (screen(0, Math.ceil(lo.y / step) * step)[1] + 0.5) % px);
+    if (dotted) ctx.lineDashOffset = -(((view.y % period) + period) % period);
     for (let x = Math.ceil(lo.x / step) * step; x <= hi.x; x += step) {
       ctx.strokeStyle = major(x) ? c.gridMajor : c.gridMinor;
       const sx = Math.round(screen(x, 0)[0]) + 0.5;
@@ -67,6 +73,7 @@ export function createWaveRenderer(ctx, view) {
       ctx.stroke();
     }
     gridDash(ctx, px, (screen(Math.ceil(lo.x / step) * step, 0)[0] + 0.5) % px);
+    if (dotted) ctx.lineDashOffset = -(((view.x % period) + period) % period);
     for (let y = Math.ceil(lo.y / step) * step; y <= hi.y; y += step) {
       ctx.strokeStyle = major(y) ? c.gridMajor : c.gridMinor;
       const sy = Math.round(screen(0, y)[1]) + 0.5;
@@ -79,20 +86,29 @@ export function createWaveRenderer(ctx, view) {
     return step;
   }
 
-  // A line segment in world coordinates, clipped to the view (rays that
-  // escape are a kilometre long).
+  // A line segment in world coordinates, drawn through vertices every Δ
+  // along it from its start (Δ about 48 px, a power of two in metres), and
+  // only over the stretch that can be seen. The vertices are fixed in the
+  // world, so panning moves every vertex by the same whole number of pixels
+  // and the line is rasterised the same; only the piece crossing the edge
+  // of the canvas, which the browser clips, can differ. Clipping a long ray
+  // to the view instead would move its end points as the view pans.
   function worldLine(x1, y1, x2, y2) {
-    const lo = world(-50, view.height + 50),
-      hi = world(view.width + 50, -50);
+    const dx = x2 - x1,
+      dy = y2 - y1,
+      len = Math.hypot(dx, dy);
+    if (!(len > 0)) return false;
+    const step = 2 ** Math.round(Math.log2(48 / view.scale)),
+      lo = world(-2, view.height + 2),
+      hi = world(view.width + 2, -2),
+      margin = 2 * step;
     let t0 = 0,
       t1 = 1;
-    const dx = x2 - x1,
-      dy = y2 - y1;
     for (const [p, q] of [
-      [-dx, x1 - lo.x],
-      [dx, hi.x - x1],
-      [-dy, y1 - lo.y],
-      [dy, hi.y - y1],
+      [-dx, x1 - (lo.x - margin)],
+      [dx, hi.x + margin - x1],
+      [-dy, y1 - (lo.y - margin)],
+      [dy, hi.y + margin - y1],
     ]) {
       if (p === 0) {
         if (q < 0) return false;
@@ -103,10 +119,14 @@ export function createWaveRenderer(ctx, view) {
       }
     }
     if (t0 > t1) return false;
-    const [ax, ay] = screen(x1 + dx * t0, y1 + dy * t0),
-      [bx, by] = screen(x1 + dx * t1, y1 + dy * t1);
-    ctx.moveTo(ax, ay);
-    ctx.lineTo(bx, by);
+    const first = Math.floor((t0 * len) / step),
+      last = Math.ceil((t1 * len) / step),
+      at = (k) => {
+        const s = Math.min(len, Math.max(0, k * step)) / len;
+        return screen(x1 + dx * s, y1 + dy * s);
+      };
+    ctx.moveTo(...at(first));
+    for (let k = first + 1; k <= last; k++) ctx.lineTo(...at(k));
     return true;
   }
   function arrowHead(x, y, angle, size) {
