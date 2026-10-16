@@ -12,6 +12,28 @@ export const GRID = 0.5;
 export const snap = (value) => Math.round(value / GRID) * GRID;
 const toEngine = (p) => ({ x: p.x * SCALE, y: -p.y * SCALE });
 const toWorld = (p) => ({ x: p.x / SCALE, y: -p.y / SCALE });
+// How far below its centre a body reaches (its centroid, for a wedge), from
+// scene data: { shape, width, height, angle }, y up.
+function lowestPoint({ shape, width, height, angle = 0 }) {
+  if (shape === "ball") return width / 2;
+  const c = Math.cos(angle),
+    s = Math.sin(angle),
+    corners =
+      shape === "wedge"
+        ? [
+            [(-2 * width) / 3, -height / 3],
+            [width / 3, -height / 3],
+            [width / 3, (2 * height) / 3],
+          ]
+        : [
+            [-width / 2, -height / 2],
+            [width / 2, -height / 2],
+            [width / 2, height / 2],
+            [-width / 2, height / 2],
+          ];
+  return -Math.min(...corners.map(([x, y]) => x * s + y * c));
+}
+
 export class Sandbox {
   constructor() {
     this.engine = Engine.create({
@@ -30,6 +52,8 @@ export class Sandbox {
       magneticZ: 0,
       airResistance: 0,
       snapping: false,
+      // The ground at y = 0. Off, bodies can go below it and keep falling.
+      floor: true,
       walls: false,
       chargeInteractions: false,
       coulombConstant: 1,
@@ -80,7 +104,7 @@ export class Sandbox {
     };
     for (const [key, v] of Object.entries(patch))
       if (
-        ["walls", "snapping", "chargeInteractions"].includes(key)
+        ["floor", "walls", "snapping", "chargeInteractions"].includes(key)
           ? typeof v !== "boolean"
           : !ranges[key] ||
             !Number.isFinite(v) ||
@@ -90,6 +114,18 @@ export class Sandbox {
         throw new Error("Invalid simulation setting: " + key);
     Object.assign(this.settings, patch);
     if (patch.walls !== undefined) this.syncWalls();
+    if (patch.floor !== undefined) this.syncFloor();
+  }
+  syncFloor() {
+    const present = this.engine.world.bodies.includes(this.floor);
+    if (this.settings.floor && !present)
+      Composite.add(this.engine.world, this.floor);
+    if (!this.settings.floor && present)
+      Composite.remove(this.engine.world, this.floor);
+  }
+  // The lowest a body's lowest point may be put: the floor, or nowhere.
+  get ground() {
+    return this.settings.floor ? 0 : -Infinity;
   }
   // The floor and the scene walls share one surface material. A contact uses
   // the lower friction and the higher restitution of its two bodies.
@@ -145,11 +181,14 @@ export class Sandbox {
       down = (Math.max(...ys) - b.position.y) / SCALE,
       up = (b.position.y - Math.min(...ys)) / SCALE;
     let x = p.x,
-      y = Math.max(down, p.y);
+      y = Math.max(this.ground + down, p.y);
     if (this.settings.walls && this.viewport) {
       const v = this.viewport;
       x = Math.max(v.minX + left, Math.min(v.maxX - right, x));
-      y = Math.max(Math.max(0, v.minY) + down, Math.min(v.maxY - up, y));
+      y = Math.max(
+        Math.max(this.ground, v.minY) + down,
+        Math.min(v.maxY - up, y),
+      );
     }
     return { x, y };
   }
@@ -184,11 +223,12 @@ export class Sandbox {
       p = {
         x: point.x,
         y: Math.max(
-          shape === "ball"
-            ? radius
-            : shape === "wedge"
-              ? height / 3
-              : height / 2,
+          this.ground +
+            (shape === "ball"
+              ? radius
+              : shape === "wedge"
+                ? height / 3
+                : height / 2),
           point.y,
         ),
       };
@@ -569,7 +609,7 @@ export class Sandbox {
       o.shape === "ball"
         ? p.y + height / 2
         : Math.max(...vertices.map((v) => v.y));
-    if (minY < -1e-5)
+    if (minY < this.ground - 1e-5)
       throw new Error(
         "There is not enough room above the floor. Move the object up first.",
       );
@@ -841,6 +881,7 @@ export class Sandbox {
       };
       Body.setAngle(b, o.lockRotation ? o.angleAnchor : g.angle);
       const floor =
+        this.ground +
         (Math.max(...b.vertices.map((v) => v.y)) - b.position.y) / SCALE;
       if (g.snap && !g.resize)
         desired = {
@@ -1397,86 +1438,7 @@ export class Sandbox {
     checkFormat(data, "physics-sim-scene");
     if (this.objects.size || this.links.size || this.fields.regions.size)
       throw new Error("Load a scene into an empty sandbox.");
-    const list = (value) => {
-      if (value !== undefined && !Array.isArray(value))
-        throw new Error("This scene file is damaged.");
-      return value || [];
-    };
-    const ids = new Map(),
-      resolve = (id) => {
-        if (id === null || id === undefined) return null;
-        if (!ids.has(id)) throw new Error("This scene file is damaged.");
-        return ids.get(id);
-      };
-    const bodies = list(data.bodies);
-    for (const b of bodies) {
-      // Build well above the floor so resizing cannot be refused, then place.
-      const id = this.add(b.shape, { x: 0, y: 10000 });
-      this.setLock(id, "position", false);
-      this.setLock(id, "rotation", false);
-      this.resizeBody(id, b.width, b.height);
-      const constants = {};
-      for (const key of [
-        "mass",
-        "charge",
-        "friction",
-        "restitution",
-        "linearDamping",
-        "angularDamping",
-      ])
-        if (b[key] !== undefined) constants[key] = b[key];
-      this.updateConstants(id, constants);
-      this.setPose(id, b);
-      ids.set(b.id, id);
-    }
-    for (const l of list(data.links)) {
-      const a = resolve(l.a),
-        b = resolve(l.b);
-      if (l.type === "belt") {
-        const id = this.mechanisms.createBelt(a, b);
-        this.mechanisms.configureBelt(id, {
-          crossed: !!l.crossed,
-          motor: !!l.motor,
-          speed: l.speed ?? 1,
-        });
-      } else if (l.type === "pulley") {
-        const id = this.mechanisms.createPulley(a, resolve(l.wheel), b),
-          cable = this.links.get(id);
-        if (l.reverse) this.mechanisms.cables.reverse(id, true);
-        // Keep the saved rope length and wrap rather than refitting it.
-        for (const key of ["aAngle", "bAngle", "feedA", "feedB", "length"])
-          if (Number.isFinite(l[key])) cable[key] = l[key];
-      } else {
-        const id = this.connect(l.type, a, b, l.aPoint, l.bPoint),
-          link = this.links.get(id);
-        this.updateLink(
-          id,
-          l.type === "spring"
-            ? { k: l.k, damping: l.damping, length: l.length }
-            : { length: l.length },
-        );
-        if (l.type === "spring" && l.lockAngle) {
-          const size = Math.hypot(l.axis?.x, l.axis?.y);
-          if (!(size > 1e-6)) throw new Error("This scene file is damaged.");
-          link.axis = { x: l.axis.x / size, y: l.axis.y / size };
-          link.lockAngle = true;
-        }
-      }
-    }
-    for (const b of bodies) {
-      const id = ids.get(b.id),
-        o = this.objects.get(id);
-      if (o.lockPosition !== !!b.lockPosition)
-        this.setLock(id, "position", !!b.lockPosition);
-      if (o.lockRotation !== !!b.lockRotation)
-        this.setLock(id, "rotation", !!b.lockRotation);
-      this.setVelocity(id, b);
-    }
-    for (const f of list(data.fields)) {
-      const { id: _id, type, ...rest } = f,
-        id = this.fields.add(type, { x: f.x, y: f.y });
-      this.fields.update(id, rest);
-    }
+    this.buildPart(data);
     if (data.floor) this.updateFloor(data.floor);
     if (data.bounds) {
       const { minX, maxX, minY, maxY } = data.bounds;
@@ -1492,6 +1454,266 @@ export class Sandbox {
     if (Number.isFinite(data.time)) this.time = data.time;
     if (Number.isFinite(data.fieldWork)) this.fields.work = data.fieldWork;
     return this;
+  }
+  // Build the bodies, links and fields of scene data into this sandbox, in
+  // addition to what is already here. Returns the new ids (bodies, links and
+  // fields, in that order). On failure what was built is removed again and
+  // the error is passed on, so the scene is left as it was.
+  buildPart(data) {
+    const list = (value) => {
+      if (value !== undefined && !Array.isArray(value))
+        throw new Error("This scene file is damaged.");
+      return value || [];
+    };
+    const created = [],
+      // Bodies are built far above the scene and then placed; the walls'
+      // room check would refuse that first step.
+      walls = this.settings.walls;
+    this.settings.walls = false;
+    try {
+      const ids = new Map(),
+        resolve = (id) => {
+          if (id === null || id === undefined) return null;
+          if (!ids.has(id)) throw new Error("This scene file is damaged.");
+          return ids.get(id);
+        };
+      const bodies = list(data.bodies);
+      for (const b of bodies) {
+        // Build well above the floor so resizing cannot be refused, then place.
+        const id = this.add(b.shape, { x: 0, y: 10000 });
+        created.push(id);
+        this.setLock(id, "position", false);
+        this.setLock(id, "rotation", false);
+        this.resizeBody(id, b.width, b.height);
+        const constants = {};
+        for (const key of [
+          "mass",
+          "charge",
+          "friction",
+          "restitution",
+          "linearDamping",
+          "angularDamping",
+        ])
+          if (b[key] !== undefined) constants[key] = b[key];
+        this.updateConstants(id, constants);
+        this.setPose(id, b);
+        ids.set(b.id, id);
+      }
+      for (const l of list(data.links)) {
+        const a = resolve(l.a),
+          b = resolve(l.b);
+        if (l.type === "belt") {
+          const id = this.mechanisms.createBelt(a, b);
+          created.push(id);
+          this.mechanisms.configureBelt(id, {
+            crossed: !!l.crossed,
+            motor: !!l.motor,
+            speed: l.speed ?? 1,
+          });
+        } else if (l.type === "pulley") {
+          const id = this.mechanisms.createPulley(a, resolve(l.wheel), b),
+            cable = this.links.get(id);
+          created.push(id);
+          if (l.reverse) this.mechanisms.cables.reverse(id, true);
+          // Keep the saved rope length and wrap rather than refitting it.
+          for (const key of ["aAngle", "bAngle", "feedA", "feedB", "length"])
+            if (Number.isFinite(l[key])) cable[key] = l[key];
+        } else {
+          const id = this.connect(l.type, a, b, l.aPoint, l.bPoint),
+            link = this.links.get(id);
+          created.push(id);
+          this.updateLink(
+            id,
+            l.type === "spring"
+              ? { k: l.k, damping: l.damping, length: l.length }
+              : { length: l.length },
+          );
+          if (l.type === "spring" && l.lockAngle) {
+            const size = Math.hypot(l.axis?.x, l.axis?.y);
+            if (!(size > 1e-6)) throw new Error("This scene file is damaged.");
+            link.axis = { x: l.axis.x / size, y: l.axis.y / size };
+            link.lockAngle = true;
+          }
+        }
+      }
+      for (const b of bodies) {
+        const id = ids.get(b.id),
+          o = this.objects.get(id);
+        if (o.lockPosition !== !!b.lockPosition)
+          this.setLock(id, "position", !!b.lockPosition);
+        if (o.lockRotation !== !!b.lockRotation)
+          this.setLock(id, "rotation", !!b.lockRotation);
+        this.setVelocity(id, b);
+      }
+      for (const f of list(data.fields)) {
+        const { id: _id, type, ...rest } = f,
+          id = this.fields.add(type, { x: f.x, y: f.y });
+        created.push(id);
+        this.fields.update(id, rest);
+      }
+    } catch (error) {
+      for (const id of created.reverse()) this.remove(id);
+      throw error;
+    } finally {
+      this.settings.walls = walls;
+    }
+    return created;
+  }
+  // Part of the scene as scene data, for copy and paste: the bodies and
+  // fields among `ids`, and every link whose bodies are all among them.
+  exportPart(ids) {
+    const chosen = new Set(ids),
+      all = this.exportScene(),
+      bodies = all.bodies.filter((b) => chosen.has(b.id)),
+      kept = new Set(bodies.map((b) => b.id));
+    return {
+      format: all.format,
+      version: all.version,
+      bodies,
+      links: all.links.filter((l) => {
+        const named = [l.a, l.b, l.wheel].filter((id) => id);
+        return named.length > 0 && named.every((id) => kept.has(id));
+      }),
+      fields: all.fields.filter((f) => chosen.has(f.id)),
+    };
+  }
+  // Add a copy of exportPart() data, moved by (dx, dy) metres. If any of it
+  // would be below the floor the whole copy is lifted just clear of it.
+  // Returns the new ids; on a refusal nothing is added.
+  addPart(data, { dx = 0, dy = 0 } = {}) {
+    checkFormat(data, "physics-sim-scene");
+    if (![dx, dy].every(Number.isFinite)) throw new Error("Invalid position.");
+    const bodies = data.bodies || [];
+    const lowest = Math.min(
+      ...bodies.map((b) => b.y + dy - lowestPoint(b)),
+      Infinity,
+    );
+    if (lowest < this.ground) dy += this.ground - lowest;
+    const move = (p) => p && { ...p, x: p.x + dx, y: p.y + dy };
+    return this.buildPart({
+      bodies: bodies.map(move),
+      links: (data.links || []).map((l) =>
+        l.aPoint ? { ...l, aPoint: move(l.aPoint), bPoint: move(l.bPoint) } : l,
+      ),
+      fields: (data.fields || []).map(move),
+    });
+  }
+  // Reflect the bodies and fields among `ids` in the line through the middle
+  // of their centres: "horizontal" swaps left and right (a vertical mirror
+  // line), "vertical" swaps up and down. Positions, angles, velocities and
+  // spins are mirrored, so the reflected scene moves as the mirror image of
+  // the original. A wedge is not mirror-symmetric: its mirror image is the
+  // same wedge with width and height exchanged, turned through a right
+  // angle. A magnetic field (a pseudovector) changes sign in a mirror. The
+  // whole change is refused, leaving the scene as it was, if a rod, belt or
+  // cable joins the selection to something outside it, if it holds a pulley,
+  // or if a body would end up in the floor.
+  reflect(ids, direction) {
+    if (!["horizontal", "vertical"].includes(direction))
+      throw new Error("Reflect horizontally or vertically.");
+    const chosen = new Set(ids),
+      bodies = [...chosen].filter((id) => this.objects.has(id)),
+      fields = [...chosen].filter((id) => this.fields.regions.has(id));
+    if (!bodies.length && !fields.length) return;
+    for (const l of this.links.values()) {
+      const named = [l.a, l.b, l.wheel].filter((id) => id),
+        inside = named.filter((id) => chosen.has(id));
+      if (!inside.length) continue;
+      if (l.type === "pulley")
+        throw new Error("Reflecting a pulley is not supported.");
+      if (l.type !== "spring" && inside.length < named.length)
+        throw new Error(
+          "Select the whole assembly (everything joined by rods and belts) to reflect it.",
+        );
+    }
+    const xs = [
+        ...bodies.map((id) => this.state(id).x),
+        ...fields.map((id) => this.fields.regions.get(id).x),
+      ],
+      ys = [
+        ...bodies.map((id) => this.state(id).y),
+        ...fields.map((id) => this.fields.regions.get(id).y),
+      ],
+      h = direction === "horizontal",
+      cx = (Math.min(...xs) + Math.max(...xs)) / 2,
+      cy = (Math.min(...ys) + Math.max(...ys)) / 2,
+      point = (p) => (h ? { x: 2 * cx - p.x, y: p.y } : { x: p.x, y: 2 * cy - p.y });
+    // Work everything out first, so that a refusal changes nothing.
+    const plans = bodies.map((id) => {
+      const o = this.objects.get(id),
+        s = this.state(id),
+        wedge = o.shape === "wedge",
+        // M_x R(θ) = R(−θ) M_x, and M_y = R(180°) M_x. A ball or block is
+        // its own mirror image; a wedge's is R(−90°) of itself with its
+        // sides exchanged.
+        angle = (h ? -s.angle : Math.PI - s.angle) - (wedge ? Math.PI / 2 : 0),
+        plan = {
+          id,
+          o,
+          wedge,
+          ...point(s),
+          angle: wedge || h ? angle : -s.angle,
+          vx: h ? -s.vx : s.vx,
+          vy: h ? s.vy : -s.vy,
+          omega: -s.omega,
+          width: wedge ? o.height : o.width,
+          height: wedge ? o.width : o.height,
+        };
+      if (
+        plan.y -
+          lowestPoint({
+            shape: o.shape,
+            width: o.shape === "ball" ? o.radius * 2 : plan.width,
+            height: o.shape === "ball" ? o.radius * 2 : plan.height,
+            angle: plan.angle,
+          }) <
+        this.ground - 1e-6
+      )
+        throw new Error(
+          "There is not enough room above the floor to reflect this. Move it up first.",
+        );
+      return plan;
+    });
+    for (const p of plans) {
+      if (p.wedge) {
+        this.setPose(p.id, { x: p.x, y: 10000, angle: 0 });
+        const walls = this.settings.walls;
+        this.settings.walls = false;
+        try {
+          this.resizeBody(p.id, p.width, p.height);
+        } finally {
+          this.settings.walls = walls;
+        }
+      }
+      this.setPose(p.id, p);
+      this.setVelocity(p.id, p);
+    }
+    for (const l of this.links.values()) {
+      if (![l.a, l.b, l.wheel].some((id) => chosen.has(id))) continue;
+      if (l.type === "belt") {
+        // Every wheel turns the other way in a mirror.
+        if (l.motor) this.mechanisms.configureBelt(l.id, { speed: -l.speed });
+        continue;
+      }
+      for (const side of ["a", "b"])
+        if (!l[side]) l[side + "Point"] = point(l[side + "Point"]);
+      if (l.axis) l.axis = h ? { x: -l.axis.x, y: l.axis.y } : { x: l.axis.x, y: -l.axis.y };
+    }
+    for (const id of fields) {
+      const f = this.fields.regions.get(id),
+        turn = (a) => {
+          const r = h ? 180 - a : -a;
+          return ((((r + 180) % 360) + 360) % 360) - 180;
+        };
+      this.fields.update(id, {
+        ...point(f),
+        angle: turn(f.angle),
+        gradientAngle: turn(f.gradientAngle),
+        gradientX: h ? -f.gradientX : f.gradientX,
+        gradientY: h ? f.gradientY : -f.gradientY,
+        ...(f.type === "magnetic" ? { strength: -f.strength } : {}),
+      });
+    }
   }
   remove(id) {
     this.fields.regions.delete(id);

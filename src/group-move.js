@@ -45,7 +45,7 @@ export class GroupMove {
               side,
               point: { ...l[side + "Point"] },
             });
-    this.floorLimit = this.bodies.length
+    this.floorLimit = this.bodies.length && sim.settings.floor
       ? Math.max(
           ...this.bodies.map(
             ({ id }) =>
