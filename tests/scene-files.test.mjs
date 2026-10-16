@@ -1,4 +1,4 @@
-// Saving and loading in the fields, orbits and circuits tools: a saved file
+// Saving and loading in the fields, orbits, circuits and waves tools: a saved file
 // must bring back the same physics, and a bad file must be refused with a
 // readable message and leave the current scene alone.
 import test from "node:test";
@@ -11,6 +11,10 @@ import { GravityLab } from "../src/orbitlab/nbody.js";
 import { sandboxPresets } from "../src/orbitlab/presets.js";
 import { CircuitLab } from "../src/circuitlab/model.js";
 import { presets as circuitPresets } from "../src/circuitlab/presets.js";
+import { RayLab } from "../src/wavelab/rays.js";
+import { WaveLab } from "../src/wavelab/waves.js";
+import { SoundLab } from "../src/wavelab/sound.js";
+import { presets as wavePresets } from "../src/wavelab/presets.js";
 
 const viaFile = (scene) => JSON.parse(JSON.stringify(scene));
 const close = (a, b, relative, message) =>
@@ -24,6 +28,9 @@ const OTHERS = {
   orbits: new OrbitLab().exportScene(),
   gravity: new GravityLab().exportScene(),
   circuits: new CircuitLab().exportScene(),
+  rays: new RayLab().exportScene(),
+  waves: new WaveLab({ width: 4, height: 4 }).exportScene(),
+  sound: new SoundLab().exportScene(),
 };
 // Files that are not ours, or are damaged.
 const JUNK = [null, 7, "text", [], {}, { format: "something-else" }];
@@ -324,4 +331,70 @@ test("a damaged file changes nothing in the scene that was open", () => {
     assert.throws(() => circuit.loadScene({ ...circuitBefore, ...bad }), Error);
     assert.deepEqual(circuit.exportScene(), circuitBefore);
   }
+});
+
+// The waves, light & sound page saves one file per view, each in its own
+// format.
+const buildWave = (p) => {
+  if (p.mode === "rays") {
+    const lab = new RayLab();
+    p.build(lab);
+    return lab;
+  }
+  if (p.mode === "waves") {
+    const lab = new WaveLab(p.tank);
+    p.build(lab);
+    return lab;
+  }
+  const lab = new SoundLab();
+  lab.setMode(p.set.mode);
+  for (const [part, values] of Object.entries(p.set)) if (part !== "mode") lab.set(part, values);
+  return lab;
+};
+const MODELS = { rays: RayLab, waves: WaveLab, sound: SoundLab };
+
+test("waves tool: every preset survives a save and load with the same physics", () => {
+  for (const p of wavePresets) {
+    const lab = buildWave(p),
+      saved = viaFile(lab.exportScene()),
+      copy = MODELS[p.mode].fromScene(saved);
+    assert.deepEqual(copy.exportScene(), saved, p.id);
+    if (p.mode === "rays") {
+      assert.deepEqual(copy.trace().segments, lab.trace().segments, p.id);
+      assert.deepEqual(copy.images(), lab.images(), p.id);
+    } else if (p.mode === "waves") {
+      lab.reset();
+      lab.advance(1);
+      copy.advance(1);
+      for (const [x, y] of [
+        [0.37, 0.81],
+        [-2.2, 1.4],
+      ])
+        assert.equal(copy.value(x, y), lab.value(x, y), p.id);
+    } else assert.deepEqual(copy.state, lab.state, p.id);
+  }
+});
+
+test("waves tool: files from other tools and views, junk and damage are refused, and the scene is kept", () => {
+  for (const [mode, Model] of Object.entries(MODELS)) {
+    const lab = buildWave(wavePresets.find((p) => p.mode === mode)),
+      before = lab.exportScene();
+    for (const [name, other] of Object.entries(OTHERS)) {
+      if (name === mode) continue;
+      assert.throws(() => lab.loadScene(other), Error, `${mode} refuses ${name}`);
+    }
+    for (const junk of JUNK) assert.throws(() => lab.loadScene(junk), Error);
+    const damaged =
+      mode === "rays"
+        ? [{ items: 3 }, { items: [{ kind: "laser" }] }, { items: [{ kind: "lens", R1: 0.2, R2: -0.2, thickness: 0, aperture: 0.3 }] }, { medium: 0.5 }]
+        : mode === "waves"
+          ? [{ tank: null }, { tank: { ...before.tank, cell: 0.2 } }, { items: [{ kind: "medium", index: 9 }] }, { items: [{ kind: "point", frequency: 3 }] }]
+          : [{ mode: "laser" }, { string: { tension: -1 } }, { pipe: { ends: "closed", harmonic: 2 } }, { beats: 4 }];
+    for (const bad of damaged) {
+      assert.throws(() => lab.loadScene({ ...before, ...bad }), Error, `${mode} ${JSON.stringify(bad)}`);
+      assert.deepEqual(lab.exportScene(), before, `${mode} kept`);
+    }
+  }
+  // A file from another view names it.
+  assert.throws(() => new RayLab().loadScene(new SoundLab().exportScene()), /Sound view/);
 });
