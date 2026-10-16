@@ -37,7 +37,7 @@ const TAU = 2 * Math.PI,
   // Simulated seconds per real second.
   WARPS = [
     1, 2, 5, 10, 20, 50, 100, 200, 500, 1e3, 2e3, 5e3, 1e4, 2e4, 5e4, 1e5, 2e5,
-    5e5, 1e6, 2e6, 5e6, 1e7,
+    5e5, 1e6, 2e6, 5e6, 1e7, 2e7, 5e7, 1e8, 2e8, 5e8, 1e9,
   ],
   HANDLE = 11;
 // The next launch, in SI: distance from the centre, speed, and angle of the

@@ -68,6 +68,49 @@ test("the Earth goes round the Sun in a year, by Kepler's third law with both ma
   near(period / DAY, T / DAY, 0.01, "measured year (days)");
 });
 
+test("in the whole Solar System each planet keeps Kepler's third law", () => {
+  const lab = new GravityLab({ maxSteps: 1e8 }),
+    AU = 1.496e11;
+  sandboxPresets.find((p) => p.id === "solar-system").build(lab);
+  const byName = (n) => lab.list().find((b) => b.name === n),
+    sun = byName("Sun").id,
+    // Mean distances (AU) the preset uses.
+    planets = { Mercury: 0.387, Venus: 0.723, Earth: 1, Mars: 1.524, Jupiter: 5.203 },
+    track = {};
+  const angle = (id) => {
+    const b = lab.get(id),
+      s = lab.get(sun);
+    return Math.atan2(b.y - s.y, b.x - s.x);
+  };
+  for (const n of Object.keys(planets))
+    track[n] = { id: byName(n).id, last: angle(byName(n).id), swept: 0, period: null };
+  const e0 = lab.energy().total,
+    h = DAY / 4;
+  // The period is the time to sweep one whole turn round the (moving) Sun,
+  // found between steps.
+  for (let t = h; t <= 12 * 365.25 * DAY; t += h) {
+    lab.advance(h);
+    for (const tr of Object.values(track)) {
+      if (tr.period !== null) continue;
+      const now = angle(tr.id);
+      let d = now - tr.last;
+      if (d > Math.PI) d -= 2 * Math.PI;
+      if (d < -Math.PI) d += 2 * Math.PI;
+      if (tr.swept + d >= 2 * Math.PI)
+        tr.period = t - (h * (tr.swept + d - 2 * Math.PI)) / d;
+      tr.swept += d;
+      tr.last = now;
+    }
+  }
+  for (const [n, a] of Object.entries(planets)) {
+    const m = lab.get(track[n].id).mass,
+      T = 2 * Math.PI * Math.sqrt((a * AU) ** 3 / (G * (1.989e30 + m)));
+    // The other planets' pulls shift periods by a few parts in 10⁴.
+    near(track[n].period / T, 1, 1e-3, `${n} period / Kepler`);
+  }
+  near((lab.energy().total - e0) / e0, 0, 1e-9, "energy");
+});
+
 test("an eccentric orbit keeps its energy to a few parts in a million over 100 orbits", () => {
   const Ms = 1.989e30,
     m = 5.972e24,

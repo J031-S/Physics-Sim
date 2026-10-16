@@ -129,6 +129,18 @@ function orbiting(lab, about, distance, angle, props) {
   return id;
 }
 const deg = Math.PI / 180;
+// The eight planets: mean distance from the Sun (AU), mass (kg), mean radius
+// (m), and a starting angle (°) chosen only to spread them out.
+const PLANETS = [
+  ["Mercury", 0.387, 3.301e23, 2.44e6, 30],
+  ["Venus", 0.723, 4.867e24, 6.052e6, 150],
+  ["Earth", 1, 5.972e24, 6.371e6, 260],
+  ["Mars", 1.524, 6.417e23, 3.39e6, 340],
+  ["Jupiter", 5.203, 1.898e27, 6.991e7, 60],
+  ["Saturn", 9.537, 5.683e26, 5.823e7, 200],
+  ["Uranus", 19.19, 8.681e25, 2.536e7, 300],
+  ["Neptune", 30.07, 1.024e26, 2.462e7, 110],
+];
 
 export const sandboxPresets = [
   {
@@ -164,12 +176,23 @@ export const sandboxPresets = [
     check: 365.25 * day,
     build(lab) {
       const sun = lab.add({ name: "Sun", ...SUN, x: 0, y: 0 });
-      for (const [name, a, mass, radius, angle] of [
-        ["Mercury", 0.387, 3.301e23, 2.44e6, 30],
-        ["Venus", 0.723, 4.867e24, 6.052e6, 150],
-        ["Earth", 1, 5.972e24, 6.371e6, 260],
-        ["Mars", 1.524, 6.417e23, 3.39e6, 340],
-      ])
+      for (const [name, a, mass, radius, angle] of PLANETS.slice(0, 4))
+        orbiting(lab, sun, a * AU, angle * deg, { name, mass, radius });
+      balance(lab);
+    },
+  },
+  {
+    id: "solar-system",
+    title: "The whole Solar System",
+    text: "The Sun and all eight planets at their real masses, sizes and mean distances, on circular orbits, every body pulling on every other.",
+    expect:
+      "Periods from Mercury's 88 days to Neptune's 165 years, with T² ∝ a³ (Kepler's third law). Zoom in on the inner planets; raise the time warp to watch the outer ones. Jupiter and Saturn pull the Sun round in a wobble of more than its own radius.",
+    warp: 5e7,
+    check: 11.9 * 365.25 * day,
+    build(lab) {
+      const sun = lab.add({ name: "Sun", ...SUN, x: 0, y: 0 });
+      // Mean distance (AU), mass (kg), mean radius (m), starting angle (°).
+      for (const [name, a, mass, radius, angle] of PLANETS)
         orbiting(lab, sun, a * AU, angle * deg, { name, mass, radius });
       balance(lab);
     },
