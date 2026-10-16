@@ -141,6 +141,18 @@
 #material-menu {
   max-height: calc((100dvh - 20px) / var(--ui-scale));
 }
+/* Copy, Paste, Duplicate, Delete (and the floor switch) above the constants. */
+.menu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.menu-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
 /* Drop-downs open over the tool-options strip below the toolbar. */
 .tools {
   z-index: 3;

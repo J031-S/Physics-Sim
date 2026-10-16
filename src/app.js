@@ -45,6 +45,13 @@ let sim = new Sandbox(),
   last = 0,
   menuId = null,
   menuPoint = null,
+  // What Ctrl+C copied (exportPart data and the box round it), and how many
+  // times it has been pasted without a pointer to place it.
+  clipboard = null,
+  pastes = 0,
+  // A placing tool used with Ctrl held stays chosen until Ctrl is let go.
+  keepPlacing = false,
+  overCanvas = false,
   // exportScene() snapshot that Reset restores: the scene as loaded from a
   // preset or file, or a hand-built scene as it was at its first Run.
   startScene = null,
@@ -70,6 +77,27 @@ function world(p) {
 function locate(e) {
   const r = canvas.getBoundingClientRect();
   return world({ x: e.clientX - r.left, y: e.clientY - r.top });
+}
+// Tools that add something to the scene. After one is used the tool returns
+// to Grab, unless Ctrl (⌘ on a Mac) is held.
+const PLACING = [
+  "ball",
+  "block",
+  "wedge",
+  "spring",
+  "rod",
+  "belt",
+  "pulley",
+  "electric",
+  "magnetic",
+];
+function placed(e) {
+  if (e.ctrlKey || e.metaKey) {
+    keepPlacing = true;
+    pending = null;
+    return;
+  }
+  chooseTool("grab");
 }
 function chooseTool(next) {
   fieldDrag = null;
@@ -119,6 +147,8 @@ function chooseTool(next) {
       "Click two objects, or an empty anchor point and an object. Escape cancels.",
     rod: "Click two objects, or an empty anchor point and an object. Escape cancels.",
   }[tool];
+  if (PLACING.includes(tool))
+    $("tool-help").textContent += " Hold Ctrl to place several.";
   $("tool-name").textContent = tool[0].toUpperCase() + tool.slice(1);
   $("select-options").hidden = tool !== "select";
   $("impulse-options").hidden = tool !== "impulse";
@@ -170,6 +200,14 @@ function select(id) {
   $("lock-caption").hidden = !o;
   const row = document.querySelector(".selection-row");
   row.hidden = ![...row.children].some((c) => !c.hidden);
+  showReflect();
+}
+// Reflection applies to bodies and fields (links follow their bodies).
+function showReflect() {
+  const can = [...selectionSet].some(
+    (id) => sim.objects.has(id) || sim.fields.regions.has(id),
+  );
+  $("reflect-h").hidden = $("reflect-v").hidden = !can;
 }
 function selectMany(ids) {
   const list = [...new Set(ids)].filter(
@@ -182,6 +220,7 @@ function selectMany(ids) {
     $("selection").hidden = false;
     $("selected-name").textContent = `${list.length} objects selected`;
   }
+  showReflect();
 }
 function finishMarquee(p) {
   const box = marquee;
@@ -361,18 +400,31 @@ function propertyRow({ id, name, unit, min, max, help, value }) {
   row.append(label, range, box, info);
   return { row, input, range };
 }
-// Menu id for the ground (and walls), which is not a selectable object.
-const FLOOR = "floor";
+// Menu id for the ground (and walls), which is not a selectable object,
+// and for empty space (paste, and the floor when it is off).
+const FLOOR = "floor",
+  SCENE = "scene";
 function openMenu(id, x, y) {
   const o = sim.objects.get(id),
     l = sim.links.get(id),
     f = sim.fields.regions.get(id),
-    floor = id === FLOOR;
-  if (!o && !l && !f && !floor) return;
+    floor = id === FLOOR,
+    empty = id === SCENE;
+  if (!o && !l && !f && !floor && !empty) return;
+  if (empty && !clipboard && sim.settings.floor) {
+    closeMenu();
+    return;
+  }
   menuId = id;
   menuPoint = { x, y };
-  select(floor ? null : id);
-  $("menu-title").textContent = floor
+  // Right-clicking one of several selected things keeps the selection, so
+  // that Copy, Duplicate and Delete act on all of it.
+  if (!(selectionSet.has(id) && selectionSet.size > 1))
+    select(floor || empty ? null : id);
+  menuActions(id, locate({ clientX: x, clientY: y }));
+  $("menu-title").textContent = empty
+    ? "Scene"
+    : floor
     ? "Floor"
     : f
       ? f.type === "electric"
@@ -391,7 +443,11 @@ function openMenu(id, x, y) {
             : l.type === "belt"
               ? "Belt"
               : "Pulley cable";
-  $("menu-note").textContent = floor
+  $("menu-note").textContent = empty
+    ? sim.settings.floor
+      ? ""
+      : "The floor is off: bodies fall past y = 0 and keep going."
+    : floor
     ? "The scene walls share the floor's material. Where two surfaces touch, the contact uses the lower friction and the higher restitution of the two."
     : f
       ? "Uniform field inside this region; overlaps add. B is perpendicular to the screen: positive out, negative in. Electric direction follows the region angle."
@@ -402,7 +458,9 @@ function openMenu(id, x, y) {
           : o?.shape === "ball"
             ? "A ball is modelled as a uniform disc (I = ½mr²), so it rolls down a slope with acceleration (2/3) g sin θ, not the (5/7) g sin θ of a solid sphere. Changes apply while the simulation runs."
             : "Changes apply while the simulation runs.";
-  const fields = floor
+  const fields = empty
+    ? []
+    : floor
     ? [
         [
           "friction",
@@ -884,7 +942,7 @@ canvas.addEventListener("pointerdown", (e) => {
       ? { x: snap(pointer.x), y: snap(pointer.y) }
       : pointer;
     select(sim.fields.add(tool, p));
-    chooseTool("grab");
+    placed(e);
     return;
   }
   if (
@@ -949,7 +1007,7 @@ canvas.addEventListener("pointerdown", (e) => {
       ? { x: snap(pointer.x), y: Math.max(GRID, snap(pointer.y)) }
       : pointer;
     select(sim.add(tool, p));
-    chooseTool("grab");
+    placed(e);
     return;
   }
   if (tool === "belt" || tool === "pulley") {
@@ -973,7 +1031,7 @@ canvas.addEventListener("pointerdown", (e) => {
             ? sim.mechanisms.createBelt(...pending.ids)
             : sim.mechanisms.createPulley(...pending.ids);
         select(result);
-        chooseTool("grab");
+        placed(e);
         toast(
           "Axle pinned initially; rotation stays free. Pulley axles can be unlocked. Select the cable to reverse its wrap.",
         );
@@ -1003,13 +1061,16 @@ canvas.addEventListener("pointerdown", (e) => {
   } else {
     try {
       select(sim.connect(tool, pending.id, id, pending.point, p));
-      chooseTool("grab");
+      placed(e);
     } catch (error) {
       toast(error.message);
     }
   }
 });
+canvas.addEventListener("pointerenter", () => (overCanvas = true));
+canvas.addEventListener("pointerleave", () => (overCanvas = false));
 canvas.addEventListener("pointermove", (e) => {
+  overCanvas = true;
   if (panDrag) {
     view.x = panDrag.viewX + e.clientX - panDrag.x;
     view.y = panDrag.viewY + e.clientY - panDrag.y;
@@ -1106,11 +1167,11 @@ function cancelDrag() {
 canvas.addEventListener("contextmenu", (e) => {
   const p = locate(e),
     // The ground: anywhere at or below y = 0 that is not an object.
-    id = sim.hit(p) || linkAt(p) || sim.fields.hit(p) || (p.y <= 0 && FLOOR);
-  if (!id) {
-    closeMenu();
-    return;
-  }
+    id =
+      sim.hit(p) ||
+      linkAt(p) ||
+      sim.fields.hit(p) ||
+      (p.y <= 0 && sim.settings.floor ? FLOOR : SCENE);
   e.preventDefault();
   cancelDrag();
   pending = null;
@@ -1186,6 +1247,7 @@ $("close-keys").onclick = () => {
 };
 function syncSettings() {
   $("setting-walls").checked = sim.settings.walls;
+  $("setting-floor").checked = sim.settings.floor;
   $("setting-chargeInteractions").checked = sim.settings.chargeInteractions;
   for (const key of ["coulombConstant", "chargeSoftening"])
     $("setting-" + key).value = tidyNumber(sim.settings[key]);
@@ -1280,7 +1342,7 @@ $("snap-toggle").onchange = (e) => {
   snapStatus();
   updateInteraction();
 };
-for (const key of ["snapping", "walls", "chargeInteractions"])
+for (const key of ["snapping", "floor", "walls", "chargeInteractions"])
   $("setting-" + key).onchange = (e) => {
     sim.updateSettings({ [key]: e.target.checked });
     snapStatus();
@@ -1304,6 +1366,7 @@ $("reset-settings").onclick = () => {
     electricY: 0,
     magneticZ: 0,
     snapping: false,
+    floor: true,
     walls: true,
     chargeInteractions: false,
     coulombConstant: 1,
@@ -1320,6 +1383,153 @@ function removeSelected() {
   }
 }
 $("delete").onclick = removeSelected;
+
+// ---- copy, paste, duplicate, reflect
+
+// Bodies and fields among the selection (a link is copied with its bodies).
+function copyable() {
+  return [...selectionSet].filter(
+    (id) => sim.objects.has(id) || sim.fields.regions.has(id),
+  );
+}
+// The box round some bodies and fields, in metres.
+function boxOf(ids) {
+  const box = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity },
+    add = (x0, x1, y0, y1) => {
+      box.minX = Math.min(box.minX, x0);
+      box.maxX = Math.max(box.maxX, x1);
+      box.minY = Math.min(box.minY, y0);
+      box.maxY = Math.max(box.maxY, y1);
+    };
+  for (const id of ids) {
+    const o = sim.objects.get(id),
+      f = sim.fields.regions.get(id);
+    if (o) {
+      const b = o.body.bounds;
+      add(b.min.x / 100, b.max.x / 100, -b.max.y / 100, -b.min.y / 100);
+    } else if (f) add(f.x - f.width / 2, f.x + f.width / 2, f.y - f.height / 2, f.y + f.height / 2);
+  }
+  return box;
+}
+const things = (n) => (n === 1 ? "1 item" : `${n} items`);
+function copySelection() {
+  const ids = copyable();
+  if (!ids.length) {
+    toast("Select an object or field to copy.");
+    return;
+  }
+  clipboard = { data: sim.exportPart(ids), box: boxOf(ids) };
+  pastes = 0;
+  toast(`Copied ${things(ids.length)}. Ctrl+V pastes at the pointer.`);
+}
+// Add a copy of `data` (from exportPart) moved by (dx, dy), and select it.
+function addCopy(data, dx, dy) {
+  try {
+    cancelDrag();
+    selectMany(sim.addPart(data, { dx, dy }));
+  } catch (error) {
+    toast(error.message);
+  }
+}
+// Paste with its centre at `point` (a world point, snapped when snapping is
+// on), or, with no point, beside the last copy.
+function paste(point) {
+  if (!clipboard) {
+    toast("Nothing copied yet: select something and press Ctrl+C.");
+    return;
+  }
+  const { data, box } = clipboard,
+    cx = (box.minX + box.maxX) / 2,
+    cy = (box.minY + box.maxY) / 2;
+  if (point) {
+    const p = sim.settings.snapping
+      ? { x: snap(point.x), y: snap(point.y) }
+      : point;
+    addCopy(data, p.x - cx, p.y - cy);
+  } else {
+    pastes++;
+    addCopy(data, pastes * (box.maxX - box.minX + 0.5), 0);
+  }
+}
+// A copy just to the right of the selection; the clipboard is untouched.
+function duplicateSelection() {
+  const ids = copyable();
+  if (!ids.length) {
+    toast("Select an object or field to duplicate.");
+    return;
+  }
+  const box = boxOf(ids);
+  addCopy(sim.exportPart(ids), box.maxX - box.minX + 0.5, 0);
+}
+function reflectSelection(direction) {
+  try {
+    cancelDrag();
+    sim.reflect(copyable(), direction);
+    showDimensions();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+$("reflect-h").onclick = () => reflectSelection("horizontal");
+$("reflect-v").onclick = () => reflectSelection("vertical");
+// The buttons at the top of the right-click menu, for `id` (an object, link,
+// field, FLOOR or SCENE) right-clicked at the world point `at`.
+function menuActions(id, at) {
+  const box = $("menu-actions"),
+    actions = [],
+    item = sim.objects.has(id) || sim.fields.regions.has(id);
+  if (item)
+    actions.push(
+      ["copy", "Copy", "Ctrl+C", copySelection],
+      ["duplicate", "Duplicate", "Ctrl+D", duplicateSelection],
+    );
+  if (clipboard)
+    actions.push([
+      "paste",
+      id === SCENE || id === FLOOR ? "Paste here" : "Paste",
+      "Ctrl+V",
+      () => paste(at),
+    ]);
+  if (item || sim.links.has(id))
+    actions.push(["delete", "Delete", "Delete", removeSelected]);
+  if (id === FLOOR)
+    actions.push([
+      null,
+      "Turn the floor off",
+      "Bodies then fall past y = 0 and keep going",
+      () => setFloor(false),
+    ]);
+  if (id === SCENE && !sim.settings.floor)
+    actions.push([null, "Turn the floor on", "", () => setFloor(true)]);
+  box.replaceChildren(
+    ...actions.map(([icon, label, hint, run]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.title = hint ? `${label} (${hint})` : label;
+      if (icon) {
+        button.dataset.icon = icon;
+        button.dataset.iconLabel = label;
+      }
+      button.onclick = () => {
+        closeMenu(true);
+        run();
+      };
+      return button;
+    }),
+  );
+  box.hidden = !actions.length;
+  renderIcons(prefs.iconWeight);
+}
+function setFloor(on) {
+  try {
+    sim.updateSettings({ floor: on });
+  } catch (error) {
+    toast(error.message);
+  }
+  syncSettings();
+  if (!on) toast("Floor off. Right-click empty space, or use Settings, to turn it on.");
+}
 function setRunning(next) {
   // A hand-built scene's starting point is its state at the first Run.
   if (next && !running && !startScene) {
@@ -1435,8 +1645,10 @@ function drawPresetPreviews() {
     try {
       preset.setup(scene);
       drawPreview(el, scene, dark);
-    } catch {
-      // A preview is decoration; the preset itself reports its own errors.
+    } catch (e) {
+      // A preview is decoration and must not stop the panel opening, but a
+      // broken one is a bug: say so in the console.
+      console.error(`Preset preview "${preset.id}" failed:`, e);
     } finally {
       scene.dispose();
     }
@@ -1777,8 +1989,24 @@ document.addEventListener("keydown", (e) => {
     closeMenu(true);
     return;
   }
-  if (typing(e) || !$("material-menu").hidden) return;
   const key = e.key.toLowerCase();
+  // Copy, paste and duplicate work wherever focus is except in a text field
+  // (where they keep their usual meaning).
+  if (
+    (e.ctrlKey || e.metaKey) &&
+    !e.altKey &&
+    !e.shiftKey &&
+    ["c", "v", "d"].includes(key) &&
+    !e.target.closest?.("input, textarea, select, [contenteditable]") &&
+    !window.getSelection?.()?.toString()
+  ) {
+    e.preventDefault();
+    if (key === "c") copySelection();
+    else if (key === "v") paste(overCanvas && pointer ? pointer : null);
+    else if (!e.repeat) duplicateSelection();
+    return;
+  }
+  if (typing(e) || !$("material-menu").hidden) return;
   // Browser reload remains native, even if Ctrl is already controlling a drag.
   if (key === "r" && (e.ctrlKey || e.metaKey)) return;
   if (key === "z" && !e.metaKey) {
@@ -1866,6 +2094,12 @@ document.addEventListener("keydown", (e) => {
   }
 });
 document.addEventListener("keyup", (e) => {
+  // Letting go of Ctrl after placing several returns to Grab (not in the
+  // middle of a spring, rod, belt or cable, which the next click finishes).
+  if (["Control", "Meta"].includes(e.key) && keepPlacing) {
+    keepPlacing = false;
+    if (!pending) chooseTool("grab");
+  }
   if (e.key === "Control") ctrl = false;
   if (e.key === "Shift") shift = false;
   if (e.key === "Alt") alt = false;
