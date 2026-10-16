@@ -15,14 +15,15 @@
 .glyph-positive {
   fill: var(--positive);
 }
+/* The charge buttons' Phosphor icons keep the colours of the charges. */
+[data-add="positive"] .ui-icon {
+  color: var(--positive);
+}
+[data-add="negative"] .ui-icon {
+  color: var(--negative);
+}
 .glyph-negative {
   fill: var(--negative);
-}
-.glyph-mark {
-  fill: none;
-  stroke: var(--on-colour);
-  stroke-width: 2.2;
-  stroke-linecap: round;
 }
 .glyph-plate {
   fill: none;
@@ -119,10 +120,4 @@
 .fl-tests button {
   padding: 3px 9px;
   font-size: 11px;
-}
-.glyph-grid {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.2;
-  opacity: 0.55;
 }

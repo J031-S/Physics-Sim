@@ -163,6 +163,23 @@
   font-size: 22px;
   overflow-x: auto;
 }
+.mt-general {
+  padding: 8px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+}
+.mt-general h2 {
+  margin: 0;
+  font-size: 13px;
+}
+.mt-general-math {
+  font-size: 18px;
+  overflow-x: auto;
+}
+.mt-general p {
+  margin: 0;
+  font-size: 13px;
+}
 .mt-solve {
   display: flex;
   flex-wrap: wrap;

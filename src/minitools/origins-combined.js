@@ -122,7 +122,7 @@ export const combined = {
     ],
   },
   "escape-speed": {
-    about: T`Throw a ball upwards and it comes back. Throw it faster and it goes higher before returning. Escape speed is the launch speed at which it would never come back, coasting away for ever with gravity slowing it but never quite stopping it. For the Earth's surface it is about 11 km/s. It depends only on the mass of the planet and the distance from its centre, and is the same for a pebble as for a spacecraft.`,
+    about: T`Throw a ball upwards and it comes back. Throw it faster and it goes higher before returning. Escape velocity is the launch speed at which it would never come back, coasting away for ever with gravity slowing it but never quite stopping it. For the Earth's surface it is about 11 km/s. It depends only on the mass of the planet and the distance from its centre, and is the same for a pebble as for a spacecraft. (Strictly it is a speed: the direction does not matter, as long as the path does not hit the planet.)`,
     idea: T`Use conservation of energy. The object needs just enough kinetic energy at launch to bring its total energy up to zero, the value it would have at rest infinitely far away.`,
     origin: [
       [
@@ -559,7 +559,7 @@ export const combined = {
       ],
       [
         T`The mass has gone, so the same banking suits a lorry and a motorbike. But the angle is right for only one speed: go faster and the car needs friction to stop it sliding up the bank; go slower and it needs friction to stop it sliding down.`,
-        T`\theta = \tan^{-1}\!\left(\frac{v^2}{rg}\right)`,
+        T`\theta = \arctan\!\left(\frac{v^2}{rg}\right)`,
       ],
     ],
   },
@@ -623,22 +623,22 @@ export const combined = {
   },
   "vertical-circle": {
     about: T`Swing a bucket of water over your head fast enough and the water stays in. Go too slowly and you get wet. This equation gives the least speed an object needs at the top of a vertical circle to stay on the circle, whether it is water in a bucket, a ball on a string or a car on a loop-the-loop. It depends only on the radius and on gravity, not on the mass.`,
-    idea: T`At the top, weight and tension both point towards the centre. The slowest possible speed is the one where the tension has dropped to zero and weight alone provides the centripetal force.`,
+    idea: T`At the top, the weight and the pull of whatever holds the object on the circle (the tension in a string, or the reaction force from a bucket or track) both point towards the centre. The slowest possible speed is the one where that force has dropped to zero and weight alone provides the centripetal force.`,
     origin: [
       [
-        T`Think about a ball on a string at the very top of a vertical circle. The centre of the circle is directly below it. Its weight $mg$ points down, towards the centre. The string can only pull, and it pulls along itself towards the centre too. So both forces point the same way and add.`,
-        T`F_{\text{net}} = F_T + mg \quad \text{(towards the centre)}`,
+        T`Think about an object at the very top of a vertical circle: a ball on a string, water in a bucket, or a car on a loop-the-loop. The centre of the circle is directly below it. Its weight $mg$ points down, towards the centre. The other force on it is $F$: the tension in the string, or the reaction force of the bucket or track. A string can only pull, and a bucket or track can only push the object away from itself, so at the top this force also points towards the centre. Both forces point the same way and add.`,
+        T`F_{\text{net}} = F + mg \quad \text{(towards the centre)}`,
       ],
       [
-        T`To move in a circle of radius $r$ at speed $v$, the ball needs a net force towards the centre of $\frac{mv^2}{r}$. The net force available is the one in the line above, so set them equal.`,
-        T`F_T + mg = \frac{mv^2}{r}`,
+        T`To move in a circle of radius $r$ at speed $v$, the object needs a net force towards the centre of $\frac{mv^2}{r}$. The net force available is the one in the line above, so set them equal.`,
+        T`F + mg = \frac{mv^2}{r}`,
       ],
       [
-        T`Subtract $mg$ from both sides to see what tension the string must provide at a given speed.`,
-        T`F_T = \frac{mv^2}{r} - mg`,
+        T`Subtract $mg$ from both sides to see what tension or reaction force is needed at a given speed.`,
+        T`F = \frac{mv^2}{r} - mg`,
       ],
       [
-        T`Go slower and the first term shrinks, so the tension needed gets smaller. But a string cannot push, so the tension can never be less than zero. The slowest speed that works is therefore the one at which the tension is exactly zero.`,
+        T`Go slower and the first term shrinks, so the force needed gets smaller. But a string cannot push and a track cannot pull, so this force can never be less than zero. The slowest speed that works is therefore the one at which it is exactly zero.`,
         T`0 = \frac{mv^2}{r} - mg`,
       ],
       [
@@ -658,8 +658,8 @@ export const combined = {
         T`v_{\text{min}} = \sqrt{gr}`,
       ],
       [
-        T`Below this speed, gravity is more than is needed to keep the ball on the circle. It curves more tightly than the circle, the string goes slack, and the ball falls inside.`,
-        T`v < \sqrt{gr} \;\Rightarrow\; \text{the string goes slack}`,
+        T`Below this speed, gravity is more than is needed to keep the object on the circle. It curves more tightly than the circle: the string goes slack, or the object leaves the track (or the water leaves the bucket), and it falls inside the circle.`,
+        T`v < \sqrt{gr} \;\Rightarrow\; \text{it leaves the circle}`,
       ],
     ],
   },
@@ -822,7 +822,7 @@ export const combined = {
         T`I = \frac{P}{V}`,
       ],
       [
-        T`This current flows through the cable, which has resistance $R$. The power turned into heat in a resistance is the current squared times the resistance (see "Power in a resistor").`,
+        T`This current flows through the cable, which has resistance $R$. The power turned into heat in a resistance is the current squared times the resistance (see "Power used or lost in a resistive component").`,
         T`P_{\text{loss}} = I^2R`,
       ],
       [

@@ -89,7 +89,14 @@ function loop(P) {
     [l, t],
   ]);
   S.cell(l, (t + b) / 2);
-  return { ...S, l, r, t, b, mx: (l + r) / 2, my: (t + b) / 2 };
+  const my = (t + b) / 2;
+  // The conventional current, out of the cell's + plate (on top) and round
+  // the loop: an arrow beside the wire under the cell, going up, with I.
+  const flow = (label = true) => {
+    P.arrow(l - 13, b - 12, l - 13, my + 20, "circuit-current", 2);
+    if (label) P.tag("I", l - 22, (b + my) / 2 + 4, "right");
+  };
+  return { ...S, l, r, t, b, mx: (l + r) / 2, my, flow };
 }
 
 // Ohm's law: the p.d. across a resistor and the current through it.
@@ -105,10 +112,9 @@ export function ohm(ctx, o) {
   ]);
   C.meter(C.mx, C.t - 40, "V");
   C.meter(C.r, C.my, "A");
-  C.current(C.r - 30, C.b, C.r - 70, C.b);
+  C.flow();
   P.tag("R", C.mx, C.t + 22);
   P.tag("V", C.mx, C.t - 64);
-  P.tag("I", C.r + 20, C.my, "left");
 }
 
 // Power in a lamp.
@@ -124,10 +130,9 @@ export function lampPower(ctx, o) {
   ]);
   C.meter(C.mx, C.t - 44, "V");
   C.meter(C.r, C.my, "A");
-  C.current(C.r - 30, C.b, C.r - 70, C.b);
+  C.flow();
   P.tag("P", C.mx, C.t + 30);
   P.tag("V", C.mx, C.t - 68);
-  P.tag("I", C.r + 20, C.my, "left");
 }
 
 // Heating in a resistor from the current through it.
@@ -142,9 +147,8 @@ export function heating(ctx, o) {
     P.line(pts, "danger", 1.2);
   }
   C.meter(C.r, C.my, "A");
-  C.current(C.r - 30, C.b, C.r - 70, C.b);
+  C.flow();
   P.tag("R", C.mx, C.t + 22);
-  P.tag("I", C.r + 20, C.my, "left");
   P.tag("P", C.mx, C.t - 52);
 }
 
@@ -196,50 +200,48 @@ export function series(ctx, o) {
     // Alternate sides so that long values do not run into each other.
     P.tag(`R${i + 1}`, x, i % 2 ? C.t + 22 : C.t - 22);
   });
-  C.current(C.r - 30, C.b, C.r - 70, C.b);
+  C.flow(false);
   P.text("the same current through each", C.mx, C.b + 18);
   P.tag("R", C.r + 16, C.my, "left");
   P.text("in total", C.r + 16, C.my + 22, "left");
 }
 
+// Three resistors side by side between two rails, the cell feeding the
+// rails from the left: the same p.d. across each, the current splitting.
 export function parallel(ctx, o) {
   const P = picture(ctx, o),
     { w, h } = P,
-    l = w * 0.16,
-    a = w * 0.36,
-    b = w * 0.66,
-    t = h * 0.14,
-    bottom = h * 0.84,
+    l = w * 0.12,
+    t = h * 0.16,
+    bottom = h * 0.8,
     S = symbols(P),
-    rows = [0.18, 0.5, 0.82].map((f) => t + (bottom - 30 - t) * f + 10);
+    xs = [0.34, 0.51, 0.68].map((f) => w * f),
+    mid = (t + bottom) / 2;
+  // The rails run from the cell to the last resistor and no further.
   S.wire([
-    [a, bottom],
-    [l, bottom],
+    [xs[2], t],
     [l, t],
-    [a, t],
+    [l, bottom],
+    [xs[2], bottom],
   ]);
-  S.cell(l, (t + bottom) / 2);
-  S.wire([
-    [a, t],
-    [a, rows[2]],
-  ]);
-  S.wire([
-    [b, rows[0]],
-    [b, bottom],
-    [a, bottom],
-  ]);
-  rows.forEach((y, i) => {
+  S.cell(l, mid);
+  xs.forEach((x, i) => {
     S.wire([
-      [a, y],
-      [b, y],
+      [x, t],
+      [x, bottom],
     ]);
-    S.resistor((a + b) / 2, y);
-    P.tag(`R${i + 1}`, (a + b) / 2, y - 18);
+    S.resistor(x, mid, true);
+    // Below, at two heights in turn, so that long values do not meet.
+    P.tag(`R${i + 1}`, x, mid + (i % 2 ? 62 : 38));
+    // A share of the current down each branch.
+    P.arrow(x - 12, t + 14, x - 12, t + 40, "circuit-current", 1.6);
   });
-  S.current(l + (a - l) * 0.25, t, l + (a - l) * 0.8, t);
-  P.text("the same p.d. across each", (a + b) / 2, bottom + 14);
-  P.tag("R", b + 18, (t + bottom) / 2, "left");
-  P.text("in total", b + 18, (t + bottom) / 2 + 22, "left");
+  // The whole current, out of the + plate and along the top rail.
+  P.arrow(l + 14, t - 11, xs[0] - 16, t - 11, "circuit-current", 2);
+  P.text("the current splits between the branches", (l + xs[2]) / 2, t - 26);
+  P.text("the same p.d. across each", (l + xs[2]) / 2, bottom + 18);
+  P.tag("R", xs[2] + 34, mid, "left");
+  P.text("in total", xs[2] + 34, mid + 22, "left");
 }
 
 // Power sent along a line with resistance: some is lost on the way.

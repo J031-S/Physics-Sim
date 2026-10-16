@@ -308,3 +308,39 @@
     flex-basis: 100%;
   }
 }
+/* Satellites or the gravity sandbox, above the outcome strip. The strip
+   and the switch take pointer input; the space round them does not. */
+.ol-modes {
+  pointer-events: auto;
+  align-self: center;
+  background: var(--panel);
+}
+/* Not inside a toolbar, so the toolbar's quiet buttons are given here: only
+   the view showing has a face, in the accent colour as on the other pages. */
+.ol-modes button {
+  border-color: transparent;
+  background: transparent;
+  font-size: 12px;
+}
+.ol-modes button:hover {
+  background: color-mix(in srgb, var(--panel), var(--accent-text) 18%);
+}
+.ol-modes button[aria-pressed="true"] {
+  background: var(--canvas-bg);
+  border-color: var(--line);
+  color: var(--accent-text);
+}
+/* Place stays lit while it is armed. */
+#place-body[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--ink);
+}
+#body-name {
+  width: 9em;
+  padding: 3px 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: transparent;
+  font-size: 11px;
+}

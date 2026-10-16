@@ -60,7 +60,16 @@
           type="file"
           accept="application/json,.json"
           hidden
-        />
+        /><button
+          id="clear"
+          title="Clear this scene"
+          aria-expanded="false"
+          aria-controls="clear-confirm"
+          data-icon="clear"
+          data-icon-label="Clear scene"
+        >
+          Clear scene
+        </button>
       </div>
     </header>
     <main>
@@ -71,7 +80,12 @@
       ></canvas>
       <div class="ol-top">
         <div class="ol-left">
-          <details id="launch-panel" class="ol-panel" open>
+          <details
+            id="launch-panel"
+            class="ol-panel"
+            data-for="satellites"
+            open
+          >
             <summary>Launch</summary>
             <label class="select-row" for="body-preset"
               >Central body
@@ -125,38 +139,71 @@
               aria-label="Satellites in flight"
             ></div>
           </details>
+          <details
+            id="bodies-panel"
+            class="ol-panel"
+            data-for="sandbox"
+            open
+            hidden
+          >
+            <summary>Bodies</summary>
+            <label class="select-row" for="body-kind"
+              >Add <select id="body-kind"></select
+            ></label>
+            <div class="fl-form">
+              <div class="prop-row">
+                <label for="new-body-mass">Mass</label><span></span
+                ><span class="prop-value"
+                  ><input
+                    id="new-body-mass"
+                    type="number"
+                    step="any"
+                    min="1"
+                    max="1e33" /><span class="unit">kg</span></span
+                >
+              </div>
+              <div class="prop-row">
+                <label for="new-body-radius">Radius</label><span></span
+                ><span class="prop-value"
+                  ><input
+                    id="new-body-radius"
+                    type="number"
+                    step="any"
+                    min="0.001"
+                    max="1e7" /><span class="unit">km</span></span
+                >
+              </div>
+            </div>
+            <div class="ol-actions">
+              <button
+                id="place-body"
+                aria-pressed="false"
+                title="Then click the scene to put the body there (hold Ctrl to place several)"
+              >
+                Place</button
+              ><button
+                id="stop-drift"
+                title="Take the centre of mass's velocity off every body, so the system stays where it is"
+              >
+                Stop drift</button
+              ><button
+                id="clear-bodies"
+                title="Remove every body and start an empty scene"
+              >
+                Remove all
+              </button>
+            </div>
+            <p id="place-note" class="fl-note"></p>
+            <div
+              id="body-list"
+              class="ol-list"
+              role="group"
+              aria-label="Bodies"
+            ></div>
+          </details>
           <details id="display-panel" class="ol-panel" open>
             <summary>Display</summary>
             <div class="ol-checks">
-              <label class="fl-check"
-                ><input id="show-velocity" type="checkbox" checked /> Velocity
-                <span class="swatch velocity" aria-hidden="true"></span
-              ></label>
-              <label
-                class="fl-check"
-                title="The gravitational force on the satellite, F = GMm/r² (G)"
-                ><input id="show-force" type="checkbox" /> Gravity force
-                <span class="swatch force" aria-hidden="true"></span
-              ></label>
-              <label class="fl-check"
-                ><input id="show-prediction" type="checkbox" checked />
-                Predicted orbit</label
-              >
-              <label class="fl-check"
-                ><input id="show-trails" type="checkbox" checked />
-                Trails</label
-              >
-              <label
-                class="fl-check"
-                title="Kepler's second law: shade the areas swept in equal times (K)"
-                ><input id="show-areas" type="checkbox" /> Equal areas</label
-              >
-              <label
-                class="fl-check"
-                title="Numbers beside the arrows and names on the scene"
-                ><input id="show-labels" type="checkbox" checked />
-                Values</label
-              >
               <label
                 class="fl-check"
                 title="Keep the whole orbit in view as it changes (A)"
@@ -172,13 +219,89 @@
           </details>
         </div>
         <div class="fl-centre">
+          <div class="fl-modes ol-modes" role="group" aria-label="Simulation">
+            <button
+              data-mode="satellites"
+              aria-pressed="true"
+              title="One central body, held fixed, and satellites too light to pull on it"
+            >
+              Satellites</button
+            ><button
+              data-mode="sandbox"
+              aria-pressed="false"
+              title="Any number of bodies, every one pulling on every other: build your own system (S)"
+            >
+              Gravity sandbox
+            </button>
+          </div>
           <div id="tool-settings" class="fl-hint" aria-live="polite">
             <strong id="tool-name"></strong>
             <span id="tool-help"></span>
           </div>
         </div>
         <div class="ol-side">
-          <details id="graph-panel" class="ol-panel" open>
+          <details
+            id="system-panel"
+            class="ol-panel"
+            data-for="sandbox"
+            open
+            hidden
+          >
+            <summary>System</summary>
+            <div id="system-grid" class="ol-readout-grid"></div>
+          </details>
+          <details
+            id="body-panel"
+            class="ol-panel"
+            data-for="sandbox"
+            open
+            hidden
+          >
+            <summary>Selected body <small id="body-subject"></small></summary>
+            <div class="fl-form">
+              <div class="prop-row">
+                <label for="body-name">Name</label><span></span
+                ><span class="prop-value"
+                  ><input id="body-name" type="text" maxlength="40"
+                /></span>
+              </div>
+              <div class="prop-row">
+                <label for="body-mass">Mass</label><span></span
+                ><span class="prop-value"
+                  ><input id="body-mass" type="number" step="any" /><span
+                    class="unit"
+                    >kg</span
+                  ></span
+                >
+              </div>
+              <div class="prop-row">
+                <label for="body-radius">Radius</label><span></span
+                ><span class="prop-value"
+                  ><input id="body-radius" type="number" step="any" /><span
+                    class="unit"
+                    >km</span
+                  ></span
+                >
+              </div>
+            </div>
+            <div class="ol-actions">
+              <button
+                id="circular-body"
+                title="Set it moving on a circular orbit round the body it goes round"
+              >
+                Circular orbit</button
+              ><button id="delete-body" title="Remove this body (Delete)">
+                Delete
+              </button>
+            </div>
+            <div id="body-grid" class="ol-readout-grid"></div>
+          </details>
+          <details
+            id="graph-panel"
+            class="ol-panel"
+            data-for="satellites"
+            open
+          >
             <summary>Graphs against time</summary>
             <div class="ol-legend" aria-hidden="true">
               <span class="key kinetic"></span> Kinetic
@@ -204,11 +327,11 @@
               aria-label="Speed of the selected satellite against time"
             ></canvas>
           </details>
-          <details id="readout" class="ol-panel" open>
+          <details id="readout" class="ol-panel" data-for="satellites" open>
             <summary>Readouts <small id="readout-subject"></small></summary>
             <div id="readout-grid" class="ol-readout-grid"></div>
           </details>
-          <details id="kepler-panel" class="ol-panel">
+          <details id="kepler-panel" class="ol-panel" data-for="satellites">
             <summary>Kepler's laws</summary>
             <strong class="ol-subhead">2nd law: equal areas</strong>
             <p id="areas-note" class="fl-note"></p>
@@ -240,8 +363,63 @@
         ><span id="zoom-level"></span
         ><button id="zoom-in" title="Zoom in (+)">+</button
         ><button id="fit-scene" title="Fit the orbits in view">
-          Fit scene
-        </button>
+          Fit scene</button
+        ><span class="cluster-divider" aria-hidden="true"></span
+        ><label class="icon-toggle" title="Velocity (V)"
+          ><input type="checkbox" id="show-velocity" checked /><span
+            data-icon="velocity"
+            data-icon-label="Velocity"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="Gravitational force (G): on the satellite, F = GMm/r²; in the sandbox, the net force on each body from all the others"
+          ><input type="checkbox" id="show-force" /><span
+            data-icon="force"
+            data-icon-label="Gravity force"
+            data-icon-only="true"
+          ></span></label
+        ><label
+          class="icon-toggle"
+          title="Predicted orbit (P): in the sandbox, the selected body's orbit round the body it goes round, as if nothing else pulled on it"
+          ><input type="checkbox" id="show-prediction" checked /><span
+            data-icon="prediction"
+            data-icon-label="Predicted orbit"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="Trails (T)"
+          ><input type="checkbox" id="show-trails" checked /><span
+            data-icon="trails"
+            data-icon-label="Trails"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" data-for="satellites" title="Kepler's second law: shade the areas swept in equal times (K)"
+          ><input type="checkbox" id="show-areas" /><span
+            data-icon="areas"
+            data-icon-label="Equal areas"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" data-for="satellites" title="Shade the gravitational potential and draw equipotentials at equal steps of it (E)"
+          ><input type="checkbox" id="show-potential" /><span
+            data-icon="equipotentials"
+            data-icon-label="Equipotentials"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="Numbers beside the arrows and names on the scene"
+          ><input type="checkbox" id="show-labels" checked /><span
+            data-icon="values"
+            data-icon-label="Values"
+            data-icon-only="true"
+          ></span></label
+        ><label
+          class="icon-toggle"
+          data-for="sandbox"
+          hidden
+          title="Snapping (Z): positions to half a grid square, velocities to 15° and 0.05 of the circular speed"
+          ><input type="checkbox" id="snap-toggle" /><span
+            data-icon="snap"
+            data-icon-label="Snapping"
+            data-icon-only="true"
+          ></span></label
+        >
       </div>
       <div class="status">
         <span id="scene-status"></span><span id="time"></span>
@@ -276,6 +454,20 @@
         <small id="mass-note"></small>
       </details>
       <details id="website-settings" class="settings-section" open></details>
+    </section>
+    <section
+      id="clear-confirm"
+      role="alertdialog"
+      aria-labelledby="clear-confirm-title"
+      aria-describedby="clear-confirm-text"
+      hidden
+    >
+      <strong id="clear-confirm-title">Clear the scene?</strong>
+      <p id="clear-confirm-text"></p>
+      <div class="button-row">
+        <button id="clear-no">Cancel</button
+        ><button id="clear-yes" class="danger">Clear scene</button>
+      </div>
     </section>
     <section id="presets-panel" hidden aria-labelledby="presets-title">
       <div class="menu-header">
@@ -319,10 +511,25 @@
           Up and down change the launch speed by 1% of the circular speed; left
           and right turn the launch direction by 1°.
         </dd>
-        <dt>V · G · P · T · K</dt>
+        <dt>S</dt>
+        <dd>
+          Switch between Satellites and the Gravity sandbox. In the sandbox:
+          choose a body and press Place, then click the scene (hold Ctrl to
+          place several); drag a body to move it; drag the handle on the
+          selected body's arrow to set its velocity (Shift keeps the
+          direction); Delete removes it; R puts the scene back as it was
+          before Run.
+        </dd>
+        <dt>Z</dt>
+        <dd>
+          Gravity sandbox: toggle snapping. Positions snap to half a grid
+          square; velocities to 15° steps from the line to the body each one
+          goes round and to 0.05 of the circular speed.
+        </dd>
+        <dt>V · G · P · T · K · E</dt>
         <dd>
           Toggle velocity · gravitational force · predicted orbit · trails ·
-          equal areas
+          equal areas · equipotentials
         </dd>
         <dt>A · + · −</dt>
         <dd>Keep the whole orbit in view · zoom in · zoom out</dd>

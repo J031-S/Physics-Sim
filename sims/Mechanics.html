@@ -296,6 +296,22 @@
               title="Resize tool: drag the object; Z toggles dimension snapping"
             >
               Resize (R)</button
+            ><button
+              id="reflect-h"
+              title="Reflect left to right (a mirror image of the selection)"
+              data-icon="flipH"
+              data-icon-label="Reflect left to right"
+              data-icon-only="true"
+            >
+              Reflect ↔</button
+            ><button
+              id="reflect-v"
+              title="Reflect top to bottom (a mirror image of the selection)"
+              data-icon="flipV"
+              data-icon-label="Reflect top to bottom"
+              data-icon-only="true"
+            >
+              Reflect ↕</button
             ><button id="delete" title="Delete selected object or connection">
               Delete
             </button></span
@@ -385,6 +401,12 @@
           ×
         </button>
       </div>
+      <div
+        id="menu-actions"
+        class="menu-actions"
+        role="group"
+        aria-label="Actions"
+      ></div>
       <p id="menu-note">Changes apply while the simulation runs.</p>
       <form id="constants"></form>
     </section>
@@ -404,6 +426,11 @@
         <label class="setting-toggle"
           ><input id="setting-snapping" type="checkbox" /> Snapping (Z) — 0.5 m
           / 15°</label
+        >
+        <label
+          class="setting-toggle"
+          title="The ground at y = 0. Off, bodies fall past it and keep going; right-click empty space to put it back."
+          ><input id="setting-floor" type="checkbox" checked /> Floor</label
         >
         <label class="setting-toggle"
           ><input id="setting-walls" type="checkbox" /> Scene boundary
@@ -751,7 +778,19 @@
         <dt>Click the scene</dt>
         <dd>Closes an open panel or menu (that click does nothing else)</dd>
         <dt>Right-click ground</dt>
-        <dd>Floor and wall friction / restitution</dd>
+        <dd>Floor and wall friction / restitution; turn the floor off</dd>
+        <dt>Right-click an object</dt>
+        <dd>Its constants, and Copy · Paste · Duplicate · Delete</dd>
+        <dt>Ctrl + C · Ctrl + V · Ctrl + D</dt>
+        <dd>
+          Copy the selection · paste it at the pointer · duplicate it beside
+          itself (links between copied objects come too)
+        </dd>
+        <dt>Hold Ctrl while placing</dt>
+        <dd>
+          Keeps the ball, block, wedge, spring, rod, belt, pulley or field tool
+          chosen, to place several; let go of Ctrl to return to Grab
+        </dd>
         <dt>Delete · Escape</dt>
         <dd>Delete selection · cancel interaction</dd>
       </dl>

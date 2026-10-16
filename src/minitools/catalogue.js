@@ -31,6 +31,7 @@
 //   wants       the simulation a tool without `sim` is waiting for
 //   related     id in src/site/pages.js of the full simulation
 //   verified    false until reviewed
+import { cosDeg, sinDeg, tanDeg } from "./trig.js";
 import { sims } from "./sims.js";
 import { explain } from "./explain.js";
 import { rearrange } from "./algebra.js";
@@ -320,9 +321,9 @@ export const tools = [
     ],
     solveFor: ["tau", "F", "r"],
     solve: {
-      tau: ({ r, F, theta }) => r * F * Math.sin(theta * deg),
-      F: ({ tau, r, theta }) => tau / (r * Math.sin(theta * deg)),
-      r: ({ tau, F, theta }) => tau / (F * Math.sin(theta * deg)),
+      tau: ({ r, F, theta }) => r * F * sinDeg(theta),
+      F: ({ tau, r, theta }) => tau / (r * sinDeg(theta)),
+      r: ({ tau, F, theta }) => tau / (F * sinDeg(theta)),
     },
     forms: {
       tau: "@r·@F\\sin @theta",
@@ -400,9 +401,9 @@ export const tools = [
     ],
     solveFor: ["W", "F", "s"],
     solve: {
-      W: ({ F, s, theta }) => F * s * Math.cos(theta * deg),
-      F: ({ W, s, theta }) => W / (s * Math.cos(theta * deg)),
-      s: ({ W, F, theta }) => W / (F * Math.cos(theta * deg)),
+      W: ({ F, s, theta }) => F * s * cosDeg(theta),
+      F: ({ W, s, theta }) => W / (s * cosDeg(theta)),
+      s: ({ W, F, theta }) => W / (F * cosDeg(theta)),
     },
     forms: {
       W: "@F·@s\\cos @theta",
@@ -738,8 +739,8 @@ export const tools = [
     latex: "F = \\frac{kq_1q_2}{r^2}",
     variables: [
       V("F", "F", "Force", "N", 1e-12, 1e3, 3.6e-8, "log"),
-      V("q1", "q_1", "First charge", "C", 1e-10, 1e-3, 2e-9, "log"),
-      V("q2", "q_2", "Second charge", "C", 1e-10, 1e-3, 2e-9, "log"),
+      V("q1", "q_1", "First charge", "C", -2e-8, 2e-8, 2e-9),
+      V("q2", "q_2", "Second charge", "C", -2e-8, 2e-8, 2e-9),
       V("r", "r", "Distance between them", "m", 0.1, 10, 1, "log"),
     ],
     constants: [kC],
@@ -766,7 +767,7 @@ export const tools = [
     variables: [
       V("E", "E", "Field strength", "N/C", 1, 1e6, 500, "log"),
       V("F", "F", "Force on the charge", "N", 1e-12, 1e3, 1e-6, "log"),
-      V("q", "q", "Charge", "C", 1e-10, 1e-3, 2e-9, "log"),
+      V("q", "q", "Charge", "C", -2e-8, 2e-8, 2e-9),
     ],
     solveFor: ["F", "E", "q"],
     solve: {
@@ -786,7 +787,7 @@ export const tools = [
     latex: "E = \\frac{kq}{r^2}",
     variables: [
       V("E", "E", "Field strength", "N/C", 1e-3, 1e9, 18, "log"),
-      V("q", "q", "Charge", "C", 1e-10, 1e-3, 2e-9, "log"),
+      V("q", "q", "Charge", "C", -2e-8, 2e-8, 2e-9),
       V("r", "r", "Distance", "m", 0.1, 10, 1, "log"),
     ],
     constants: [kC],
@@ -833,7 +834,7 @@ export const tools = [
     latex: "W = qV",
     variables: [
       V("W", "W", "Work done", "J", 1e-12, 1e3, 1e-7, "log"),
-      V("q", "q", "Charge", "C", 1e-10, 1e-3, 2e-9, "log"),
+      V("q", "q", "Charge", "C", -2e-8, 2e-8, 2e-9),
       V("V", "V", "Potential difference", "V", 1, 1e4, 50, "log"),
     ],
     solveFor: ["W", "q", "V"],
@@ -913,7 +914,7 @@ export const tools = [
   tool({
     id: "power-current-resistance",
     visual: "heating",
-    title: "Power in a resistor",
+    title: "Power used or lost in a resistive component",
     topic: "Circuits",
     purpose: "Heating grows with the square of the current",
     latex: "P = I^2R",
@@ -954,6 +955,11 @@ export const tools = [
       R3: ({ R, R1, R2 }) => R - R1 - R2,
     },
     forms: { R: "@R1 + @R2 + @R3", R3: "@R - @R1 - @R2" },
+    general: {
+      title: "For any number of resistors",
+      latex: "R = R_1 + R_2 + \\dots + R_n = \\sum_{i=1}^{n} R_i",
+      say: "With $n$ resistors in series the resistances all add. The $\\sum$ (sigma) means “add up”: add $R_i$ for every $i$ from 1 to $n$. This page shows three.",
+    },
     related: "circuits",
   }),
   tool({
@@ -974,6 +980,12 @@ export const tools = [
     forms: {
       R: "\\left(\\frac{1}{@R1} + \\frac{1}{@R2} + \\frac{1}{@R3}\\right)^{-1}",
     },
+    general: {
+      title: "For any number of resistors",
+      latex:
+        "\\frac{1}{R} = \\frac{1}{R_1} + \\frac{1}{R_2} + \\dots + \\frac{1}{R_n} = \\sum_{i=1}^{n} \\frac{1}{R_i}",
+      say: "With $n$ resistors in parallel the reciprocals all add. The $\\sum$ (sigma) means “add up”: add $\\frac{1}{R_i}$ for every $i$ from 1 to $n$, then take the reciprocal of the total to get $R$. This page shows three.",
+    },
     related: "circuits",
   }),
 
@@ -987,16 +999,16 @@ export const tools = [
     latex: "F = qvB\\sin\\theta",
     variables: [
       V("F", "F", "Force", "N", 0, 1000, 12),
-      V("q", "q", "Charge", "C", 0.1, 10, 1),
+      V("q", "q", "Charge", "C", -10, 10, 1),
       V("v", "v", "Speed", "m/s", 0, 20, 4),
       V("B", "B", "Magnetic field", "T", 0, 10, 3),
       V("theta", "\\theta", "Angle between v and B", "°", 0, 90, 90),
     ],
     solveFor: ["F", "B", "v"],
     solve: {
-      F: ({ q, v, B, theta }) => q * v * B * Math.sin(theta * deg),
-      B: ({ F, q, v, theta }) => F / (q * v * Math.sin(theta * deg)),
-      v: ({ F, q, B, theta }) => F / (q * B * Math.sin(theta * deg)),
+      F: ({ q, v, B, theta }) => q * v * B * sinDeg(theta),
+      B: ({ F, q, v, theta }) => F / (q * v * sinDeg(theta)),
+      v: ({ F, q, B, theta }) => F / (q * B * sinDeg(theta)),
     },
     forms: {
       F: "@q·@v·@B\\sin @theta",
@@ -1021,9 +1033,9 @@ export const tools = [
     ],
     solveFor: ["F", "B", "I"],
     solve: {
-      F: ({ B, I, l, theta }) => B * I * l * Math.sin(theta * deg),
-      B: ({ F, I, l, theta }) => F / (I * l * Math.sin(theta * deg)),
-      I: ({ F, B, l, theta }) => F / (B * l * Math.sin(theta * deg)),
+      F: ({ B, I, l, theta }) => B * I * l * sinDeg(theta),
+      B: ({ F, I, l, theta }) => F / (I * l * sinDeg(theta)),
+      I: ({ F, B, l, theta }) => F / (B * l * sinDeg(theta)),
     },
     forms: {
       F: "@B·@I·@l\\sin @theta",
@@ -1073,9 +1085,9 @@ export const tools = [
     ],
     solveFor: ["Phi", "B", "A"],
     solve: {
-      Phi: ({ B, A, theta }) => B * A * Math.cos(theta * deg),
-      B: ({ Phi, A, theta }) => Phi / (A * Math.cos(theta * deg)),
-      A: ({ Phi, B, theta }) => Phi / (B * Math.cos(theta * deg)),
+      Phi: ({ B, A, theta }) => B * A * cosDeg(theta),
+      B: ({ Phi, A, theta }) => Phi / (A * cosDeg(theta)),
+      A: ({ Phi, B, theta }) => Phi / (B * cosDeg(theta)),
     },
     forms: {
       Phi: "@B·@A\\cos @theta",
@@ -1223,16 +1235,16 @@ export const tools = [
     solveFor: ["theta2", "n2", "theta1"],
     solve: {
       theta2: ({ n1, theta1, n2 }) =>
-        Math.asin((n1 * Math.sin(theta1 * deg)) / n2) / deg,
+        Math.asin((n1 * sinDeg(theta1)) / n2) / deg,
       n2: ({ n1, theta1, theta2 }) =>
-        (n1 * Math.sin(theta1 * deg)) / Math.sin(theta2 * deg),
+        (n1 * sinDeg(theta1)) / sinDeg(theta2),
       theta1: ({ n1, n2, theta2 }) =>
-        Math.asin((n2 * Math.sin(theta2 * deg)) / n1) / deg,
+        Math.asin((n2 * sinDeg(theta2)) / n1) / deg,
     },
     forms: {
-      theta2: "\\sin^{-1}\\left(\\frac{@n1\\sin @theta1}{@n2}\\right)",
+      theta2: "\\arcsin\\left(\\frac{@n1\\sin @theta1}{@n2}\\right)",
       n2: "\\frac{@n1\\sin @theta1}{\\sin @theta2}",
-      theta1: "\\sin^{-1}\\left(\\frac{@n2\\sin @theta2}{@n1}\\right)",
+      theta1: "\\arcsin\\left(\\frac{@n2\\sin @theta2}{@n1}\\right)",
     },
     wants: "waves",
   }),
@@ -1679,7 +1691,7 @@ export const tools = [
     latex: "y = \\frac{qVL^2}{2mdu^2}",
     variables: [
       V("y", "y", "Sideways deflection", "m", 0, 10, 0.5),
-      V("q", "q", "Charge", "C", 0.1, 10, 1),
+      V("q", "q", "Charge", "C", -10, 10, 1),
       V("V", "V", "P.d. across the plates", "V", 0, 100, 2),
       V("L", "L", "Length of the plates", "m", 0.5, 6, 4),
       V("m", "m", "Mass", "kg", 0.05, 100, 1, "log"),
@@ -1745,8 +1757,8 @@ export const tools = [
     ],
     solveFor: ["R", "u"],
     solve: {
-      R: ({ u, theta, g }) => (u * u * Math.sin(2 * theta * deg)) / g,
-      u: ({ R, theta, g }) => Math.sqrt((R * g) / Math.sin(2 * theta * deg)),
+      R: ({ u, theta, g }) => (u * u * sinDeg(2 * theta)) / g,
+      u: ({ R, theta, g }) => Math.sqrt((R * g) / sinDeg(2 * theta)),
     },
     forms: {
       R: "\\frac{@u^{2}\\sin(2·@theta)}{@g}",
@@ -1794,9 +1806,9 @@ export const tools = [
     solveFor: ["a", "mu", "theta"],
     solve: {
       a: ({ g, theta, mu }) =>
-        g * (Math.sin(theta * deg) - mu * Math.cos(theta * deg)),
+        g * (sinDeg(theta) - mu * cosDeg(theta)),
       mu: ({ a, g, theta }) =>
-        (Math.sin(theta * deg) - a / g) / Math.cos(theta * deg),
+        (sinDeg(theta) - a / g) / cosDeg(theta),
       theta: ({ a, g, mu }) => {
         // sin θ − μ cos θ = a/g, as R sin(θ − φ) with R = √(1 + μ²), tan φ = μ
         const R = Math.hypot(1, mu);
@@ -1807,7 +1819,7 @@ export const tools = [
       a: "@g(\\sin @theta - @mu\\cos @theta)",
       mu: "\\frac{\\sin @theta - @a/@g}{\\cos @theta}",
       theta:
-        "\\sin^{-1}\\left(\\frac{@a/@g}{\\sqrt{1+@mu^{2}}}\\right) + \\tan^{-1} @mu",
+        "\\arcsin\\left(\\frac{@a/@g}{\\sqrt{1+@mu^{2}}}\\right) + \\arctan @mu",
     },
     uses: ["weight", "friction", "newtons-second-law"],
     related: "mechanics",
@@ -1829,11 +1841,11 @@ export const tools = [
     solveFor: ["theta", "v", "r"],
     solve: {
       theta: ({ v, r, g }) => Math.atan((v * v) / (r * g)) / deg,
-      v: ({ theta, r, g }) => Math.sqrt(r * g * Math.tan(theta * deg)),
-      r: ({ v, g, theta }) => (v * v) / (g * Math.tan(theta * deg)),
+      v: ({ theta, r, g }) => Math.sqrt(r * g * tanDeg(theta)),
+      r: ({ v, g, theta }) => (v * v) / (g * tanDeg(theta)),
     },
     forms: {
-      theta: "\\tan^{-1}\\frac{@v^{2}}{@r·@g}",
+      theta: "\\arctan\\frac{@v^{2}}{@r·@g}",
       v: "\\sqrt{@r·@g\\tan @theta}",
       r: "\\frac{@v^{2}}{@g\\tan @theta}",
     },
@@ -1851,15 +1863,15 @@ export const tools = [
     variables: [
       V("T", "T", "Period", "s", 0.1, 20, 1.87),
       V("L", "L", "Length of the string", "m", 0.1, 10, 1),
-      V("theta", "\\theta", "Angle from the vertical", "°", 0, 85, 30),
+      V("theta", "\\theta", "Angle from the vertical", "°", 0, 89, 30),
       V("g", "g", "Gravitational field strength", "m/s²", 1, 30, 9.81),
     ],
     solveFor: ["T", "L"],
     solve: {
       T: ({ L, theta, g }) =>
-        2 * Math.PI * Math.sqrt((L * Math.cos(theta * deg)) / g),
+        2 * Math.PI * Math.sqrt((L * cosDeg(theta)) / g),
       L: ({ T, theta, g }) =>
-        (g * T * T) / (4 * Math.PI * Math.PI * Math.cos(theta * deg)),
+        (g * T * T) / (4 * Math.PI * Math.PI * cosDeg(theta)),
     },
     forms: {
       T: "2\\pi\\sqrt{\\frac{@L\\cos @theta}{@g}}",

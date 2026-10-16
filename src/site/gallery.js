@@ -39,7 +39,7 @@ if (document.body.classList.contains("gallery-pane")) {
   renderAllMath();
 } else {
   setupSettingsPanel();
-  // The frames load after developer mode (?dev) has been remembered, so they
+  // The frames load after developer mode (?physium-dev) has been remembered, so they
   // show the scheme too.
   for (const frame of document.querySelectorAll("iframe[data-src]"))
     frame.src = frame.dataset.src;

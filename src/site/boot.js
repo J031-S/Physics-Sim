@@ -27,7 +27,8 @@
       "--ui-scale",
       Math.max(80, Math.min(140, prefs.size)) / 100,
     );
-  var asked = new URLSearchParams(window.location.search).get("dev"),
+  // The same parameter as DEV_PARAM in src/site/developer.js.
+  var asked = new URLSearchParams(window.location.search).get("physium-dev"),
     dev =
       asked !== null
         ? asked !== "0" && asked !== "off"
@@ -38,6 +39,8 @@
     scheme.id = "physium-scheme";
     scheme.textContent = css;
     document.head.appendChild(scheme);
+    // The house style in tokens.css stands aside (see src/site/surface.js).
+    root.classList.add("dev-scheme");
   }
   root.setAttribute("data-booting", "");
   var hide = document.createElement("style");

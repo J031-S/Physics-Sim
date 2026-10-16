@@ -13,9 +13,23 @@ export function motion(ctx, o) {
   P.ground(30, w - 30, y + 14);
   P.ball(x0, y, 13, "body-ball", P.has("u") ? 1 : 0.45);
   P.ball(x1, y, 13);
-  P.text("start", x0, y + 34);
+  // One ball at two moments: the clock reads 0 at the start and t at the
+  // end, with an arrow between them to show the time passing.
+  P.text("t = 0", x0, y + 34);
   if (P.has("t")) P.tag("t", x1, y + 34);
-  else P.text("end", x1, y + 34);
+  else P.text("later", x1, y + 34);
+  const gap = x1 > x0 ? 1 : -1;
+  P.line(
+    [
+      [x0 + gap * 40, y + 34],
+      [x1 - gap * 52, y + 34],
+    ],
+    "ink-soft",
+    1,
+    [4, 4],
+  );
+  P.arrow(x1 - gap * 60, y + 34, x1 - gap * 48, y + 34, "ink-soft", 1);
+  P.text("the same ball, later", (x0 + x1) / 2, y + 34);
   if (P.has("u")) {
     const L = P.length("u", 16, 80);
     P.arrow(x0, y, x0 + L, y, "vector-velocity");
@@ -300,36 +314,43 @@ export function drop(ctx, o) {
   P.tag("g", w * 0.82, h * 0.25 + 60);
 }
 
-// A motor lifting a load: work done in a time.
+// Power as in the mini simulation: a steady push (a uniform field on a
+// charged ball) does work W on the ball in the time t; the power is the work
+// done each second.
 export function power(ctx, o) {
   const P = picture(ctx, o),
     { w, h } = P,
-    x = w * 0.42,
-    top = 30;
+    y = h * 0.5,
+    x0 = 90,
+    x1 = w - 150;
+  P.fieldArrows(20, y - 46, w - 20, y + 46, {
+    clear: [
+      { x: x0, y, r: 28 },
+      { x: x1, y, r: 28 },
+      { x: x1 + 50, y, r: 30 },
+      { x: (x0 + x1) / 2, y, r: 60 },
+    ],
+  });
+  P.text("a steady push on the ball (a uniform field)", 24, y - 60, "left");
+  P.ball(x0, y, 13, "body-ball", 0.45);
+  P.ball(x1, y, 13);
+  P.arrow(x1 + 15, y, x1 + 75, y, "vector-velocity");
+  P.text("t = 0, at rest", x0, y + 64);
+  P.tag("t", x1, y + 64);
   P.line(
     [
-      [x - 70, top - 8],
-      [x + 70, top - 8],
+      [x0 + 60, y + 64],
+      [x1 - 50, y + 64],
     ],
-    "structure",
-    3,
+    "ink-soft",
+    1,
+    [4, 4],
   );
-  P.block(x, top + 14, 56, 34, "structure");
-  P.text("motor", x - 36, top + 14, "right");
-  P.line(
-    [
-      [x, top + 31],
-      [x, h * 0.62],
-    ],
-    "ink",
-    1.5,
-  );
-  P.block(x, h * 0.62 + 16, 40, 32);
-  P.arrow(x + 40, h * 0.7, x + 40, h * 0.45, "vector-velocity");
-  P.tag("P", x + 44, top + 14, "left");
-  P.tag("W", x + 52, h * 0.58, "left");
-  P.tag("t", x + 52, h * 0.58 + 24, "left");
-  P.ground(30, w - 30, h - 16);
+  P.arrow(x1 - 58, y + 64, x1 - 46, y + 64, "ink-soft", 1);
+  P.tag("W", (x0 + x1) / 2, y - 12);
+  P.text("work done on the ball", (x0 + x1) / 2, y + 14);
+  P.tag("P", w - 24, 22, "right");
+  P.text("work done each second", w - 24, 46, "right");
 }
 
 // A car driven by a force at a speed.
@@ -454,16 +475,18 @@ export function ramp(ctx, o) {
     P.tag("mu", bx + up[0] * 52, by + up[1] * 52 - 14, "left");
   }
   if (P.value("a") > 0) {
-    const L = Math.abs(P.length("a", 24, 70));
-    P.arrow(
-      bx - up[0] * (s / 2 + 4) + nx * 26,
-      by - up[1] * (s / 2 + 4) + ny * 26,
-      bx - up[0] * (s / 2 + 4 + L) + nx * 26,
-      by - up[1] * (s / 2 + 4 + L) + ny * 26,
-      "accent-text",
-    );
-  } else P.text("stays put: friction holds it", w - 30, 24, "right");
-  P.tag("a", w - 30, 50, "right");
+    // From the block's downhill face, along the slope, labelled at its tip.
+    const L = Math.abs(P.length("a", 24, 70)),
+      x1 = bx - up[0] * (s / 2),
+      y1 = by - up[1] * (s / 2),
+      x2 = x1 - up[0] * L,
+      y2 = y1 - up[1] * L;
+    P.arrow(x1, y1, x2, y2, "accent-text");
+    P.tag("a", x2 - 6, y2 - 16, "right");
+  } else {
+    P.text("stays put: friction holds it", w - 30, 24, "right");
+    P.tag("a", w - 30, 50, "right");
+  }
   P.tag("g", w - 30, 76, "right");
 }
 

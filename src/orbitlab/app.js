@@ -13,7 +13,9 @@ import {
   circularSpeed,
   escapeSpeed,
 } from "./model.js";
-import { presets } from "./presets.js";
+import { presets, sandboxPresets } from "./presets.js";
+import { createSandbox } from "./sandbox.js";
+import { GravityLab } from "./nbody.js";
 import { setupSceneFiles } from "../scene-file.js";
 import {
   ARROW,
@@ -35,7 +37,7 @@ const TAU = 2 * Math.PI,
   // Simulated seconds per real second.
   WARPS = [
     1, 2, 5, 10, 20, 50, 100, 200, 500, 1e3, 2e3, 5e3, 1e4, 2e4, 5e4, 1e5, 2e5,
-    5e5, 1e6, 2e6, 5e6, 1e7,
+    5e5, 1e6, 2e6, 5e6, 1e7, 2e7, 5e7, 1e8, 2e8, 5e8, 1e9,
   ],
   HANDLE = 11;
 // The next launch, in SI: distance from the centre, speed, and angle of the
@@ -44,10 +46,15 @@ const aim = {
   radius: lab.body.radius + 400 * km,
   speed: circularSpeed(lab.mu, lab.body.radius + 400 * km),
   angle: 0,
+  // Where round the body the launch point is: anticlockwise from the top.
+  bearing: 0,
 };
 // Pixels per metre and the screen position of the body's centre.
 const view = { scale: 1e-5, x: 0, y: 0, width: 0, height: 0 };
 const state = {
+  // "satellites" (one fixed body, light satellites: OrbitLab) or "sandbox"
+  // (any number of bodies pulling on one another: GravityLab, sandbox.js).
+  mode: "satellites",
   running: false,
   warp: 500,
   // Simulated seconds per real second actually achieved over recent frames.
@@ -62,6 +69,7 @@ const state = {
     prediction: true,
     trails: true,
     areas: false,
+    potential: false,
     labels: true,
   },
 };
@@ -89,6 +97,7 @@ function attempt(fn) {
 }
 const renderer = createOrbitRenderer(ctx, view),
   { screen, world } = renderer;
+const sandboxed = () => state.mode === "sandbox";
 function eventPoint(e) {
   const r = canvas.getBoundingClientRect();
   return { sx: e.clientX - r.left, sy: e.clientY - r.top };
@@ -281,6 +290,11 @@ function removeSatellite(id) {
   buildList();
 }
 function reset() {
+  if (sandboxed()) {
+    setRunning(false);
+    sandbox.reset();
+    return;
+  }
   lab.clear();
   paths.clear();
   state.selected = null;
@@ -290,6 +304,7 @@ function reset() {
   fitted = false;
 }
 function setRunning(on) {
+  if (on && sandboxed()) sandbox.running();
   state.running = on;
   state.achieved = state.warp;
   last = 0;
@@ -298,6 +313,11 @@ function setRunning(on) {
 }
 function toggleRunning() {
   if (state.running) return setRunning(false);
+  if (sandboxed()) {
+    if (!sandbox.lab.list().length)
+      return toast("Add a body first: choose one and press Place.");
+    return setRunning(true);
+  }
   // Run with nothing in flight (none launched yet, or all of them landed
   // or gone) launches the satellite that is set up.
   if (!lab.list().some((s) => s.status === "flying")) return void launch();
@@ -306,6 +326,11 @@ function toggleRunning() {
 // One frame's worth of simulated time at the current warp, while paused.
 function stepOnce() {
   if (state.running) setRunning(false);
+  if (sandboxed()) {
+    sandbox.running();
+    sandbox.lab.advance(state.warp * FRAME);
+    return;
+  }
   if (!lab.list().length) {
     if (!launch()) return;
     setRunning(false);
@@ -352,7 +377,9 @@ function buildList() {
     chip.append(pick, remove);
     list.append(chip);
   }
-  $("reset").disabled = !lab.list().length;
+  $("reset").disabled = sandboxed()
+    ? !sandbox.canReset()
+    : !lab.list().length;
 }
 
 // ---------------------------------------------------------------- forms
@@ -571,6 +598,28 @@ function buildForms() {
     }),
     slide: (v) => setAim({ angle: wrapAngle(v * perUnit) }),
   });
+  addRow($("launch-form"), {
+    key: "bearing",
+    label: "Position round",
+    title:
+      "Where round the body the launch point is: 0 is straight above the centre, increasing anticlockwise. In Edit mode, drag the launch point to move it.",
+    unit: radians ? "rad" : "°",
+    read: () => tidy(aim.bearing / perUnit, 2),
+    write: (v) => {
+      if (!Number.isFinite(v) || Math.abs(v * perUnit) > Math.PI + 1e-9)
+        throw new Error(
+          `Position round must be between ${radians ? "−3.14 rad and 3.14 rad" : "−180° and 180°"}.`,
+        );
+      setAim({ bearing: wrapAngle(v * perUnit) });
+    },
+    slider: () => ({
+      min: radians ? -3.14 : -180,
+      max: radians ? 3.14 : 180,
+      step: radians ? 0.01 : 1,
+      value: aim.bearing / perUnit,
+    }),
+    slide: (v) => setAim({ bearing: wrapAngle(v * perUnit) }),
+  });
   syncForms();
 }
 
@@ -654,7 +703,7 @@ function sceneBox() {
       for (const [x, y] of path) if (x * x + y * y <= limit * limit) add(x, y);
     },
     p = preview();
-  add(0, aim.radius);
+  add(-aim.radius * Math.sin(aim.bearing), aim.radius * Math.cos(aim.bearing));
   // An escaping path is shown out to three launch radii before launch, and
   // then for as far as the satellite has gone.
   addPath(p.path, p.elements.bound ? Infinity : 3 * aim.radius);
@@ -669,7 +718,7 @@ function sceneBox() {
   return box;
 }
 function fitTarget() {
-  const box = sceneBox(),
+  const box = sandboxed() ? sandbox.sceneBox() : sceneBox(),
     area = clearArea(),
     w = box.maxX - box.minX,
     h = box.maxY - box.minY,
@@ -740,6 +789,31 @@ function draw() {
   const c = palette();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, r.width, r.height);
+  if (sandboxed()) {
+    sandbox.draw({
+      colours: c,
+      grid: prefs.grid,
+      show: state.show,
+      area: clearArea(),
+    });
+    put(
+      $("time"),
+      `t = ${joined(duration(sandbox.lab.time))} · ${num(state.warp, 3)}×`,
+    );
+    const n = sandbox.lab.list().length;
+    put(
+      $("scene-status"),
+      `Gravity sandbox · ${n} bod${n === 1 ? "y" : "ies"}, every one pulling on every other · bodies that touch merge`,
+    );
+    put($("zoom-level"), "↔ " + joined(sandboxDistance(view.width / view.scale)));
+    put($("tool-name"), "Gravity sandbox");
+    put(
+      $("tool-help"),
+      "Place bodies from the Bodies panel · drag one to move it · drag the handle on the selected body's arrow to set its velocity · every arrow is on one scale for the whole scene (see System)",
+    );
+    $("reset").disabled = !sandbox.canReset();
+    return;
+  }
   renderer.drawScene(lab, {
     colours: c,
     grid: prefs.grid,
@@ -1305,7 +1379,22 @@ function frame(now) {
     frameBegan = performance.now();
   let simulated = 0;
   last = now;
-  if (state.running && elapsed > 0) {
+  if (state.running && elapsed > 0 && sandboxed()) {
+    const model = sandbox.lab,
+      began = performance.now(),
+      done = model.advance(elapsed * state.warp),
+      took = performance.now() - began;
+    simulated = done;
+    // As below: about 6 ms of work a frame, never longer steps.
+    if (took > 7 || done < elapsed * state.warp)
+      model.maxSteps = clamp(
+        model.maxSteps * clamp(6 / Math.max(took, 0.5), 0.7, 1.3),
+        200,
+        200000,
+      );
+    state.achieved += (done / elapsed - state.achieved) * 0.1;
+    if (!model.list().length) setRunning(false);
+  } else if (state.running && elapsed > 0) {
     const began = performance.now(),
       done = lab.advance(elapsed * state.warp),
       took = performance.now() - began;
@@ -1348,8 +1437,17 @@ canvas.addEventListener("pointerdown", (e) => {
   // A click on the scene closes an open panel and does nothing else.
   if (closePanels()) return;
   if (e.button !== 0 && e.button !== 1) return;
+  if (sandboxed() && e.button === 0) {
+    const at = eventPoint(e);
+    if (sandbox.pointerdown(e, at.sx, at.sy)) {
+      drag = { type: "sandbox" };
+      e.preventDefault();
+      capture(e);
+      return;
+    }
+  }
   const { sx, sy } = eventPoint(e),
-    hit = e.button === 0 ? hitTest(sx, sy) : null;
+    hit = e.button === 0 && !sandboxed() ? hitTest(sx, sy) : null;
   if (hit?.type === "satellite") {
     state.selected = hit.id;
     buildList();
@@ -1361,6 +1459,10 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 canvas.addEventListener("pointermove", (e) => {
   const { sx, sy } = eventPoint(e);
+  if (sandboxed() && (!drag || drag.type === "sandbox")) {
+    sandbox.pointermove(e, sx, sy);
+    return;
+  }
   if (!drag) {
     const hit = hitTest(sx, sy);
     canvas.style.cursor = hit
@@ -1387,22 +1489,27 @@ canvas.addEventListener("pointermove", (e) => {
         LIMITS.speed,
       ),
       patch = { speed: Number(speed.toPrecision(4)) };
-    if (!e.shiftKey && Math.hypot(dx, dy) > 2) {
-      // Whole degrees, so that horizontal is easy to find again.
-      patch.angle =
-        (Math.round((Math.atan2(dy, dx) * 180) / Math.PI) * Math.PI) / 180;
-    }
+    if (!e.shiftKey && Math.hypot(dx, dy) > 2)
+      patch.angle = wholeDegrees(Math.atan2(dy, dx) - aim.bearing);
     if (attempt(() => setAim(patch))) syncForms();
   } else if (drag.type === "point") {
-    const radius = Math.max(lab.body.radius, world(sx, sy).y),
+    // Outside Edit mode the launch point moves only straight out from the
+    // centre or back towards it; its altitude is what changes.
+    const p = world(sx, sy),
+      up = -p.x * Math.sin(aim.bearing) + p.y * Math.cos(aim.bearing),
+      radius = Math.max(lab.body.radius, up),
       altitude = Number((radius - lab.body.radius).toPrecision(4));
     if (attempt(() => setAim({ radius: lab.body.radius + altitude })))
       syncForms();
   }
 });
 function endDrag() {
+  if (drag?.type === "sandbox") sandbox.pointerup();
   drag = null;
 }
+// Whole degrees, so that horizontal is easy to find again.
+const wholeDegrees = (a) =>
+  wrapAngle((Math.round((a * 180) / Math.PI) * Math.PI) / 180);
 canvas.addEventListener("pointerup", endDrag);
 canvas.addEventListener("pointercancel", endDrag);
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -1420,6 +1527,7 @@ const PANELS = {
   "settings-panel": "settings-toggle",
   "keys-panel": "shortcuts",
   "presets-panel": "presets-toggle",
+  "clear-confirm": "clear",
 };
 function closePanels(except) {
   let closed = false;
@@ -1457,15 +1565,22 @@ const toggleShow = (id) => {
   $(id).checked = !$(id).checked;
   $(id).dispatchEvent(new window.Event("change", { bubbles: true }));
 };
+document.addEventListener("keyup", (e) => {
+  if (sandboxed()) sandbox.keyup(e);
+});
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     drag = null;
     closePanels();
+    if (sandboxed()) sandbox.keydown(e);
     return;
   }
   if (typing(e) || e.metaKey || e.ctrlKey || e.altKey) return;
   const key = e.key.toLowerCase();
-  if (e.key.startsWith("Arrow")) {
+  if (sandboxed() && sandbox.keydown(e)) return;
+  if (key === "s" && !e.repeat)
+    return setMode(sandboxed() ? "satellites" : "sandbox");
+  if (e.key.startsWith("Arrow") && !sandboxed()) {
     e.preventDefault();
     const p = preview(),
       patch =
@@ -1498,14 +1613,22 @@ document.addEventListener("keydown", (e) => {
     return zoomAt(view.width / 2, view.height / 2, 1.25);
   if (key === "-") return zoomAt(view.width / 2, view.height / 2, 0.8);
   if (e.repeat) return;
+  // Keys for the satellites only.
+  if (sandboxed() && ["l", "k", "e"].includes(key)) return;
+  if (key === "z") {
+    if (sandboxed()) sandbox.setSnapping(!sandbox.snapping());
+    return;
+  }
   if (key === "l") launch();
+
   else if (key === "r") reset();
-  else if (key === "c") lab.clearTrails();
+  else if (key === "c") (sandboxed() ? sandbox.clearTrails() : lab.clearTrails());
   else if (key === "v") toggleShow("show-velocity");
   else if (key === "g") toggleShow("show-force");
   else if (key === "p") toggleShow("show-prediction");
   else if (key === "t") toggleShow("show-trails");
   else if (key === "k") toggleShow("show-areas");
+  else if (key === "e") toggleShow("show-potential");
   else if (key === "a") toggleShow("auto-fit");
   else if (key === "?") togglePanel("keys-panel");
 });
@@ -1516,6 +1639,7 @@ for (const [id, key] of [
   ["show-prediction", "prediction"],
   ["show-trails", "trails"],
   ["show-areas", "areas"],
+  ["show-potential", "potential"],
   ["show-labels", "labels"],
 ])
   $(id).addEventListener("change", (e) => {
@@ -1595,6 +1719,26 @@ $("settings-toggle").addEventListener("click", () =>
   togglePanel("settings-panel"),
 );
 $("close-settings").addEventListener("click", () => closePanels());
+// Clear scene: the view showing is emptied and its clock set to zero. In
+// the satellites view the central body and the launch being set up stay,
+// since they are the set-up rather than the scene.
+$("clear").addEventListener("click", () => {
+  $("clear-confirm-text").textContent = sandboxed()
+    ? "Every body is removed from the gravity sandbox and the clock is set to zero. The satellites view is not affected."
+    : "Every satellite, trail and third-law point is removed and the clock is set to zero. The central body and the launch set-up are kept. The gravity sandbox is not affected.";
+  if (togglePanel("clear-confirm")) $("clear-no").focus();
+});
+$("clear-no").addEventListener("click", () => closePanels());
+$("clear-yes").addEventListener("click", () => {
+  closePanels();
+  if (sandboxed()) {
+    setRunning(false);
+    sandbox.clear();
+    return;
+  }
+  reset();
+  lab.clearThirdLaw();
+});
 $("shortcuts").addEventListener("click", () => togglePanel("keys-panel"));
 $("close-keys").addEventListener("click", () => closePanels());
 $("presets-toggle").addEventListener("click", () => {
@@ -1607,15 +1751,31 @@ $("close-presets").addEventListener("click", () => closePanels());
 // and when each satellite was launched; loading flies them again to the
 // moment of saving, then waits for Run.
 setupSceneFiles({
-  filename: "physics-sim-orbits.json",
+  filename: () =>
+    sandboxed() ? "physium-gravity.json" : "physics-sim-orbits.json",
   toast,
-  save: () => ({
-    ...lab.exportScene(),
-    aim: { ...aim },
-    warp: state.warp,
-  }),
+  // The sandbox saves its own kind of file; loading one switches to it.
+  save: () =>
+    sandboxed()
+      ? { ...sandbox.lab.exportScene(), warp: state.warp }
+      : {
+          ...lab.exportScene(),
+          aim: { ...aim },
+          warp: state.warp,
+        },
   load(data) {
+    if (data?.format === "physium-gravity") {
+      new GravityLab().loadScene(data);
+      setMode("sandbox");
+      sandbox.load(data);
+      if (WARPS.includes(data.warp)) setWarp(data.warp);
+      fitted = false;
+      setAutoFit(true);
+      toast("Scene loaded · press Run to continue");
+      return;
+    }
     const report = lab.loadScene(data);
+    setMode("satellites");
     ghost = null;
     paths.clear();
     for (const s of lab.list())
@@ -1629,6 +1789,7 @@ setupSceneFiles({
         radius: data.aim.radius,
         speed: data.aim.speed,
         angle: data.aim.angle,
+        bearing: data.aim.bearing ?? 0,
       });
     } catch {
       const radius = Math.max(aim.radius, lab.body.radius);
@@ -1636,6 +1797,7 @@ setupSceneFiles({
         radius,
         speed: Math.min(circularSpeed(lab.mu, radius), LIMITS.speed),
         angle: 0,
+        bearing: 0,
       });
     }
     if (WARPS.includes(data.warp)) setWarp(data.warp);
@@ -1654,14 +1816,17 @@ setupSceneFiles({
 function loadPreset(preset) {
   attempt(() => {
     changeBody({ key: preset.body, ...BODIES[preset.body] }, false, true);
-    setAim(preset.launch(lab.mu, lab.body.radius));
+    setAim({ bearing: 0, ...preset.launch(lab.mu, lab.body.radius) });
     setWarp(preset.warp);
     setAutoFit(true);
     syncForms();
   });
 }
 {
-  const list = $("preset-list");
+  const list = $("preset-list"),
+    heading = document.createElement("h3");
+  heading.textContent = "Satellites";
+  list.append(heading);
   for (const preset of presets) {
     const button = document.createElement("button"),
       title = document.createElement("strong"),
@@ -1693,6 +1858,7 @@ function drawPresetPreviews() {
   const dark = isDark();
   if (previewTheme === dark) return;
   previewTheme = dark;
+  drawSandboxPreviews();
   const c = palette();
   for (const preset of presets)
     try {
@@ -1743,8 +1909,148 @@ function drawPresetPreviews() {
       g.arc(...at(0, launched.radius), 2.4, 0, TAU);
       g.fillStyle = c.satellites[0];
       g.fill();
-    } catch {
-      // A preview is decoration; the preset itself reports its own errors.
+    } catch (e) {
+      // A preview is decoration and must not stop the panel opening, but a
+      // broken one is a bug: say so in the console.
+      console.error(`Preset preview "${preset.id}" failed:`, e);
+    }
+}
+
+// ---------------------------------------------------------------- sandbox
+
+// Distances in the sandbox: kilometres up to a hundredth of an AU, then AU.
+const AU = 1.496e11;
+const sandboxDistance = (m, sig = 4) =>
+  Math.abs(m) >= 0.01 * AU ? [num(m / AU, sig), "AU"] : [num(m / km, sig), "km"];
+const sandbox = createSandbox({
+  canvas,
+  view,
+  renderer,
+  palette,
+  toast,
+  attempt,
+  format: { num, duration, prefixed, joined, speedText, angleText },
+  onChange() {
+    $("reset").disabled = !sandbox.canReset();
+  },
+  holdView: () => setAutoFit(false),
+});
+// Satellites or the sandbox: each has its own panels, toggles and keys;
+// the clock stops and the view is fitted afresh.
+function setMode(mode) {
+  if (mode === state.mode) return;
+  setRunning(false);
+  state.mode = mode;
+  for (const b of document.querySelectorAll("[data-mode]"))
+    b.setAttribute("aria-pressed", String(b.dataset.mode === mode));
+  for (const el of document.querySelectorAll("[data-for]"))
+    el.hidden = el.dataset.for !== mode;
+  document.body.dataset.mode = mode;
+  canvas.style.cursor = "";
+  fitted = false;
+  setAutoFit(true);
+  buildList();
+}
+for (const b of document.querySelectorAll("[data-mode]"))
+  b.addEventListener("click", () => setMode(b.dataset.mode));
+function loadSandboxPreset(preset) {
+  setMode("sandbox");
+  sandbox.loadPreset(preset);
+  setWarp(preset.warp);
+  fitted = false;
+  setAutoFit(true);
+}
+{
+  const list = $("preset-list"),
+    heading = document.createElement("h3");
+  heading.className = "preset-group";
+  heading.textContent = "Gravity sandbox";
+  list.append(heading);
+  for (const preset of sandboxPresets) {
+    const button = document.createElement("button"),
+      title = document.createElement("strong"),
+      text = document.createElement("span"),
+      expect = document.createElement("span"),
+      picture = document.createElement("canvas"),
+      words = document.createElement("span");
+    button.className = "preset";
+    button.dataset.preset = preset.id;
+    title.textContent = preset.title;
+    text.textContent = preset.text;
+    expect.className = "preset-expect";
+    expect.textContent = "What to check: " + preset.expect;
+    picture.className = "preset-preview";
+    picture.setAttribute("aria-hidden", "true");
+    words.className = "preset-text";
+    words.append(title, text, expect);
+    button.append(picture, words);
+    button.addEventListener("click", () => {
+      closePanels();
+      loadSandboxPreset(preset);
+    });
+    list.append(button);
+  }
+}
+// Sandbox thumbnails: each preset built in a spare lab and run for a while,
+// its trails drawn, so the picture is what the preset really does.
+function drawSandboxPreviews() {
+  const c = palette();
+  for (const preset of sandboxPresets)
+    try {
+      const el = document.querySelector(
+          `[data-preset="${preset.id}"] .preset-preview`,
+        ),
+        g = el.getContext("2d"),
+        dpr = window.devicePixelRatio || 1,
+        w = 112,
+        h = 72;
+      if (!g?.setTransform) continue;
+      el.width = w * dpr;
+      el.height = h * dpr;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const scene = new GravityLab({ maxSteps: 4000, trailLength: 400 });
+      preset.build(scene);
+      const box = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity },
+        span = Math.max(
+          ...scene.list().map((b) => Math.hypot(b.x, b.y)),
+          1,
+        );
+      scene.trailSpacing = span / 200;
+      scene.advance(preset.check ?? 1e6);
+      for (const b of scene.list())
+        for (const [x, y] of [...b.trail, [b.x, b.y]]) {
+          box.minX = Math.min(box.minX, x);
+          box.maxX = Math.max(box.maxX, x);
+          box.minY = Math.min(box.minY, y);
+          box.maxY = Math.max(box.maxY, y);
+        }
+      const k = Math.min(
+          (w - 12) / (box.maxX - box.minX || 1),
+          (h - 12) / (box.maxY - box.minY || 1),
+        ),
+        at = (x, y) => [
+          w / 2 + (x - (box.minX + box.maxX) / 2) * k,
+          h / 2 - (y - (box.minY + box.maxY) / 2) * k,
+        ];
+      g.fillStyle = c.paper;
+      g.fillRect(0, 0, w, h);
+      for (const b of scene.list()) {
+        const colour =
+          b.mass > 1e29 ? c.star : c.satellites[b.colour % c.satellites.length];
+        g.strokeStyle = colour;
+        g.lineWidth = 1;
+        g.beginPath();
+        b.trail.forEach(([x, y], i) =>
+          i ? g.lineTo(...at(x, y)) : g.moveTo(...at(x, y)),
+        );
+        g.stroke();
+        g.beginPath();
+        g.arc(...at(b.x, b.y), b.mass > 1e29 ? 3 : 1.8, 0, TAU);
+        g.fillStyle = colour;
+        g.fill();
+      }
+    } catch (e) {
+      console.error(`Preset preview "${preset.id}" failed:`, e);
     }
 }
 

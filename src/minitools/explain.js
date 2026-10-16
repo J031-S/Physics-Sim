@@ -461,8 +461,8 @@ export const explain = {
         ],
         ["Swap the sides.", T`\sin\theta_2 = \frac{n_1\sin\theta_1}{n_2}`],
         [
-          "This gives the sine of the angle, not the angle. Use the inverse sine ($\\sin^{-1}$ on a calculator) to get the angle back.",
-          T`\theta_2 = \sin^{-1}\left(\frac{n_1\sin\theta_1}{n_2}\right)`,
+          "This gives the sine of the angle, not the angle. Use the inverse sine, $\\arcsin$ (the $\\sin^{-1}$ key on a calculator), to get the angle back.",
+          T`\theta_2 = \arcsin\left(\frac{n_1\sin\theta_1}{n_2}\right)`,
         ],
       ],
       n2: [
@@ -480,8 +480,8 @@ export const explain = {
           T`\sin\theta_1 = \frac{n_2\sin\theta_2}{n_1}`,
         ],
         [
-          "This gives the sine of the angle, not the angle. Use the inverse sine ($\\sin^{-1}$ on a calculator) to get the angle back.",
-          T`\theta_1 = \sin^{-1}\left(\frac{n_2\sin\theta_2}{n_1}\right)`,
+          "This gives the sine of the angle, not the angle. Use the inverse sine, $\\arcsin$ (the $\\sin^{-1}$ key on a calculator), to get the angle back.",
+          T`\theta_1 = \arcsin\left(\frac{n_2\sin\theta_2}{n_1}\right)`,
         ],
       ],
     },
@@ -718,7 +718,7 @@ export const explain = {
         ],
         [
           "$\\theta$ appears twice, inside a sine and a cosine, so it cannot be collected by adding and dividing. Instead use the identity that turns the right-hand side into a single sine: $\\sin\\theta - \\mu\\cos\\theta = \\sqrt{1 + \\mu^2}\\,\\sin(\\theta - \\phi)$, where $\\tan\\phi = \\mu$.",
-          T`\frac{a}{g} = \sqrt{1 + \mu^2}\;\sin(\theta - \phi), \qquad \phi = \tan^{-1}\mu`,
+          T`\frac{a}{g} = \sqrt{1 + \mu^2}\;\sin(\theta - \phi), \qquad \phi = \arctan\mu`,
         ],
         [
           "Divide both sides by $\\sqrt{1 + \\mu^2}$.",
@@ -726,11 +726,11 @@ export const explain = {
         ],
         [
           "Use the inverse sine to get the angle $\\theta - \\phi$ back.",
-          T`\theta - \phi = \sin^{-1}\left(\frac{a/g}{\sqrt{1 + \mu^2}}\right)`,
+          T`\theta - \phi = \arcsin\left(\frac{a/g}{\sqrt{1 + \mu^2}}\right)`,
         ],
         [
-          "Add $\\phi$ to both sides, writing it as $\\tan^{-1}\\mu$.",
-          T`\theta = \sin^{-1}\left(\frac{a/g}{\sqrt{1 + \mu^2}}\right) + \tan^{-1}\mu`,
+          "Add $\\phi$ to both sides, writing it as $\\arctan\\mu$.",
+          T`\theta = \arcsin\left(\frac{a/g}{\sqrt{1 + \mu^2}}\right) + \arctan\mu`,
         ],
       ],
     },
@@ -748,8 +748,8 @@ export const explain = {
       theta: [
         ["Start from the equation.", T`\tan\theta = \frac{v^2}{rg}`],
         [
-          "This gives the tangent of the angle, not the angle. Use the inverse tangent ($\\tan^{-1}$ on a calculator) to get the angle back.",
-          T`\theta = \tan^{-1}\left(\frac{v^2}{rg}\right)`,
+          "This gives the tangent of the angle, not the angle. Use the inverse tangent ($\\arctan$ on a calculator) to get the angle back.",
+          T`\theta = \arctan\left(\frac{v^2}{rg}\right)`,
         ],
       ],
     },
@@ -759,6 +759,10 @@ export const explain = {
         : null,
   },
   "conical-pendulum": {
+    check: (v) =>
+      v.theta === 0
+        ? "At 0° the bob simply hangs at rest straight below the pivot: it is not going round, so there is no period. (The formula's value is the limit as the angle shrinks towards 0°: the period of very small circles.)"
+        : null,
     subject: "T",
     eq: "T^2 = #4pi2 L #cos / g",
     before:

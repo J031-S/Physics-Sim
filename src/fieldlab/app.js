@@ -3,7 +3,16 @@
 import { $, isDark, showToast } from "../site/dom.js";
 import { setupSite } from "../site/shell.js";
 import { styleCanvas } from "../site/canvas-style.js";
-import { FieldLab, KINDS, EPS0, MU0, TestCharges } from "./model.js";
+import {
+  FieldLab,
+  KINDS,
+  EPS0,
+  MU0,
+  TestCharges,
+  LIMITS,
+  electricFieldLines,
+  magneticFieldLines,
+} from "./model.js";
 import {
   createFieldRenderer,
   fieldPalette,
@@ -47,6 +56,8 @@ const tests = new TestCharges(lab, { range: 150, limit: 1200 });
 let lastFrame = 0,
   previewTheme = null;
 let drag = null,
+  // R held: dragging a plate or magnet resizes it about its centre.
+  resizeHeld = false,
   computed = null,
   stale = true,
   queued = false,
@@ -98,7 +109,7 @@ const ADD = {
 const TOOL_HELP = {
   grab: [
     "Grab",
-    "Drag a source to move it; Ctrl-drag turns a plate or magnet. Click one to change its values.",
+    "Drag a source to move it; Ctrl-drag turns a plate or magnet; hold R and drag to resize one. Click one to change its values.",
   ],
   pan: ["Pan", "Drag to move the view. Scroll to zoom."],
 };
@@ -546,11 +557,16 @@ function setMode(mode) {
   for (const b of document.querySelectorAll("[data-for]"))
     b.hidden = b.dataset.for !== mode;
   $("show-equipotentials-label").hidden = !electric;
+  $("equipotentials-toggle").hidden = !electric;
   lastFrame = 0;
   updateTests();
-  $("show-forces-text").textContent = electric
-    ? "Forces on charges"
-    : "Forces on wires";
+  // The forces toggle names what it shows in this field.
+  const forces = electric ? "Forces on charges" : "Forces on wires",
+    toggle = $("show-forces-label");
+  toggle.title = `${forces} (F)`;
+  toggle.querySelector("[data-icon]").dataset.iconLabel = forces;
+  const spoken = toggle.querySelector(".sr-only");
+  if (spoken) spoken.textContent = forces;
   $("probe-field-name").textContent = electric ? "E" : "B";
   for (const el of document.querySelectorAll(".probe-potential"))
     el.hidden = !electric;
@@ -694,6 +710,26 @@ function removeSelected() {
   invalidate();
 }
 
+// Resize a plate or magnet about its centre to reach the pointer: its length
+// along its own axis, and a magnet's width across it. Snapping takes each to
+// a whole number of grid steps either side of the centre.
+function resizeSource(s, p) {
+  const c = Math.cos(s.angle),
+    n = Math.sin(s.angle),
+    dx = p.x - s.x,
+    dy = p.y - s.y,
+    size = (half, [lo, hi]) => {
+      let v = 2 * Math.abs(half);
+      if (state.snapping) v = 2 * snapTo(v / 2, GRID);
+      return Math.min(hi, Math.max(lo, v));
+    },
+    patch = { length: size(dx * c + dy * n, LIMITS.length) };
+  if (s.kind === "magnet") patch.width = size(-dx * n + dy * c, LIMITS.width);
+  if (attempt(() => lab.update(s.id, patch))) {
+    syncForm();
+    invalidate();
+  }
+}
 function moveSource(s, x, y) {
   if (state.snapping) {
     x = snapTo(x, GRID);
@@ -759,8 +795,11 @@ canvas.addEventListener("pointerdown", (e) => {
     return pan();
   }
   select(hit.id);
+  const long = hit.kind === "plate" || hit.kind === "magnet";
   drag =
-    e.ctrlKey && (hit.kind === "plate" || hit.kind === "magnet")
+    resizeHeld && long
+      ? { type: "resize", id: hit.id }
+      : e.ctrlKey && long
       ? {
           type: "rotate",
           id: hit.id,
@@ -782,6 +821,7 @@ canvas.addEventListener("pointermove", (e) => {
     const s = lab.get(drag.id);
     if (!s) drag = null;
     else if (drag.type === "move") moveSource(s, p.x + drag.dx, p.y + drag.dy);
+    else if (drag.type === "resize") resizeSource(s, p);
     else {
       let angle = Math.atan2(p.y - s.y, p.x - s.x) + drag.offset;
       if (state.snapping) angle = snapTo(angle, ROTATE_STEP);
@@ -790,8 +830,14 @@ canvas.addEventListener("pointermove", (e) => {
         invalidate();
       }
     }
-  } else if (state.tool === "grab")
-    canvas.style.cursor = hitTest(sx, sy) ? "move" : "";
+  } else if (state.tool === "grab") {
+    const hit = hitTest(sx, sy);
+    canvas.style.cursor = !hit
+      ? ""
+      : resizeHeld && (hit.kind === "plate" || hit.kind === "magnet")
+        ? "nwse-resize"
+        : "move";
+  }
   updateProbe();
 });
 function endDrag() {
@@ -831,7 +877,13 @@ const toggleShow = (id) => {
   $(id).checked = !$(id).checked;
   $(id).dispatchEvent(new window.Event("change", { bubbles: true }));
 };
+document.addEventListener("keyup", (e) => {
+  if (e.key.toLowerCase() === "r") resizeHeld = false;
+});
+window.addEventListener("blur", () => (resizeHeld = false));
 document.addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() === "r" && !typing(e) && !e.ctrlKey && !e.metaKey)
+    resizeHeld = true;
   if (e.key === "Escape") {
     drag = null;
     closePanels();
@@ -1005,8 +1057,10 @@ function drawPresetPreviews() {
         document.querySelector(`[data-preset="${preset.id}"] .preset-preview`),
         preset,
       );
-    } catch {
-      // A preview is decoration; the preset itself reports its own errors.
+    } catch (e) {
+      // A preview is decoration and must not stop the panel opening, but a
+      // broken one is a bug: say so in the console.
+      console.error(`Preset preview "${preset.id}" failed:`, e);
     }
 }
 function drawPreview(el, preset) {

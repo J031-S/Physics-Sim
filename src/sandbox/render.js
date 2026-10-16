@@ -298,6 +298,8 @@ export function createSceneRenderer(ctx, view) {
         vectors: false,
         forceVectors: false,
         highlighted: () => false,
+        // Label every arrow with its value, not only the selected body's.
+        labels: false,
         selected: null,
         forceOf: (id) => sim.netForce(id),
         forceScale: 4,
@@ -354,14 +356,27 @@ export function createSceneRenderer(ctx, view) {
         );
       }
     endGrid(ctx);
-    ctx.fillStyle = color("canvas-ground", dark);
-    ctx.fillRect(0, view.y, o.width, o.height - view.y);
-    line(
-      { x: 0, y: view.y },
-      { x: o.width, y: view.y },
-      color("structure", dark),
-      2,
-    );
+    if (sim.settings.floor) {
+      ctx.fillStyle = color("canvas-ground", dark);
+      ctx.fillRect(0, view.y, o.width, o.height - view.y);
+      line(
+        { x: 0, y: view.y },
+        { x: o.width, y: view.y },
+        color("structure", dark),
+        2,
+      );
+    } else {
+      // No floor: only a faint dashed line where it would be (y = 0, the
+      // zero of gravitational potential energy).
+      ctx.setLineDash([6, 6]);
+      line(
+        { x: 0, y: view.y },
+        { x: o.width, y: view.y },
+        color("ink-soft", dark),
+        1,
+      );
+      ctx.setLineDash([]);
+    }
     if (sim.settings.walls) {
       ctx.strokeStyle = color("structure", dark);
       ctx.lineWidth = 4;
@@ -516,7 +531,7 @@ export function createSceneRenderer(ctx, view) {
             s.vx * VELOCITY_PX,
             s.vy * VELOCITY_PX,
             color("vector-velocity", dark),
-            o.highlighted(body.id) && fixed(speed) + " m/s",
+            (o.labels || o.highlighted(body.id)) && fixed(speed) + " m/s",
           );
       }
       if (o.forceVectors) {
@@ -530,7 +545,7 @@ export function createSceneRenderer(ctx, view) {
             f.x * o.forceScale,
             f.y * o.forceScale,
             color("vector-force", dark),
-            body.id === o.selected && fixed(size) + " N",
+            (o.labels || body.id === o.selected) && fixed(size) + " N",
             FORCE_CAP,
           );
       }

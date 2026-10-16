@@ -292,3 +292,144 @@ test("both locks defeat dragging and Alt resizing", () => {
   close(s.links.get(l).length, 2);
   s.dispose();
 });
+
+test("with the floor off a body falls through y = 0 as in free fall; on again, it lands", () => {
+  const s = new Sandbox(),
+    id = s.add("ball", { x: 0, y: 2 });
+  s.updateConstants(id, { linearDamping: 0, angularDamping: 0 });
+  s.updateSettings({ floor: false });
+  run(s, 1.5);
+  // y = 2 − ½ g t² = 2 − 0.5 × 9.81 × 1.5² = −9.03625 m, well below the floor
+  // (read at potentialPoint, the position that goes with the velocity).
+  close(s.potentialPoint(id).y, 2 - 0.5 * 9.81 * 1.5 ** 2, 1e-6);
+  close(s.state(id).vy, -9.81 * 1.5, 1e-6);
+  // Placing and adding below the ground is allowed with no floor.
+  const low = s.add("block", { x: 3, y: -5 });
+  close(s.state(low).y, -5, 1e-9);
+  // Files keep the setting.
+  const copy = Sandbox.fromScene(s.exportScene());
+  assert.equal(copy.settings.floor, false);
+  copy.dispose();
+  // Back on: a body put above it lands and rests on it.
+  s.updateSettings({ floor: true });
+  const again = s.add("ball", { x: 6, y: 1 });
+  run(s, 2);
+  close(s.state(again).y, 0.4, 0.01);
+  assert.throws(() => s.updateSettings({ floor: "no" }));
+  s.dispose();
+});
+
+// World vertices of a body, y up.
+const corners = (s, id) =>
+  s.objects
+    .get(id)
+    .body.vertices.map((v) => ({ x: v.x / 100, y: -v.y / 100 }));
+const sameSet = (a, b, t = 1e-6) => {
+  assert.equal(a.length, b.length);
+  for (const p of a)
+    assert.ok(
+      b.some((q) => Math.hypot(p.x - q.x, p.y - q.y) < t),
+      `${JSON.stringify(p)} not in ${JSON.stringify(b)}`,
+    );
+};
+
+test("reflecting a wedge gives its exact mirror image, either way", () => {
+  for (const direction of ["horizontal", "vertical"]) {
+    const s = new Sandbox(),
+      id = s.add("wedge", { x: 0, y: 5 });
+    s.setLock(id, "position", false);
+    s.setLock(id, "rotation", false);
+    s.resizeBody(id, 3, 1.2);
+    s.setPose(id, { x: 1, y: 5, angle: 0.3 });
+    const before = corners(s, id),
+      c = s.state(id);
+    s.reflect([id], direction);
+    // Mirrored in the line through the wedge's own centroid.
+    const mirror = (p) =>
+      direction === "horizontal"
+        ? { x: 2 * c.x - p.x, y: p.y }
+        : { x: p.x, y: 2 * c.y - p.y };
+    sameSet(corners(s, id), before.map(mirror));
+    s.dispose();
+  }
+});
+
+test("a reflected scene moves as the mirror image of the original", () => {
+  const build = () => {
+    const s = new Sandbox();
+    s.updateSettings({ gravity: 0 });
+    const a = s.add("ball", { x: -1, y: 5 }),
+      b = s.add("block", { x: 2, y: 4 });
+    for (const id of [a, b])
+      s.updateConstants(id, { linearDamping: 0, angularDamping: 0 });
+    s.setVelocity(a, { vx: 1, vy: 0.5, omega: 2 });
+    s.setVelocity(b, { vx: -0.3, vy: 0.2, omega: -1 });
+    const field = s.fields.add("magnetic", { x: 0, y: 5 });
+    s.fields.update(field, { width: 10, height: 6, strength: 2 });
+    s.updateConstants(a, { charge: 1 });
+    return { s, a, b };
+  };
+  const one = build(),
+    two = build();
+  two.s.reflect([two.a, two.b, ...two.s.fields.regions.keys()], "horizontal");
+  run(one.s, 1);
+  run(two.s, 1);
+  // The centre line is x = 0.5 (midway between −1 and 2).
+  for (const key of ["a", "b"]) {
+    const p = one.s.state(one[key]),
+      q = two.s.state(two[key]);
+    close(q.x, 1 - p.x, 1e-6);
+    close(q.y, p.y, 1e-6);
+    close(q.vx, -p.vx, 1e-6);
+    close(q.vy, p.vy, 1e-6);
+    close(q.omega, -p.omega, 1e-6);
+  }
+  one.s.dispose();
+  two.s.dispose();
+});
+
+test("reflection refuses half an assembly or a body that would go into the floor", () => {
+  const s = new Sandbox(),
+    a = s.add("ball", { x: 0, y: 3 }),
+    b = s.add("ball", { x: 2, y: 3 });
+  s.connect("rod", a, b);
+  const before = s.exportScene();
+  assert.throws(() => s.reflect([a], "horizontal"), /whole assembly/);
+  const w = s.add("wedge", { x: 6, y: 0 });
+  assert.throws(() => s.reflect([w], "vertical"), /room above the floor/);
+  assert.deepEqual(s.exportScene().bodies.slice(0, 2), before.bodies);
+  s.dispose();
+});
+
+test("copy and paste: a part keeps its links and values, and is lifted clear of the floor", () => {
+  const s = new Sandbox(),
+    a = s.add("ball", { x: 0, y: 3 }),
+    b = s.add("block", { x: 2, y: 3 }),
+    other = s.add("ball", { x: 5, y: 3 });
+  s.updateConstants(a, { mass: 3, charge: -2 });
+  const rod = s.connect("rod", a, b),
+    spring = s.connect("spring", b, other);
+  s.updateLink(rod, { length: 2 });
+  const part = s.exportPart([a, b]);
+  // The rod between the two copied bodies comes too; the spring to a body
+  // left behind does not.
+  assert.equal(part.links.length, 1);
+  const ids = s.addPart(part, { dx: 0, dy: -10 });
+  assert.equal(ids.length, 3);
+  const [na, nb, nrod] = ids;
+  assert.equal(s.objects.get(na).mass, 3);
+  assert.equal(s.objects.get(na).charge, -2);
+  assert.equal(s.links.get(nrod).type, "rod");
+  close(s.links.get(nrod).length, 2, 1e-9);
+  // Asked for y = −7; lifted so the block's lowest point is on the floor.
+  close(s.state(nb).y, 0.45, 1e-9);
+  close(s.state(na).y, 0.45, 1e-9);
+  assert.ok(s.links.has(spring));
+  // A refused paste adds nothing.
+  const count = s.objects.size;
+  assert.throws(() =>
+    s.addPart({ ...part, bodies: [{ ...part.bodies[0], mass: -1 }] }),
+  );
+  assert.equal(s.objects.size, count);
+  s.dispose();
+});

@@ -16,17 +16,17 @@
 // A word starting with # is a fixed factor from FIXED below (#2, #4pi2,
 // #sin, …), which is never the unknown.
 
-const deg = Math.PI / 180;
+import { cosDeg, sinDeg, tanDeg } from "./trig.js";
 // Fixed factors: how they are written and what they are worth.
 const FIXED = {
   2: { tex: "2", value: () => 2 },
   "2pi": { tex: "2\\pi", value: () => 2 * Math.PI },
   "4pi": { tex: "4\\pi", value: () => 4 * Math.PI },
   "4pi2": { tex: "4\\pi^{2}", value: () => 4 * Math.PI ** 2 },
-  sin: { tex: "\\sin\\theta", value: (v) => Math.sin(v.theta * deg) },
-  cos: { tex: "\\cos\\theta", value: (v) => Math.cos(v.theta * deg) },
-  tan: { tex: "\\tan\\theta", value: (v) => Math.tan(v.theta * deg) },
-  sin2: { tex: "\\sin 2\\theta", value: (v) => Math.sin(2 * v.theta * deg) },
+  sin: { tex: "\\sin\\theta", value: (v) => sinDeg(v.theta) },
+  cos: { tex: "\\cos\\theta", value: (v) => cosDeg(v.theta) },
+  tan: { tex: "\\tan\\theta", value: (v) => tanDeg(v.theta) },
+  sin2: { tex: "\\sin 2\\theta", value: (v) => sinDeg(2 * v.theta) },
 };
 
 function parseSide(text) {

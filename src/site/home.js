@@ -6,7 +6,7 @@ import { $ } from "./dom.js";
 import { pages } from "./pages.js";
 import { renderAllMath } from "./math.js";
 import { renderIcons } from "./icons.js";
-import { toolById } from "../minitools/catalogue.js";
+import { tools, toolById } from "../minitools/catalogue.js";
 import { toolCard } from "../minitools/card.js";
 
 const prefs = setupSite();
@@ -34,11 +34,41 @@ for (const page of pages.filter((p) => p.group === "simulation")) {
   sims.append(card);
 }
 
-const featured = document.querySelector(".home-featured");
-for (const id of copy.featured) {
-  const tool = toolById(id);
-  if (tool) featured.append(toolCard(tool));
+const about = document.querySelector(".home-about-text");
+for (const text of copy.about ?? []) {
+  const p = document.createElement("p");
+  p.textContent = text;
+  about.append(p);
 }
+
+// Every minitool, the featured ones first, in a row that scrolls sideways.
+const featured = document.querySelector(".home-featured"),
+  first = copy.featured.map(toolById).filter(Boolean);
+for (const tool of [...first, ...tools.filter((t) => !first.includes(t))])
+  featured.append(toolCard(tool));
+const steps = [...document.querySelectorAll(".carousel-step")];
+function updateSteps() {
+  const end = featured.scrollWidth - featured.clientWidth - 2;
+  steps[0].disabled = featured.scrollLeft <= 2;
+  steps[1].disabled = featured.scrollLeft >= end;
+}
+for (const button of steps)
+  button.addEventListener("click", () =>
+    featured.scrollBy({
+      // Most of a screenful, so the last card seen stays in view.
+      left: Number(button.dataset.step) * featured.clientWidth * 0.85,
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+    }),
+  );
+featured.addEventListener("scroll", updateSteps, { passive: true });
+window.addEventListener("resize", updateSteps);
+featured.addEventListener("keydown", (e) => {
+  if (!["ArrowLeft", "ArrowRight"].includes(e.key)) return;
+  e.preventDefault();
+  steps[e.key === "ArrowLeft" ? 0 : 1].click();
+});
 document.querySelector(".home-more").href = pageUrl(
   pages.find((p) => p.id === "minitools"),
 );
@@ -50,3 +80,4 @@ for (const line of copy.how) {
   how.append(item);
 }
 renderAllMath(featured);
+updateSteps();

@@ -1,24 +1,24 @@
 /* Generated from src/site/theme.js by `npm run tokens`. Do not edit. */
 :root {
-  --canvas-bg: #f2f0e9;
-  --panel: #fffefa;
-  --line: #ccd3c7;
-  --ink: #354438;
-  --ink-soft: #6f7f63;
-  --accent: #435d49;
-  --accent-text: #4f7547;
-  --accent-soft: #e5eedf;
+  --canvas-bg: #eef0f6;
+  --panel: #fbfcff;
+  --line: #d1d3da;
+  --ink: #141a33;
+  --ink-soft: #686d7e;
+  --accent: #2b3a8a;
+  --accent-text: #2b3a8a;
+  --accent-soft: #dee1ef;
   --danger: #a5544a;
   --danger-text: #b3261e;
   --on-colour: #ffffff;
-  --shadow: #34473125;
-  --canvas-grid: #dce1d4;
-  --canvas-ground: #e0e3d8;
-  --structure: #7f9076;
-  --body-ball: #dba66b;
-  --body-block: #8ca6bc;
-  --body-wedge: #a2b889;
-  --orbit-body: #9fb39a;
+  --shadow: #0e122424;
+  --canvas-grid: #dadde4;
+  --canvas-ground: #d7dae9;
+  --structure: #5a6080;
+  --body-ball: #e8b84a;
+  --body-block: #7a8fd0;
+  --body-wedge: #a8b0d8;
+  --orbit-body: #c47a3a;
   --vector-velocity: #497caa;
   --vector-force: #c2410c;
   --energy-kinetic: #497caa;
@@ -41,27 +41,27 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --canvas-bg: #1c1a16;
-  --panel: #2a2722;
-  --line: #4a453b;
-  --ink: #ebe5d6;
-  --ink-soft: #bdb4a2;
-  --accent: #435d49;
-  --accent-text: #a9c49d;
-  --accent-soft: #3b4c3f;
+  --canvas-bg: #03040c;
+  --panel: #0b0e1f;
+  --line: #393c4c;
+  --ink: #f0f2ff;
+  --ink-soft: #91939e;
+  --accent: #2b3a8a;
+  --accent-text: #ffd36b;
+  --accent-soft: #413930;
   --danger: #b35d52;
   --danger-text: #ff8f7d;
   --on-colour: #ffffff;
-  --shadow: #34473125;
-  --canvas-grid: #2a2721;
-  --canvas-ground: #25332a;
-  --structure: #7f9076;
-  --body-ball: #dba66b;
-  --body-block: #8ca6bc;
-  --body-wedge: #a2b889;
-  --orbit-body: #5d6b5c;
-  --vector-velocity: #6fa8ec;
-  --vector-force: #ef8a6f;
+  --shadow: #00000055;
+  --canvas-grid: #16171f;
+  --canvas-ground: #131221;
+  --structure: #6a7099;
+  --body-ball: #ffd36b;
+  --body-block: #5f7ae0;
+  --body-wedge: #3a4a8a;
+  --orbit-body: #e07a3a;
+  --vector-velocity: #7ab8ff;
+  --vector-force: #ff8a5a;
   --energy-kinetic: #3987e5;
   --energy-gravitational: #199e70;
   --energy-elastic: #c98500;
@@ -91,3 +91,27 @@
   --body-label: color-mix(in srgb, var(--body-wedge) 25%, black);
   --hatch: color-mix(in srgb, var(--on-colour) 50%, transparent);
 }
+
+/* The house style: size and choice tokens (src/site/surface.js). */
+@font-face { font-family: "Physium JetBrains Mono"; src: url("../vendor/fonts/jetbrains-mono.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
+:root:not(.dev-scheme) button:not(.preset), :root:not(.dev-scheme) .button-link { border-radius: 999px !important; }
+:root:not(.dev-scheme) input[type="number"], :root:not(.dev-scheme) input[type="text"], :root:not(.dev-scheme) input[type="search"], :root:not(.dev-scheme) select, :root:not(.dev-scheme) textarea { border-radius: 999px !important; }
+:root:not(.dev-scheme) #settings-panel, :root:not(.dev-scheme) #keys-panel, :root:not(.dev-scheme) #presets-panel, :root:not(.dev-scheme) #clear-confirm, :root:not(.dev-scheme) #material-menu, :root:not(.dev-scheme) .nav-menu, :root:not(.dev-scheme) .category-menu, :root:not(.dev-scheme) .dev-window { border-radius: 13px !important; }
+:root:not(.dev-scheme) .camera-controls, :root:not(.dev-scheme) #selection, :root:not(.dev-scheme) .edit-tools, :root:not(.dev-scheme) .tools, :root:not(.dev-scheme) .fl-toolbar, :root:not(.dev-scheme) .fl-modes, :root:not(.dev-scheme) .fl-hint, :root:not(.dev-scheme) .fl-display, :root:not(.dev-scheme) .cl-panel, :root:not(.dev-scheme) .cl-note, :root:not(.dev-scheme) .ol-panel, :root:not(.dev-scheme) .tool-settings, :root:not(.dev-scheme) .vector-legend, :root:not(.dev-scheme) .energy-panel, :root:not(.dev-scheme) .card, :root:not(.dev-scheme) #preset-list .preset { border-radius: 13px !important; }
+:root:not(.dev-scheme) main canvas:not(.preset-preview) { border-radius: 13px !important; }
+:root:not(.dev-scheme) button:not(.preset), :root:not(.dev-scheme) .button-link, :root:not(.dev-scheme) input[type="number"], :root:not(.dev-scheme) input[type="text"], :root:not(.dev-scheme) input[type="search"], :root:not(.dev-scheme) select, :root:not(.dev-scheme) textarea, :root:not(.dev-scheme) #settings-panel, :root:not(.dev-scheme) #keys-panel, :root:not(.dev-scheme) #presets-panel, :root:not(.dev-scheme) #clear-confirm, :root:not(.dev-scheme) #material-menu, :root:not(.dev-scheme) .nav-menu, :root:not(.dev-scheme) .category-menu, :root:not(.dev-scheme) .dev-window, :root:not(.dev-scheme) .camera-controls, :root:not(.dev-scheme) #selection, :root:not(.dev-scheme) .edit-tools, :root:not(.dev-scheme) .tools, :root:not(.dev-scheme) .fl-toolbar, :root:not(.dev-scheme) .fl-modes, :root:not(.dev-scheme) .fl-hint, :root:not(.dev-scheme) .fl-display, :root:not(.dev-scheme) .cl-panel, :root:not(.dev-scheme) .cl-note, :root:not(.dev-scheme) .ol-panel, :root:not(.dev-scheme) .tool-settings, :root:not(.dev-scheme) .vector-legend, :root:not(.dev-scheme) .energy-panel, :root:not(.dev-scheme) .card, :root:not(.dev-scheme) #preset-list .preset { border-style: dashed !important; }
+:root:not(.dev-scheme) input[type="checkbox"]:not(.icon-toggle *, .sr-only) { appearance: none !important; width: 26px !important; height: 15px !important; flex: 0 0 26px !important; border-radius: 999px !important; background-color: var(--line) !important; background-image: radial-gradient(circle, var(--panel) 5px, transparent 5.5px) !important; background-size: 15px 15px !important; background-repeat: no-repeat !important; background-position: left center !important; transition: background-position 0.15s, background-color 0.15s !important; cursor: pointer !important; }
+:root:not(.dev-scheme) input[type="checkbox"]:not(.icon-toggle *, .sr-only):checked { background-color: var(--accent-text) !important; background-position: right center !important; }
+:root:not(.dev-scheme) input[type="range"] { appearance: none !important; height: 6px !important; border-radius: 999px !important; background: var(--line) !important; }
+:root:not(.dev-scheme) input[type="range"]::-webkit-slider-thumb { appearance: none !important; width: 16px !important; height: 16px !important; border-radius: 999px !important; background: var(--accent-text) !important; border: 2px solid var(--panel) !important; }
+:root:not(.dev-scheme) input[type="range"]::-moz-range-thumb { appearance: none !important; width: 16px !important; height: 16px !important; border-radius: 999px !important; background: var(--accent-text) !important; border: 2px solid var(--panel) !important; }
+:root:not(.dev-scheme) :focus-visible { outline: none !important; box-shadow: inset 0 -3px 0 var(--accent-text) !important; }
+:root:not(.dev-scheme) header { position: fixed !important; z-index: 40 !important; top: 8px !important; left: 8px !important; right: 8px !important; border: 1px solid var(--line) !important; border-radius: 13px !important; box-shadow: 0 6px 24px var(--shadow) !important; }
+:root:not(.dev-scheme) body:not(.doc-page) main { height: 100dvh !important; }
+:root:not(.dev-scheme) body:not(.doc-page) main > :not(canvas) { margin-top: calc(var(--header-h) * var(--ui-scale) + 8px) !important; }
+:root:not(.dev-scheme) .doc-page main { padding-top: calc(calc(var(--header-h) * var(--ui-scale) + 8px) + 8px) !important; }
+:root:not(.dev-scheme) body { background-image: radial-gradient(circle, color-mix(in srgb, var(--ink-soft) 20%, transparent) 1.2px, transparent 1.6px) !important; background-size: 24px 24px !important; }
+:root:not(.dev-scheme)[data-theme="dark"] body { background-image: radial-gradient(circle, color-mix(in srgb, var(--ink-soft) 20%, transparent) 1.2px, transparent 1.6px) !important; background-size: 24px 24px !important; }
+:root:not(.dev-scheme) output, :root:not(.dev-scheme) input[type="number"], :root:not(.dev-scheme) .prop-value, :root:not(.dev-scheme) .num, :root:not(.dev-scheme) .status, :root:not(.dev-scheme) #dimensions, :root:not(.dev-scheme) .vector-legend small, :root:not(.dev-scheme) .energy-total, :root:not(.dev-scheme) .fl-check small, :root:not(.dev-scheme) [id^="readout-"] { font-family: "Physium JetBrains Mono", system-ui, sans-serif !important; font-variant-numeric: tabular-nums !important; }
+:root:not(.dev-scheme) code, :root:not(.dev-scheme) pre, :root:not(.dev-scheme) kbd, :root:not(.dev-scheme) textarea, :root:not(.dev-scheme) .key { font-family: "Physium JetBrains Mono", system-ui, sans-serif !important; }
+:root:not(.dev-scheme) .ui-icon { zoom: 1.05 !important; }

@@ -1,18 +1,26 @@
 // Developer options: for the site's author, not students. Developer mode is
-// turned on by ?dev in the address or by the switch at the foot of the
-// Website section, and is remembered. With it off, nothing here shows and
+// turned on only by ?physium-dev in the address (DEV_PARAM), and is then
+// remembered in this browser until the switch at the foot of the Website
+// section turns it off; the switch itself shows only while it is on, so a
+// visitor who has not used the address never sees any of it. With it off,
+// nothing here shows and
 // the site uses the theme.js defaults; with it on, the Developer group
 // appears above the switch, the current developer scheme is applied, and the
 // theme tweaker (tweaker.js, loaded when first opened) can edit it.
 import { $, option, showToast } from "./dom.js";
 import { colourValue, setOverrides, value } from "./theme.js";
 import { checkScheme, emptyScheme, isDefault } from "./scheme.js";
+import { CUSTOM_CSS } from "./theme.js";
+import { PRESETS, presetByName } from "./scheme-presets.js";
 import { fontStack, surfaceCss } from "./surface.js";
 import { failedEquations, onFrame } from "./dev-hooks.js";
 import { iconWeights } from "./icons.js";
 
 const root = new URL("../../", import.meta.url);
 export const DEV_KEY = "physium-developer";
+// The address parameter that turns developer mode on (=0 or =off turns it
+// off). src/site/boot.js reads the same name.
+export const DEV_PARAM = "physium-dev";
 export const SCHEMES_KEY = "physium-schemes";
 const CSS_KEY = "physium-scheme-css";
 const forget = (key) => {
@@ -36,35 +44,94 @@ const write = (key, data) => {
 
 // ---------------------------------------------------------------- state
 
+// What the page shows is one working scheme, but it is chosen and kept in two
+// independent halves, so that any colour scheme can go with any style:
+//   colours  the light and dark colours (the Colours tab)
+//   style    every size and choice token and the custom CSS (fonts, borders,
+//            corners, backgrounds, patterns, icons, canvas lines …)
+// Each half has its own named collection; picking one half never touches the
+// other. `picked` remembers where each half came from: "" for theme.js,
+// "builtin:<name>" for a built-in colour scheme, "mine:<name>" for one of
+// the author's own.
+export const PARTS = {
+  colours: ["light", "dark"],
+  style: ["values", "css"],
+};
+export const BUILTIN = "builtin:",
+  MINE = "mine:";
+const partOf = (scheme, kind) =>
+  Object.fromEntries(
+    PARTS[kind].map((k) => [k, structuredClone(scheme[k])]),
+  );
+const emptyPart = (kind) => partOf(emptyScheme(), kind);
+
 let prefs = null,
   dev = { on: false, tools: {} },
-  // The scheme being worked on, and the saved ones by name.
-  store = { current: emptyScheme("Default"), saved: {} },
+  store = {
+    current: emptyScheme("Working"),
+    colours: {},
+    style: {},
+    picked: { colours: "", style: "" },
+  },
   history = { past: [], future: [] },
   comparing = false;
+
+// A half read from storage, checked by checkScheme (with the other half
+// empty); null if it is damaged.
+function checkPart(kind, part) {
+  try {
+    return partOf(checkScheme({ ...emptyScheme(), ...part }), kind);
+  } catch {
+    return null;
+  }
+}
 
 function loadStore() {
   const data = read(SCHEMES_KEY, {});
   try {
     store.current = data.current
       ? checkScheme(data.current)
-      : emptyScheme("Default");
+      : emptyScheme("Working");
   } catch {
-    store.current = emptyScheme("Default");
+    store.current = emptyScheme("Working");
   }
-  store.saved = {};
+  store.colours = {};
+  store.style = {};
+  for (const kind of ["colours", "style"])
+    for (const [name, part] of Object.entries(data[kind] ?? {})) {
+      const ok = checkPart(kind, part);
+      if (ok) store[kind][name] = ok;
+    }
+  // Schemes saved before the split: each becomes a colour scheme and/or a
+  // style of the same name, whichever halves it changed.
   for (const [name, scheme] of Object.entries(data.saved ?? {}))
     try {
-      store.saved[name] = checkScheme(scheme);
+      const full = checkScheme(scheme);
+      if (Object.keys(full.light).length || Object.keys(full.dark).length)
+        store.colours[name] ??= partOf(full, "colours");
+      if (Object.keys(full.values).length || full.css !== CUSTOM_CSS)
+        store.style[name] ??= partOf(full, "style");
     } catch {
       // A damaged saved scheme is dropped rather than breaking the page.
     }
+  store.picked = { colours: "", style: "", ...(data.picked ?? {}) };
+  // Before the split, the working scheme was one of the saved schemes.
+  if (!data.picked && data.saved?.[store.current.name])
+    for (const kind of ["colours", "style"])
+      if (store[kind][store.current.name])
+        store.picked[kind] = MINE + store.current.name;
+  saveStore();
 }
-const saveStore = () => write(SCHEMES_KEY, store);
+const saveStore = () =>
+  write(SCHEMES_KEY, {
+    current: store.current,
+    colours: store.colours,
+    style: store.style,
+    picked: store.picked,
+  });
 
 export const developerMode = () => dev.on;
 export const currentScheme = () => structuredClone(store.current);
-export const savedSchemes = () => store.saved;
 
 // ---------------------------------------------------------------- applying
 
@@ -85,7 +152,11 @@ function colourCss(scheme) {
 // returns everything to the theme.js defaults.
 function applyToPage(scheme) {
   let style = document.getElementById(styleId);
-  if (!scheme || isDefault(scheme)) {
+  // The house style in tokens.css stands aside while a scheme is shown (the
+  // scheme's own CSS includes everything it keeps of it).
+  const shown = !!scheme && !isDefault(scheme);
+  document.documentElement.classList.toggle("dev-scheme", shown);
+  if (!shown) {
     setOverrides();
     style?.remove();
     forget(CSS_KEY);
@@ -162,23 +233,60 @@ export function compare(on) {
   comparing = on;
   applyToPage(on ? null : store.current);
 }
-export function saveSchemeAs(name) {
-  const clean = String(name).trim().slice(0, 60);
-  if (!clean) throw new Error("Give the scheme a name.");
-  store.saved[clean] = { ...structuredClone(store.current), name: clean };
-  setScheme({ ...store.current, name: clean }, { record: false });
+// The half of a scheme a picker value names, or null.
+function sourcePart(kind, key) {
+  if (key === "") return emptyPart(kind);
+  if (key.startsWith(BUILTIN) && kind === "colours") {
+    const preset = presetByName(key.slice(BUILTIN.length));
+    return preset ? partOf(checkScheme(preset), "colours") : null;
+  }
+  if (key.startsWith(MINE)) {
+    const part = store[kind][key.slice(MINE.length)];
+    return part ? structuredClone(part) : null;
+  }
+  return null;
+}
+// Changes one half of the working scheme; the other half is kept as it is.
+export function usePart(kind, key) {
+  const part = sourcePart(kind, key);
+  if (!part) throw new Error("There is no such scheme.");
+  store.picked[kind] = key;
+  setScheme({ ...store.current, ...part });
+}
+// Whether the working scheme's half still matches where it was picked from.
+export function partEdited(kind) {
+  const part = sourcePart(kind, store.picked[kind]);
+  return (
+    !part ||
+    JSON.stringify(checkPart(kind, part)) !==
+      JSON.stringify(partOf(store.current, kind))
+  );
+}
+export const pickedPart = (kind) => store.picked[kind];
+export const savedParts = (kind) => store[kind];
+export function savePart(kind, name) {
+  const clean = String(name ?? "").trim().slice(0, 60);
+  if (!clean) throw new Error("Give it a name.");
+  store[kind][clean] = partOf(store.current, kind);
+  store.picked[kind] = MINE + clean;
   saveStore();
+  window.dispatchEvent(new window.Event("physium-scheme-edit"));
   return clean;
 }
-export function deleteSaved(name) {
-  delete store.saved[name];
+export function deletePart(kind, name) {
+  delete store[kind][name];
+  if (store.picked[kind] === MINE + name) store.picked[kind] = "";
   saveStore();
+  window.dispatchEvent(new window.Event("physium-scheme-edit"));
 }
-export function switchTo(name) {
-  const scheme =
-    name === "" ? emptyScheme("Default") : (store.saved[name] ?? null);
-  if (!scheme) throw new Error(`There is no scheme called "${name}".`);
-  setScheme(structuredClone(scheme));
+// The name to offer when saving: where the half came from.
+export function partName(kind) {
+  const key = store.picked[kind];
+  return key.startsWith(MINE)
+    ? key.slice(MINE.length)
+    : key.startsWith(BUILTIN)
+      ? key.slice(BUILTIN.length) + " (mine)"
+      : "";
 }
 
 // ---------------------------------------------------------------- the switch
@@ -187,12 +295,16 @@ function turnOn(on) {
   dev.on = on;
   write(DEV_KEY, dev);
   if (on) enable();
-  else disable();
+  else {
+    disable();
+    // Off, the switch goes too: the address is the only way back.
+    document.querySelector(".dev-switch")?.remove();
+  }
 }
 
 function setupSwitch() {
   const section = $("website-settings");
-  if (!section) return;
+  if (!section || !dev.on) return;
   const label = document.createElement("label");
   label.className = "setting-toggle dev-switch";
   label.innerHTML = `<input id="ui-developer" type="checkbox" /> Developer options`;
@@ -210,8 +322,12 @@ const GROUP = `<summary>Developer</summary>
     <a class="button-link dev-link" id="dev-gallery">Component gallery</a>
   </div>
   <label class="select-row"
-    >Scheme
-    <select id="dev-scheme"></select>
+    >Colours
+    <select id="dev-colours"></select>
+  </label>
+  <label class="select-row"
+    >Style
+    <select id="dev-style"></select>
   </label>
   <label class="select-row"
     >Icon weight
@@ -307,19 +423,54 @@ function disable() {
   applyToPage(null);
 }
 
-function fillSchemes() {
-  const select = $("dev-scheme");
-  if (!select) return;
-  const names = Object.keys(store.saved).sort();
+// Fills a picker for one half: the default, the built-in colour schemes
+// (colours only), and the author's own, with the working half selected and
+// marked "(edited)" when it has been changed since it was picked.
+export function partOptions(select, kind) {
+  const group = (label, items) => {
+    const g = document.createElement("optgroup");
+    g.label = label;
+    g.append(...items);
+    return g;
+  };
+  const names = Object.keys(store[kind]).sort();
   select.replaceChildren(
     option("Default (theme.js)", ""),
-    ...names.map((n) => option(n, n)),
+    ...(kind === "colours"
+      ? [
+          group(
+            "Built-in colour schemes",
+            PRESETS.map((p) => {
+              const o = option(p.name, BUILTIN + p.name);
+              o.title = p.description;
+              return o;
+            }),
+          ),
+        ]
+      : []),
+    ...(names.length
+      ? [
+          group(
+            kind === "colours" ? "Your colour schemes" : "Your styles",
+            names.map((n) => option(n, MINE + n)),
+          ),
+        ]
+      : []),
   );
-  select.value = store.saved[store.current.name] ? store.current.name : "";
-  if (!store.saved[store.current.name] && !isDefault(store.current)) {
-    const unsaved = option(`${store.current.name} (unsaved)`, "*");
-    select.append(unsaved);
+  const key = store.picked[kind];
+  select.value = [...select.options].some((o) => o.value === key) ? key : "";
+  if (partEdited(kind)) {
+    const chosen = select.selectedOptions[0];
+    const edited = option(`${chosen ? chosen.textContent : "Unsaved"} (edited)`, "*");
+    select.append(edited);
     select.value = "*";
+  }
+}
+
+function fillSchemes() {
+  for (const kind of ["colours", "style"]) {
+    const select = $(kind === "colours" ? "dev-colours" : "dev-style");
+    if (select) partOptions(select, kind);
   }
 }
 
@@ -345,10 +496,13 @@ function buildGroup() {
     }),
   );
   fillSchemes();
-  $("dev-scheme").addEventListener("change", (e) => {
-    if (e.target.value === "*") return;
-    switchTo(e.target.value);
-  });
+  for (const kind of ["colours", "style"])
+    $(kind === "colours" ? "dev-colours" : "dev-style").addEventListener(
+      "change",
+      (e) => {
+        if (e.target.value !== "*") usePart(kind, e.target.value);
+      },
+    );
   window.addEventListener("physium-scheme-edit", () => {
     fillSchemes();
     if ($("ui-icons")) $("ui-icons").value = value("icon-weight");
@@ -708,7 +862,7 @@ function setupPreferencesTools() {
 export function setupDeveloper(preferences) {
   prefs = preferences;
   dev = { on: false, tools: {}, ...read(DEV_KEY, {}) };
-  const asked = new URLSearchParams(window.location.search).get("dev");
+  const asked = new URLSearchParams(window.location.search).get(DEV_PARAM);
   if (asked !== null) {
     dev.on = asked !== "0" && asked !== "off";
     write(DEV_KEY, dev);

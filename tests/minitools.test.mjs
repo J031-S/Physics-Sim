@@ -353,3 +353,79 @@ test("each mini simulation measures what its formula gives, at the defaults", as
     }
   assert.ok(compared >= 60, `only ${compared} compared`);
 });
+
+// Run one tool's mini simulation with some values changed from the defaults
+// and return [measured, formula].
+async function measure(id, key, changes = {}) {
+  const { startRun } = await import("../src/minitools/runner.js");
+  const t = toolById(id),
+    v = { ...defaults(t), ...changes };
+  v[key] = t.solve[key](v);
+  const run = startRun(t.sim, engines[t.sim.engine], () => v, () => key);
+  for (let s = 0; s < 120 && !run.stopped && !run.still; s += 1 / 60)
+    run.advance(1 / 60);
+  const m = run.measured;
+  run.dispose();
+  return [m && typeof m === "object" ? m.value : m, v[key]];
+}
+
+test("mini simulations away from the defaults: signs, edges and long runs", async () => {
+  const cases = [
+    // Negative charges give negative readings, as the formula does.
+    ["coulombs-law", "F", { q1: -5e-9 }],
+    ["electric-field-force", "F", { q: -3e-9 }],
+    ["point-charge-field", "E", { q: -2e-9 }],
+    // A negative charge fired at the + plate: the field does negative work.
+    ["electric-work", "W", { q: -5e-9 }],
+    // Launched from the floor, landing back on it.
+    ["projectile-range", "R", { theta: 15 }],
+    ["projectile-range", "R", { theta: 80 }],
+    // μ = 1 on a block twice as wide as it is tall: it slides without tipping.
+    ["friction", "Ff", { mu: 1 }],
+    ["friction", "Ff", { mu: 0.05 }],
+    // A long horizontal stretch, made with several field regions end to end.
+    ["hookes-law", "x", { k: 0.2, F: 10 }],
+  ];
+  for (const [id, key, changes] of cases) {
+    const [measured, formula] = await measure(id, key, changes);
+    assert.ok(Number.isFinite(measured), `${id} ${key}: nothing measured`);
+    assert.ok(
+      Math.abs(measured - formula) <= 2e-3 * Math.abs(formula),
+      `${id} ${key} ${JSON.stringify(changes)}: measured ${measured}, formula ${formula}`,
+    );
+  }
+});
+
+test("trigonometry is exact at whole right angles, so edge cases give 0", () => {
+  const torque = toolById("torque"),
+    flux = toolById("magnetic-flux");
+  assert.equal(torque.solve.tau({ ...defaults(torque), theta: 180 }), 0);
+  assert.equal(torque.solve.tau({ ...defaults(torque), theta: 0 }), 0);
+  assert.equal(flux.solve.Phi({ ...defaults(flux), theta: 90 }), 0);
+});
+
+test("a slider's range covers only values the mini simulation can show", async () => {
+  const { allowedRange } = await import("../src/minitools/ranges.js");
+  const t = toolById("electric-work"),
+    E = engines.sandbox,
+    works = (v) => {
+      t.sim.build(v, E).dispose();
+      return true;
+    },
+    v = defaults(t);
+  const [lo, hi] = allowedRange(t, v, "W", "V", works);
+  const q = t.variables.find((x) => x.key === "V");
+  // Each end works, and (where it is not the catalogue's own end) a little
+  // beyond it does not: the scene there would take too long to cross.
+  for (const [end, beyond, edge] of [
+    [lo, lo * 0.97, q.min],
+    [hi, hi * 1.03, q.max],
+  ]) {
+    assert.ok(works({ ...v, V: end, W: t.solve.W({ ...v, V: end }) }));
+    if (end !== edge)
+      assert.throws(() =>
+        works({ ...v, V: beyond, W: t.solve.W({ ...v, V: beyond }) }),
+      );
+  }
+  assert.ok(lo > q.min && hi < q.max, `range ${lo} to ${hi}`);
+});

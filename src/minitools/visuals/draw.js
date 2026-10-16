@@ -344,6 +344,72 @@ export function picture(ctx, o) {
       }
     ctx.globalAlpha = 1;
   }
+  // A uniform field in the plane of the screen, drawn as the field is
+  // drawn in the simulations: a faint shade and a lattice of short arrows,
+  // all the same length, pointing along it (canvas angle, 0 is to the
+  // right). `clear` lists circles { x, y, r } kept free of arrows, so the
+  // things in the field are not drawn over.
+  function fieldArrows(
+    x0,
+    y0,
+    x1,
+    y1,
+    { angle = 0, colour = "field-electric", step = 36, clear = [] } = {},
+  ) {
+    ctx.fillStyle = col(colour);
+    ctx.globalAlpha = 0.07;
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.globalAlpha = 1;
+    const c = Math.cos(angle) * 8,
+      sn = Math.sin(angle) * 8,
+      nx = Math.floor((x1 - x0) / step),
+      ny = Math.floor((y1 - y0) / step),
+      ox = x0 + (x1 - x0 - (nx - 1) * step) / 2,
+      oy = y0 + (y1 - y0 - (ny - 1) * step) / 2;
+    for (let i = 0; i < nx; i++)
+      for (let j = 0; j < ny; j++) {
+        const x = ox + i * step,
+          y = oy + j * step;
+        if (clear.some((k) => Math.hypot(x - k.x, y - k.y) < k.r)) continue;
+        arrowTo(x - c, y - sn, x + c, y + sn, colour, 1.3);
+      }
+  }
+  // A coil of wire seen from the side: one continuous helix of `turns`
+  // turns and radius r round the axis from (x0, y0) to (x1, y1). The half of
+  // each turn behind the axis is drawn faintly, the half in front over it.
+  function helix(x0, y0, x1, y1, r, turns, colour = "circuit-current") {
+    const len = Math.hypot(x1 - x0, y1 - y0),
+      ux = (x1 - x0) / len,
+      uy = (y1 - y0) / len,
+      n = Math.max(24, Math.ceil(turns * 24)),
+      at = (k) => {
+        const t = (k / n) * turns,
+          a = TAU * t,
+          // Along the axis, with a little lean so each turn reads as a loop.
+          along = (k / n) * len + 0.18 * r * Math.sin(a),
+          across = r * Math.cos(a);
+        return [x0 + ux * along - uy * across, y0 + uy * along + ux * across];
+      },
+      front = (k) => Math.sin((TAU * (k + 0.5) * turns) / n) > 0;
+    ctx.strokeStyle = col(colour);
+    ctx.lineCap = "round";
+    for (const pass of [false, true]) {
+      ctx.globalAlpha = pass ? 1 : 0.35;
+      ctx.lineWidth = pass ? 2 : 1.4;
+      ctx.beginPath();
+      for (let k = 0; k < n; k++)
+        if (front(k) === pass) {
+          const [ax, ay] = at(k),
+            [bx, by] = at(k + 1);
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(bx, by);
+        }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.lineCap = "butt";
+    return { start: at(0), end: at(n) };
+  }
   // A charged plate seen edge on.
   function plate(x0, y0, x1, y1, sign) {
     line(
@@ -379,6 +445,8 @@ export function picture(ctx, o) {
     charge,
     outOf,
     bRegion,
+    fieldArrows,
+    helix,
     plate,
   };
 }

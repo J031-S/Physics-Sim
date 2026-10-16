@@ -155,8 +155,11 @@ export function drawFields(
     ctx.fillStyle = ctx.strokeStyle;
     ctx.lineWidth = 1.1;
     if (f.strength && f.type === "electric" && f.direction === "parallel") {
+      // Lines sit half a spacing either side of the region's centre line, so
+      // that a body moving along the middle of a region (and its trail and
+      // arrows) is never hidden under a field line.
       for (
-        let y = Math.ceil(top / spacing) * spacing;
+        let y = (Math.ceil(top / spacing - 0.5) + 0.5) * spacing;
         y <= bottom;
         y += spacing
       ) {
@@ -207,10 +210,11 @@ export function drawFields(
         }
       }
     } else if (f.strength) {
-      for (let i = Math.ceil(left / spacing); i * spacing <= right; i++)
-        for (let j = Math.ceil(top / spacing); j * spacing <= bottom; j++) {
-          const x = i * spacing,
-            y = j * spacing,
+      // The markers sit off the centre lines too (see above).
+      for (let i = Math.ceil(left / spacing - 0.5); (i + 0.5) * spacing <= right; i++)
+        for (let j = Math.ceil(top / spacing - 0.5); (j + 0.5) * spacing <= bottom; j++) {
+          const x = (i + 0.5) * spacing,
+            y = (j + 0.5) * spacing,
             sample = fields.sample(f, toWorld(x, y));
           // Every grid point keeps its marker; opacity and size follow the
           // local strength, so weaker field fades out evenly.
@@ -233,14 +237,27 @@ export function drawFields(
         }
     }
     ctx.restore();
+    const ink = ctx.strokeStyle;
+    ctx.restore();
+    // The label stays upright, however the region is turned: just above the
+    // top-left corner of the box the turned region fits in.
+    const c = Math.abs(Math.cos(a)),
+      sn = Math.abs(Math.sin(a)),
+      ex =
+        f.shape === "rectangle"
+          ? (c * w + sn * h) / 2
+          : Math.hypot((c * w) / 2, (sn * h) / 2),
+      ey =
+        f.shape === "rectangle"
+          ? (sn * w + c * h) / 2
+          : Math.hypot((sn * w) / 2, (c * h) / 2);
     ctx.font = "11px system-ui";
-    ctx.fillStyle = ctx.strokeStyle;
+    ctx.fillStyle = ink;
     ctx.fillText(
       `${f.type === "electric" ? "E" : "B"} ${tidyNumber(f.strength, 3)} ${f.type === "electric" ? "N/C" : "T"} · ${f.gradient}`,
-      -w / 2 + 6,
-      -h / 2 - 7,
+      p.x - ex + 6,
+      p.y - ey - 7,
     );
-    ctx.restore();
   }
 }
 export class FieldDrag {

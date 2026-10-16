@@ -208,6 +208,32 @@ function circularOrbit(watch) {
   };
 }
 
+// A small mass let go from rest a distance r from the centre of a body of
+// mass M (radius 0.4 r, so the fall can be seen), in the orbits simulation:
+// it falls straight in and stops on the surface. `watch` reads what is
+// wanted at the moment of release. With `potential`, the scene shades the
+// potential and draws equipotentials.
+function fallFrom(watch, { potential = false, bars } = {}) {
+  return {
+    engine: "orbitlab",
+    caption: `A satellite of mass m let go from rest at a distance r from the centre of a body of mass M, in the orbits simulation. It falls straight in until it reaches the surface; the value is read from the simulation at the moment it is let go.${potential ? " The shading and dashed circles show the gravitational potential (circles at equal steps of it)." : ""}`,
+    build: (v, E) => {
+      const lab = orbit(E, {
+        M: v.M,
+        R: Math.min(6.371e6, 0.4 * v.r),
+        r: v.r,
+        v: 0,
+        m: v.m,
+      });
+      lab.tags.potential = potential;
+      return lab;
+    },
+    until: (lab) => lab.get(lab.tags.satellite)?.status === "impact",
+    watch,
+    ...(bars ? { bars } : {}),
+  };
+}
+
 // ---------------------------------------------------------------- plates
 
 // Two plates a gap d apart in the fields simulation, held at a potential
@@ -242,6 +268,10 @@ const forceOn = (lab, id) => {
   const f = lab.forceOn(id);
   return f && Math.hypot(f.x, f.y);
 };
+// The x-component of a force or field, which carries its sign: these
+// scenes are laid out along x, so a negative charge gives a negative
+// reading, as the formula does.
+const forceAlongX = (lab, id) => lab.forceOn(id)?.x ?? null;
 // A reading from the circuit's solution (magnitude), or null.
 function reading(lab, id, quantity) {
   const value = lab.solve().of(id)?.[quantity];
@@ -351,25 +381,38 @@ export const sims = {
   friction: {
     engine: "sandbox",
     caption:
-      "A block of weight N slides at 6 m/s on a floor of friction μ; the friction force is its mass times its measured deceleration.",
+      "A block of weight N slides at 6 m/s on a floor of friction μ; the friction force is its mass times its measured deceleration. The scene stops just before the block does.",
     build: (v, E) => {
+      // Watched until just before it stops (the deceleration is only μg
+      // while it slides), or for 3 s on a floor with little friction.
+      const T = v.mu > 0 ? Math.min(3, (0.95 * 6) / (v.mu * 9.81)) : 3,
+        reach = 6 * T - 0.5 * v.mu * 9.81 * T * T;
       const sim = sandbox(E, {
         gravity: 9.81,
         floorFriction: v.mu,
-        view: { minX: -1, maxX: 5, minY: 0, maxY: 3 },
+        view: {
+          minX: -1,
+          maxX: reach + 1,
+          minY: 0,
+          maxY: Math.max(3, (reach + 2) / 2),
+        },
       });
+      sim.tags.T = T;
       sim.tags.mass = v.N / 9.81;
       sim.tags.ball = body(sim, "block", {
+        // Twice as wide as it is tall: friction at the floor tips a block
+        // whose μ is more than its width over its height, and μ goes to 1.
         x: 0,
-        y: 0.25,
-        size: [0.5, 0.5],
+        y: 0.2,
+        size: [0.8, 0.4],
         mass: v.N / 9.81,
         friction: v.mu,
         vx: 6,
       });
       return sim;
     },
-    duration: () => 0.4,
+    duration: (v, m) => m?.tags.T ?? 0.4,
+    speed: (v, m) => paced(m.tags.T, 3),
     watch: {
       Ff: (m) =>
         m.time > 0 ? (m.tags.mass * (6 - ball(m).vx)) / m.time : null,
@@ -379,28 +422,36 @@ export const sims = {
   "hookes-law": {
     engine: "sandbox",
     caption:
-      "A mass of weight F is hung on a spring of stiffness k (natural length 1 m) and let go; damping brings it to rest. The extension is how far below the natural length it hangs.",
+      "A 1 kg ball carrying charge, gravity off, on a horizontal spring of stiffness k (natural length 1 m) fixed to the wall at the left; the spring is kept horizontal. The shaded electric field pulls the ball to the right with the force F, and damping brings it to rest. The extension is how far past the natural length it comes to rest.",
     build: (v, E) => {
-      const mass = v.F / 9.81,
-        drop = v.F / v.k;
-      if (drop > 60)
+      const stretch = v.F / v.k;
+      if (stretch > 60)
         throw new Error("the spring would stretch more than 60 m.");
-      const top = 1 + drop + 1.2,
+      const y = 1.5,
+        end = 1 + stretch,
         sim = sandbox(E, {
-          gravity: 9.81,
-          view: {
-            minX: -top * 0.4,
-            maxX: top * 0.4,
-            minY: 0,
-            maxY: top + 0.3,
-          },
+          view: { minX: -0.5, maxX: end + 1, minY: 0, maxY: 3 },
         });
-      const omega = Math.sqrt(v.k / mass);
+      // A region holds at most 100 N/C, so a bigger pull uses more charge.
+      const charge = Math.max(1, Math.ceil(Math.abs(v.F) / 100));
+      // And at most 50 m long, so a long stretch gets several end to end.
+      const length = end + 0.5,
+        pieces = Math.ceil(length / 48);
+      if (v.F)
+        for (let i = 0; i < pieces; i++)
+          region(sim, "electric", {
+            x: 0.5 + (i + 0.5) * (length / pieces),
+            y,
+            width: length / pieces,
+            height: 1.2,
+            strength: v.F / charge,
+          });
+      const omega = Math.sqrt(v.k);
       sim.tags.ball = body(sim, "ball", {
-        x: 0,
-        y: top - 1,
-        size: clamp(top / 12, 0.2, 1.5),
-        mass,
+        x: 1,
+        y,
+        size: 0.3,
+        charge: v.F ? charge : 0,
         // About critical damping, so it settles without bouncing for long.
         linearDamping: Math.min(20, 2 * omega),
       });
@@ -408,25 +459,26 @@ export const sims = {
         "spring",
         null,
         sim.tags.ball,
-        { x: 0, y: top },
+        { x: 0, y },
         null,
       );
       sim.updateLink(spring, { k: v.k, damping: 0 });
-      sim.tags.top = top;
+      sim.setSpringAngle(spring, true);
       sim.tags.T = (2 * Math.PI) / omega;
       return sim;
     },
     speed: (v, m) => paced(1.5 * m.tags.T, 3),
     until: (m) => m.time > 3 * m.tags.T,
     watch: {
-      x: (m) => m.tags.top - ball(m).y - 1,
-      F: (m, _, v) => v.k * (m.tags.top - ball(m).y - 1),
+      x: (m) => ball(m).x - 1,
+      F: (m, _, v) => v.k * (ball(m).x - 1),
     },
   },
 
   // -------------------------------------------------------------- momentum
   momentum: {
     engine: "sandbox",
+    bars: "momentum",
     caption:
       "A ball of mass m gliding at v; its momentum is read from the simulation.",
     build: (v, E) => glide(E, { u: v.v, mass: v.m, time: 3 }),
@@ -440,6 +492,7 @@ export const sims = {
   },
   impulse: {
     engine: "sandbox",
+    bars: "momentum",
     caption:
       "A ball of mass m carrying 1 C, gravity off, in a uniform electric field (shaded) of F N/C, so the force on it is F, for the time Δt.",
     build: (v, E) => glide(E, { force: v.F, mass: v.m, time: v.dt }),
@@ -451,6 +504,7 @@ export const sims = {
   // -------------------------------------------------------------- energy
   "work-done": {
     engine: "sandbox",
+    bars: "energy",
     caption:
       "A 20 kg ball carrying 1 C on a frictionless floor, in a uniform electric field (shaded) of F N/C at the angle θ, so it is pulled with force F. The work done is the kinetic energy it has gained after moving s.",
     build: (v, E) =>
@@ -473,6 +527,7 @@ export const sims = {
   },
   "kinetic-energy": {
     engine: "sandbox",
+    bars: "energy",
     caption:
       "A ball of mass m gliding at v; its kinetic energy is read from the simulation.",
     build: (v, E) => glide(E, { u: v.v, mass: v.m, time: 3 }),
@@ -484,6 +539,7 @@ export const sims = {
   },
   "gravitational-potential-energy": {
     engine: "sandbox",
+    bars: "energy",
     caption:
       "A ball of mass m held with its centre at height h above the floor, then let go; its potential energy is read from the simulation at the moment of release.",
     build: (v, E) => {
@@ -506,6 +562,7 @@ export const sims = {
   },
   "elastic-potential-energy": {
     engine: "sandbox",
+    bars: "energy",
     caption:
       "A 1 kg ball on a spring of natural length 2 m, pulled out by x and let go, with gravity off; the stored energy is read from the simulation at the moment of release.",
     build: (v, E) => {
@@ -530,6 +587,7 @@ export const sims = {
   },
   "power-work-time": {
     engine: "sandbox",
+    bars: "energy",
     caption:
       "A 1 kg ball carrying 1 C is pushed from rest by a uniform electric field (shaded) for the time t, with the push that does work W on it in that time. The power is the kinetic energy it gains divided by t.",
     build: (v, E) =>
@@ -541,6 +599,7 @@ export const sims = {
   },
   "power-force-velocity": {
     engine: "sandbox",
+    bars: "energy",
     caption:
       "A 100 kg ball carrying 1 C moving at v through a uniform electric field (shaded) of F N/C. The power is the force on it, read from the simulation, times its speed.",
     build: (v, E) => glide(E, { u: v.v, force: v.F, mass: 100, time: 1 }),
@@ -570,15 +629,28 @@ export const sims = {
   }),
 
   // -------------------------------------------------------------- gravitation
-  "newtons-gravitation": circularOrbit({
-    F: (lab) => lab.measure(lab.tags.satellite).force,
+  "newtons-gravitation": fallFrom({
+    F: (lab) => once(lab, "F", true, () => lab.measure(lab.tags.satellite).force),
   }),
-  "gravitational-field-strength": circularOrbit({
-    g: (lab) => lab.measure(lab.tags.satellite).force / lab.satelliteMass,
-  }),
-  "gravitational-potential": circularOrbit({
-    Ep: (lab) => lab.measure(lab.tags.satellite).potential,
-  }),
+  "gravitational-field-strength": fallFrom(
+    {
+      g: (lab) =>
+        once(
+          lab,
+          "g",
+          true,
+          () => lab.measure(lab.tags.satellite).force / lab.satelliteMass,
+        ),
+    },
+    { potential: true },
+  ),
+  "gravitational-potential": fallFrom(
+    {
+      Ep: (lab) =>
+        once(lab, "Ep", true, () => lab.measure(lab.tags.satellite).potential),
+    },
+    { potential: true, bars: "energy" },
+  ),
 
   // -------------------------------------------------------------- electric fields
   "coulombs-law": {
@@ -592,7 +664,9 @@ export const sims = {
       lab.tags.forces = true;
       return lab;
     },
-    watch: { F: (lab) => forceOn(lab, lab.tags.second) },
+    // The second charge is on the +x side: + is a push apart (like
+    // charges), − a pull together, as the sign of kq₁q₂/r².
+    watch: { F: (lab) => forceAlongX(lab, lab.tags.second) },
   },
   "electric-field-force": {
     engine: "fieldlab",
@@ -608,10 +682,10 @@ export const sims = {
       return lab;
     },
     watch: {
-      F: (lab) => forceOn(lab, lab.tags.charge),
+      F: (lab) => forceAlongX(lab, lab.tags.charge),
       E: (lab, _, v) => {
-        const f = forceOn(lab, lab.tags.charge);
-        return f && f / v.q;
+        const f = forceAlongX(lab, lab.tags.charge);
+        return f === null ? null : f / v.q;
       },
     },
   },
@@ -625,7 +699,10 @@ export const sims = {
       lab.tags.probe = { x: v.r, y: 0 };
       return lab;
     },
-    watch: { E: (lab) => fieldAt(lab, lab.tags.probe.x, lab.tags.probe.y) },
+    // Along +x from the charge: away from a positive charge is +.
+    watch: {
+      E: (lab) => lab.electricField(lab.tags.probe.x, lab.tags.probe.y)[0],
+    },
   },
   "uniform-field-plates": {
     engine: "fieldlab",
@@ -640,26 +717,83 @@ export const sims = {
     },
   },
   "electric-work": {
-    engine: "fieldlab",
+    engine: "sandbox",
+    bars: "energy",
     caption:
-      platesCaption +
-      "The work is the force on the charge, qE from the simulation, added up in small steps along the straight path from one plate to the other.",
-    build: (v, E) => plates(E, v.V, 0.2),
-    watch: {
-      // Simpson's rule on the field along the path across the gap.
-      W: (lab, _, v) => {
-        const d = lab.tags.d,
-          n = 200,
-          h = d / n;
-        let sum = 0;
-        for (let i = 0; i <= n; i++) {
-          const y = -d / 2 + i * h,
-            edge = i === 0 || i === n,
-            // Just inside the faces: the field jumps at a plate.
-            at = edge ? y * (1 - 1e-6) : y;
-          sum += (edge ? 1 : i % 2 ? 4 : 2) * fieldAt(lab, 0, at);
+      "Two plates d apart with a uniform electric field of V/d N/C between them (arrows), so the potential difference across the gap is V; gravity off, and the charge (50 g, the lightest body the sandbox has) passes through holes in the plates. The work the field does on it is the kinetic energy it has gained once it is through. A positive charge starts at rest at the + plate; a negative one is fired at the + plate fast enough to get through, and the field slows it down (negative work).",
+    build: (v, E) => {
+      // A region holds at most 100 N/C, so a large p.d. needs a wide gap.
+      const d = Math.max(1, v.V / 100);
+      if (d > 50)
+        throw new Error(
+          "the plates would have to be more than 50 m apart: sandbox fields go up to 100 N/C.",
+        );
+      const mass = 0.05,
+        // The speed the field gives (or takes away) across the whole gap.
+        gained = Math.sqrt((2 * Math.abs(v.q) * v.V) / mass),
+        u = v.q < 0 ? Math.SQRT2 * gained : 0,
+        // From rest, or slowing from √2·gained to gained: either way the
+        // crossing takes a time of about 2d/gained.
+        T = (2 * d) / gained;
+      if (!(T < 1200))
+        throw new Error(
+          "the charge would take more than 20 minutes to cross the gap (the lightest body in the sandbox is 50 g).",
+        );
+      const half = Math.max(1.2, 0.4 * d),
+        y = half + 0.3,
+        sim = sandbox(E, {
+          view: { minX: -1, maxX: d + 1.5, minY: 0, maxY: 2 * half + 0.6 },
+        });
+      region(sim, "electric", {
+        x: d / 2,
+        y,
+        width: d,
+        height: 2 * half,
+        strength: v.V / d,
+      });
+      // Each plate is two fixed pieces with a hole between them.
+      for (const x of [-0.05, d + 0.05])
+        for (const side of [-1, 1]) {
+          const piece = body(sim, "block", {
+            x,
+            y: y + (side * (half + 0.15)) / 2,
+            size: [0.1, half - 0.15],
+          });
+          sim.setLock(piece, "position", true);
+          sim.setLock(piece, "rotation", true);
         }
-        return (v.q * sum * h) / 3;
+      sim.tags.ball = body(sim, "ball", {
+        x: 1e-6 * d,
+        y,
+        size: 0.1,
+        mass,
+        charge: v.q,
+        vx: u,
+      });
+      sim.tags.d = d;
+      sim.tags.start = mass * u * u * 0.5;
+      sim.tags.T = T;
+      return sim;
+    },
+    speed: (v, m) => paced(m.tags.T, 4),
+    until: (m) => m.potentialPoint(m.tags.ball).x > m.tags.d + 0.4,
+    watch: {
+      // Once it has left the field nothing more acts on it, so its kinetic
+      // energy from then on is its energy at the far plate.
+      W: (m) =>
+        once(
+          m,
+          "W",
+          m.potentialPoint(m.tags.ball).x > m.tags.d + 0.01,
+          () => m.measure(m.tags.ball).kinetic - m.tags.start,
+        ),
+      q: (m, _, v) => {
+        const W = sims["electric-work"].watch.W(m);
+        return W === null ? null : W / v.V;
+      },
+      V: (m, _, v) => {
+        const W = sims["electric-work"].watch.W(m);
+        return W === null ? null : W / v.q;
       },
     },
   },
@@ -678,21 +812,25 @@ export const sims = {
   "ohms-law": {
     engine: "circuitlab",
     caption:
-      "A cell of emf V and a resistor R; read the current from the ammeter.",
-    build: (v, E) => loop(E, v.V, [["resistor", { resistance: v.R }]]),
+      "A cell of emf V and a resistor R, with an ammeter in series and a voltmeter across the resistor; the readings are the simulation's.",
+    build: (v, E) =>
+      loop(E, v.V, [["resistor", { resistance: v.R }]], { voltmeter: 0 }),
     watch: {
       I: (lab) => reading(lab, lab.tags.ammeter, "current"),
-      V: (lab) => reading(lab, lab.tags.parts[0], "voltage"),
+      V: (lab) => reading(lab, lab.tags.voltmeter, "voltage"),
       R: (lab) =>
-        reading(lab, lab.tags.parts[0], "voltage") /
+        reading(lab, lab.tags.voltmeter, "voltage") /
         reading(lab, lab.tags.ammeter, "current"),
     },
   },
   "electrical-power": {
     engine: "circuitlab",
     caption:
-      "A cell of emf V and a resistor that draws the current I; the resistor's power is read from the simulation.",
-    build: (v, E) => loop(E, v.V, [["resistor", { resistance: v.V / v.I }]]),
+      "A cell of emf V and a resistor that draws the current I, with an ammeter in series and a voltmeter across the resistor; the resistor's power is read from the simulation.",
+    build: (v, E) =>
+      loop(E, v.V, [["resistor", { resistance: v.V / v.I }]], {
+        voltmeter: 0,
+      }),
     watch: { P: (lab) => reading(lab, lab.tags.parts[0], "power") },
   },
   "power-current-resistance": {
@@ -845,6 +983,7 @@ export const sims = {
   },
   "escape-speed": {
     engine: "orbitlab",
+    bars: "energy",
     caption:
       "A satellite launched sideways at the distance r with the speed shown: at the escape speed its path is a parabola and it never comes back. The measured value is the speed that makes the simulation's own kinetic and potential energies add to zero at launch.",
     build: (v, E) =>
@@ -989,6 +1128,7 @@ export const sims = {
   },
   "electron-gun": {
     engine: "sandbox",
+    bars: "energy",
     caption:
       "The charge starts at rest at one side of a 1 m wide electric field of V N/C (arrows), so it crosses a potential difference of V; its speed is read once it has left the field.",
     build: (v, E) => {
@@ -1122,7 +1262,7 @@ export const sims = {
   "projectile-range": {
     engine: "sandbox",
     caption:
-      "A ball launched 0.6 m above the floor with gravity g; the range is how far it has gone when it is back at the height it was launched from.",
+      "A ball launched from the floor with gravity g; the range is how far it has gone when it is back down at the height it was launched from.",
     build: (v, E) => {
       if ((2 * v.u * Math.sin(v.theta * deg)) / v.g < 0.25)
         throw new Error(
@@ -1132,10 +1272,12 @@ export const sims = {
         gravity: v.g,
         view: { minX: -1, maxX: Math.max(4, v.R + 1), minY: 0, maxY: 3 },
       });
+      // Launched from the floor: the ball starts resting on it (a
+      // millimetre clear, so that it is not touching at the start).
       sim.tags.ball = body(sim, "ball", {
         x: 0,
-        y: 0.6,
-        size: 0.2,
+        y: 0.051,
+        size: 0.1,
         vx: v.u * Math.cos(v.theta * deg),
         vy: v.u * Math.sin(v.theta * deg),
       });
@@ -1144,16 +1286,31 @@ export const sims = {
       return sim;
     },
     speed: (v, m) => paced(m.tags.T, 3),
-    until: (m) => !!m.tags.crossings?.R?.done,
+    until: (m) => m.tags.landed !== undefined,
     watch: {
-      R: (m) => {
-        const s = travelled(m);
-        return crossing(m, "R", s.y, 0, () => ({ x: s.x }))?.x ?? null;
+      // The ball lands back on the floor, at the height it started from.
+      // The floor stops it in the step it arrives, so its last step in free
+      // flight is carried on to that height along the same parabola (exact
+      // for free fall), rather than read from a step the floor has
+      // already changed.
+      R: (m, _, v) => {
+        if (m.tags.landed !== undefined) return m.tags.landed;
+        const s = travelled(m),
+          b = ball(m),
+          last = m.tags.flight;
+        if (last && last.vy < 0 && (b.vy > last.vy || s.y <= 0)) {
+          const t = (last.vy + Math.sqrt(last.vy ** 2 + 2 * v.g * last.y)) / v.g;
+          m.tags.landed = last.x + last.vx * t;
+          return m.tags.landed;
+        }
+        m.tags.flight = { x: s.x, y: s.y, vx: b.vx, vy: b.vy };
+        return null;
       },
     },
   },
   "falling-without-friction": {
     engine: "sandbox",
+    bars: "energy",
     caption:
       "A ball dropped from rest with gravity g; its speed is read as it passes a point h below where it started.",
     build: (v, E) => {
@@ -1231,6 +1388,7 @@ export const sims = {
   },
   "mass-on-spring": {
     engine: "sandbox",
+    bars: "energy",
     caption:
       "A mass on a spring with no damping and gravity off, pulled 0.5 m from the spring's natural length and let go; the period is timed from the simulation.",
     build: (v, E) => {
@@ -1259,6 +1417,7 @@ export const sims = {
   },
   "simple-pendulum": {
     engine: "sandbox",
+    bars: "energy",
     caption:
       "A ball on a light rod of length L, let go from 5° with gravity g; the period is timed from the simulation. (The formula is for small swings; at 5° the true period is 0.05% longer.)",
     build: (v, E) => {
@@ -1286,6 +1445,7 @@ export const sims = {
   },
   "collisions-1d": {
     engine: "sandbox",
+    bars: "momentum",
     caption:
       "Two balls with gravity off, the first on the left. The first ball's velocity is read from the simulation just after they collide, with the second ball's beside it.",
     build: (v, E) => {

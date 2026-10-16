@@ -108,8 +108,10 @@ export function fields(E, mode = "electric", view = 3) {
 
 // A cell of emf `emf` with the given components in series round one loop,
 // an ammeter first. Returns the circuit with tags.cell, tags.ammeter and
-// tags.parts (ids in order).
-export function loop(E, emf, parts) {
+// tags.parts (ids in order). With `voltmeter` (an index into `parts`), a
+// voltmeter is joined across that part, + on the side the current comes
+// in, as tags.voltmeter.
+export function loop(E, emf, parts, { voltmeter = null } = {}) {
   const lab = new E.CircuitLab(),
     UP = 3,
     width = 3 + 3 * parts.length;
@@ -121,6 +123,11 @@ export function loop(E, emf, parts) {
   for (const [kind, props] of parts) {
     lab.wire([x, 4], [x + 1, 4]);
     lab.tags.parts.push(lab.add(kind, { x: x + 2, y: 4, ...props }));
+    if (voltmeter === lab.tags.parts.length - 1) {
+      lab.wire([x + 1, 4], [x + 1, 6]);
+      lab.wire([x + 3, 4], [x + 3, 6]);
+      lab.tags.voltmeter = lab.add("voltmeter", { x: x + 2, y: 6 });
+    }
     x += 3;
   }
   lab.wire([x, 4], [width, 4], [width, 0], [0, 0], [0, 1]);
@@ -130,7 +137,8 @@ export function loop(E, emf, parts) {
 export function parallel(E, emf, resistances) {
   const lab = new E.CircuitLab(),
     UP = 3,
-    right = 3 + 3 * resistances.length;
+    // The rails end at the last resistor.
+    right = 4 + 3 * (resistances.length - 1);
   lab.tags = { parts: [] };
   lab.tags.cell = lab.add("cell", { x: 0, y: 2, rot: UP, emf });
   lab.wire([0, 3], [0, 6], [1, 6]);

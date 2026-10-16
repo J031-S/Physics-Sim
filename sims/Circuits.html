@@ -284,33 +284,13 @@
         <div class="cl-side">
           <details id="display-panel" class="cl-panel" open>
             <summary>Display</summary>
-            <label
-              class="fl-check"
-              title="Moving dots show the current; their speed is proportional to it (C)"
-              ><input id="show-current" type="checkbox" checked /> Current
-              <span class="cl-dot" aria-hidden="true"></span
-            ></label>
-            <label
-              class="fl-check cl-indent"
-              title="Show the dots moving the way the electrons do, from − round to +, instead of conventional current (E)"
-              ><input id="electron-flow" type="checkbox" /> Electron flow
-              <small id="flow-note">conventional: + to −</small></label
-            >
-            <label
-              class="fl-check"
-              title="Colour each wire by its potential: everything joined by plain wire is the same colour (P)"
-              ><input id="show-potential" type="checkbox" /> Colour by
-              potential</label
-            >
+            <p class="fl-note">
+              Current dots: <small id="flow-note">conventional: + to −</small>
+            </p>
             <div id="potential-legend" class="fl-legend" hidden>
               <span class="cl-ramp" aria-hidden="true"></span>
               <span id="potential-legend-text"></span>
             </div>
-            <label
-              class="fl-check"
-              title="Names, values and meter readings beside the components (V)"
-              ><input id="show-labels" type="checkbox" checked /> Values</label
-            >
           </details>
           <div
             id="selection"
@@ -398,8 +378,33 @@
         ><span id="zoom-level">100%</span
         ><button id="zoom-in" title="Zoom in (+)">+</button
         ><button id="fit-scene" title="Fit the circuit in view (F)">
-          Fit scene
-        </button>
+          Fit scene</button
+        ><span class="cluster-divider" aria-hidden="true"></span
+        ><label class="icon-toggle" title="Moving dots show the current; their speed is proportional to it (C)"
+          ><input type="checkbox" id="show-current" checked /><span
+            data-icon="current"
+            data-icon-label="Current"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="Show the dots moving the way the electrons do, from − round to +, instead of conventional current (E)"
+          ><input type="checkbox" id="electron-flow" /><span
+            data-icon="electrons"
+            data-icon-label="Electron flow"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="Colour each wire by its potential: everything joined by plain wire is the same colour (P)"
+          ><input type="checkbox" id="show-potential" /><span
+            data-icon="potential"
+            data-icon-label="Colour by potential"
+            data-icon-only="true"
+          ></span></label
+        ><label class="icon-toggle" title="Names, values and meter readings beside the components (V)"
+          ><input type="checkbox" id="show-labels" checked /><span
+            data-icon="values"
+            data-icon-label="Values"
+            data-icon-only="true"
+          ></span></label
+        >
       </div>
       <div class="status">
         <span id="scene-status"></span><span id="time"></span>

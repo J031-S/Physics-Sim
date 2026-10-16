@@ -122,6 +122,57 @@
 .home-footer a {
   color: var(--accent-text);
 }
+.home-about-text {
+  max-width: 70ch;
+  line-height: 1.55;
+}
+/* The minitools carousel: a row of cards that scrolls sideways, a card at a
+   time snapping into place, with a button at each end. */
+.home-carousel {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.home-featured {
+  display: flex;
+  /* A grid item may otherwise grow to fit every card; and KaTeX's hidden
+     (absolutely positioned) MathML must be held inside the scroller, or the
+     whole page scrolls sideways. */
+  min-width: 0;
+  position: relative;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 2px;
+  padding: 4px 2px 12px;
+  overscroll-behavior-x: contain;
+}
+.home-featured > .mt-card {
+  flex: 0 0 270px;
+  scroll-snap-align: start;
+}
+.home-featured:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+.carousel-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+}
+.carousel-step .ui-icon {
+  width: 18px;
+  height: 18px;
+}
+.carousel-step:disabled {
+  opacity: 0.35;
+}
 .home-how {
   max-width: 70ch;
   padding-left: 20px;
@@ -147,6 +198,13 @@
 @media (max-width: 600px) {
   .home-hero {
     padding-top: 32px;
+  }
+  /* On a phone the row is swiped; the buttons would only take room. */
+  .home-carousel {
+    grid-template-columns: 1fr;
+  }
+  .carousel-step {
+    display: none;
   }
   .home-hero h1 {
     font-size: 32px;

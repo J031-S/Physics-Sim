@@ -994,6 +994,7 @@ body.doc-page {
   display: flex;
   gap: 2px;
   padding: 2px;
+  border: 1px solid var(--line);
   border-radius: 9px;
   background: color-mix(in srgb, var(--line), transparent 55%);
 }

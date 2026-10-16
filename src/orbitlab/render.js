@@ -32,7 +32,9 @@ export const ORBIT_COLOURS = {
   force: "vector-force",
   kinetic: "energy-kinetic",
   potential: "energy-gravitational",
+  equipotential: "field-equipotential",
   axis: "canvas-grid-major",
+  star: "body-ball",
 };
 const SATELLITE_COLOURS = [
   "field-electric",
@@ -51,6 +53,14 @@ export function orbitPalette(dark) {
     // One colour per satellite, in launch order: the site's data colours.
     satellites: SATELLITE_COLOURS.map((name) => color(name, dark)),
   };
+}
+
+// A "#rgb" or "#rrggbb" colour at opacity `a`.
+function withAlpha(hex, a) {
+  let h = hex.slice(1, 7);
+  if (h.length === 3) h = h.replace(/./g, (d) => d + d);
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, a))})`;
 }
 
 // Round step (1, 2 or 5 × 10ⁿ) giving about `count` intervals over `range`.
@@ -131,10 +141,12 @@ export function createOrbitRenderer(ctx, view) {
     ctx.stroke();
   }
 
+  // The spacing of the grid lines, in metres, at the present zoom.
+  const gridStep = () => niceStep(90 / view.scale, 1);
   function drawGrid(c) {
     const lo = world(0, view.height),
       hi = world(view.width, 0),
-      step = niceStep(90 / view.scale, 1);
+      step = gridStep();
     ctx.lineWidth = 1;
     ctx.strokeStyle = c.gridMinor;
     const px = step * view.scale,
@@ -185,6 +197,48 @@ export function createOrbitRenderer(ctx, view) {
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillText(joined(distance(length, 3)), x + w / 2, y + 4);
+  }
+
+  // The gravitational potential V = −GM/r round the body: shading that is
+  // deepest at the surface and fades as V rises towards zero far away, and
+  // equipotential circles at equal steps of V. With ten steps from the
+  // surface value to zero, the circles fall at r = R / (1 − k/10).
+  function drawPotential(c) {
+    const [x, y] = screen(0, 0),
+      R = lab.body.radius * view.scale,
+      far = Math.hypot(view.width, view.height);
+    if (!(R > 0)) return;
+    const shade = ctx.createRadialGradient(x, y, R, x, y, Math.max(R + 1, far));
+    // |V| ∝ 1/r: sample the falloff at a few radii.
+    for (const t of [0, 0.05, 0.12, 0.25, 0.5, 1]) {
+      const r = R + t * (far - R);
+      shade.addColorStop(t, withAlpha(c.equipotential, 0.32 * (R / r)));
+    }
+    ctx.fillStyle = shade;
+    ctx.fillRect(0, 0, view.width, view.height);
+    ctx.strokeStyle = c.equipotential;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    for (let k = 1; k < 10; k++) {
+      const r = R / (1 - k / 10);
+      if (r > far + Math.hypot(x, y)) break;
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    if (state.show.labels) {
+      const step = (lab.mu / lab.body.radius) / 10;
+      label(
+        `equipotentials every ${joined(prefixed(step, "J/kg", 3))}`,
+        // Above the scale bar, clear of the clock in the corner.
+        view.width / 2,
+        view.height - 46,
+        c,
+      );
+    }
   }
 
   function drawBody(c) {
@@ -312,16 +366,24 @@ export function createOrbitRenderer(ctx, view) {
 
   // The launch that is set up: its point, the local horizontal, the velocity
   // arrow with its drag handle, and the path it would follow.
+  // The launch point may be anywhere round the body (`aim.bearing`,
+  // anticlockwise from the top); everything about it turns with it.
   function ghostGeometry() {
     const p = preview(),
-      [x, y] = screen(0, aim.radius),
-      length = (ARROW * aim.speed) / p.circularSpeed;
+      bearing = aim.bearing ?? 0,
+      [x, y] = screen(
+        -aim.radius * Math.sin(bearing),
+        aim.radius * Math.cos(bearing),
+      ),
+      length = (ARROW * aim.speed) / p.circularSpeed,
+      direction = aim.angle + bearing;
     return {
       x,
       y,
+      bearing,
       length,
-      tipX: x + Math.cos(aim.angle) * length,
-      tipY: y - Math.sin(aim.angle) * length,
+      tipX: x + Math.cos(direction) * length,
+      tipY: y - Math.sin(direction) * length,
     };
   }
   function drawGhost(c) {
@@ -337,33 +399,41 @@ export function createOrbitRenderer(ctx, view) {
       ctx.globalAlpha = 1;
     }
     // Local horizontal through the launch point, and the altitude below it.
+    const fx = Math.cos(g.bearing),
+      fy = -Math.sin(g.bearing),
+      direction = aim.angle + g.bearing;
     ctx.strokeStyle = c.soft;
     ctx.lineWidth = 1;
     ctx.setLineDash([2, 3]);
     ctx.beginPath();
-    ctx.moveTo(g.x - 46, g.y);
-    ctx.lineTo(g.x + 46, g.y);
+    ctx.moveTo(g.x - 46 * fx, g.y - 46 * fy);
+    ctx.lineTo(g.x + 46 * fx, g.y + 46 * fy);
     ctx.moveTo(g.x, g.y);
-    ctx.lineTo(...screen(0, lab.body.radius));
+    ctx.lineTo(
+      ...screen(
+        -lab.body.radius * Math.sin(g.bearing),
+        lab.body.radius * Math.cos(g.bearing),
+      ),
+    );
     ctx.stroke();
     ctx.setLineDash([]);
     if (Math.abs(aim.angle) > 0.02 && g.length > 24) {
       ctx.beginPath();
-      ctx.arc(g.x, g.y, 20, 0, -aim.angle, aim.angle > 0);
+      ctx.arc(g.x, g.y, 20, -g.bearing, -direction, aim.angle > 0);
       ctx.stroke();
       if (state.show.labels)
         label(
           angleText(aim.angle),
-          g.x + 34 * Math.cos(aim.angle / 2),
-          g.y - 34 * Math.sin(aim.angle / 2),
+          g.x + 34 * Math.cos(g.bearing + aim.angle / 2),
+          g.y - 34 * Math.sin(g.bearing + aim.angle / 2),
           c,
         );
     }
     arrow(
       g.x,
       g.y,
-      Math.cos(aim.angle),
-      -Math.sin(aim.angle),
+      Math.cos(direction),
+      -Math.sin(direction),
       g.length,
       c.velocity,
       2.6,
@@ -398,6 +468,7 @@ export function createOrbitRenderer(ctx, view) {
     ctx.setLineDash([]);
     ctx.lineJoin = "round";
     if (options.grid) drawGrid(c);
+    if (state.show.potential) drawPotential(c);
     drawBody(c);
     for (const s of lab.list()) {
       const colour = c.satellites[s.colour];
@@ -428,6 +499,188 @@ export function createOrbitRenderer(ctx, view) {
     for (const s of lab.list()) drawSatellite(s, c);
     drawScaleBar(c);
   }
+
+  // ------------------------------------------------------ gravity sandbox
+
+  // Smallest drawn radius of a body, in pixels: stars (over 10²⁹ kg) a
+  // little bigger, so that they stand out at any zoom.
+  const shownRadius = (b) =>
+    Math.max(b.radius * view.scale, b.mass > 1e29 ? 6 : 3.5);
+  const bodyColour = (b, c) =>
+    b.mass > 1e29 ? c.star : c.satellites[b.colour % c.satellites.length];
+  // Where a body's velocity arrow ends: its velocity relative to the body
+  // it goes round, ARROW pixels at the circular orbit speed there
+  // (GravityLab.velocityFrame).
+  // A body's velocity arrow: its velocity in the frame of the scene, ARROW
+  // pixels for `unit` m/s (one scale for every body).
+  function sandboxTip(lab, id, unit) {
+    const b = lab.get(id),
+      [x, y] = screen(b.x, b.y),
+      v = Math.hypot(b.vx, b.vy),
+      length = Math.min((ARROW * v) / unit, 400);
+    return v > 0
+      ? {
+          x,
+          y,
+          tipX: x + (b.vx / v) * length,
+          tipY: y - (b.vy / v) * length,
+          shortened: length < (ARROW * v) / unit,
+        }
+      : { x, y, tipX: x, tipY: y, shortened: false };
+  }
+  // options: colours, grid, show (velocity, force, trails, labels,
+  // prediction), units ({ speed, force }: m/s and N drawn ARROW pixels
+  // long), selected (a body id), prediction (points of the selected body's
+  // two-body orbit, in metres), ghost ({ x, y, radius, mass } of a body
+  // about to be placed), area, format (joined, distance, speedText,
+  // forceText).
+  function drawSandbox(lab, options) {
+    const c = options.colours,
+      show = options.show;
+    ({ joined, distance, speedText } = options.format);
+    clearArea = () => options.area;
+    ctx.setLineDash([]);
+    ctx.lineJoin = "round";
+    if (options.grid) drawGrid(c);
+    if (show.trails)
+      for (const b of lab.list()) {
+        ctx.strokeStyle = bodyColour(b, c);
+        ctx.globalAlpha = 0.6;
+        ctx.lineWidth = 1.5;
+        strokePoints([...b.trail, [b.x, b.y]]);
+        ctx.globalAlpha = 1;
+      }
+    const chosen = lab.get(options.selected);
+    if (chosen && show.prediction && options.prediction) {
+      ctx.strokeStyle = c.ink;
+      ctx.globalAlpha = 0.45;
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([5, 4]);
+      strokePoints(options.prediction);
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+    // The centre of mass of the whole system.
+    const com = lab.centreOfMass();
+    if (lab.list().length > 1) {
+      const [x, y] = screen(com.x, com.y);
+      ctx.strokeStyle = c.soft;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, TAU);
+      ctx.moveTo(x - 8, y);
+      ctx.lineTo(x + 8, y);
+      ctx.moveTo(x, y - 8);
+      ctx.lineTo(x, y + 8);
+      ctx.stroke();
+      // Named unless it is inside a body (a star much heavier than the rest).
+      const inside = lab
+        .list()
+        .some((b) => {
+          const [bx, by] = screen(b.x, b.y);
+          return Math.hypot(bx - x, by - y) < shownRadius(b) + 14;
+        });
+      if (show.labels && !inside) label("centre of mass", x, y + 16, c);
+    }
+    for (const b of lab.list()) {
+      const [x, y] = screen(b.x, b.y),
+        r = shownRadius(b);
+      ctx.fillStyle = bodyColour(b, c);
+      ctx.strokeStyle = c.ink;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 0.5;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      if (b.id === options.selected) {
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = c.ink;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(x, y, r + 5, 0, TAU);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (show.labels) label(b.name, x, y + r + 11, c);
+    }
+    // Net gravitational force on each body, from all the others.
+    if (show.force)
+      for (const b of lab.list()) {
+        const F = lab.force(b.id),
+          size = Math.hypot(F.x, F.y),
+          full = (ARROW * size) / options.units.force,
+          length = Math.min(full, 190);
+        if (length < 1) continue;
+        const [x, y] = screen(b.x, b.y),
+          ux = F.x / size,
+          uy = -F.y / size;
+        arrow(x, y, ux, uy, length, c.force, b.id === options.selected ? 2.4 : 1.6);
+        // Beside the middle of the arrow, clear of whatever it points at.
+        if (show.labels && b.id === options.selected)
+          label(
+            joined(options.format.forceText(size)) +
+              (full > length ? " (arrow shortened)" : ""),
+            x + (ux * length) / 2 + uy * 14,
+            y + (uy * length) / 2 - ux * 14,
+            c,
+          );
+      }
+    if (show.velocity)
+      for (const b of lab.list()) {
+        const g = sandboxTip(lab, b.id, options.units.speed),
+          length = Math.hypot(g.tipX - g.x, g.tipY - g.y);
+        if (length < 1) continue;
+        const ux = (g.tipX - g.x) / length,
+          uy = (g.tipY - g.y) / length;
+        arrow(
+          g.x,
+          g.y,
+          ux,
+          uy,
+          length,
+          c.velocity,
+          b.id === options.selected ? 2.4 : 1.6,
+        );
+        if (show.labels && b.id === options.selected)
+          label(
+            joined(speedText(Math.hypot(b.vx, b.vy), 3)) +
+              (g.shortened ? " (arrow shortened)" : ""),
+            g.tipX + ux * 40,
+            g.tipY + uy * 40,
+            c,
+          );
+      }
+    // The handle that aims the selected body.
+    if (chosen) {
+      const g = sandboxTip(lab, chosen.id, options.units.speed);
+      ctx.beginPath();
+      ctx.arc(g.tipX, g.tipY, 5.5, 0, TAU);
+      ctx.fillStyle = c.panel;
+      ctx.fill();
+      ctx.strokeStyle = c.velocity;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    if (options.ghost) {
+      const g = options.ghost,
+        [x, y] = screen(g.x, g.y);
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = g.mass > 1e29 ? c.star : c.ink;
+      ctx.beginPath();
+      ctx.arc(x, y, shownRadius(g), 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    drawScaleBar(c);
+  }
+  function sandboxHandle(lab, id, unit) {
+    return sandboxTip(lab, id, unit);
+  }
+  // A body's drawn radius, for hit testing.
+  const sandboxRadius = (b) => shownRadius(b);
+
   // Where the launch point and the arrow's tip are, in canvas pixels.
   function launchGeometry(options) {
     use(options);
@@ -441,5 +694,9 @@ export function createOrbitRenderer(ctx, view) {
     strokePoints,
     drawScene,
     launchGeometry,
+    drawSandbox,
+    sandboxHandle,
+    sandboxRadius,
+    gridStep,
   };
 }

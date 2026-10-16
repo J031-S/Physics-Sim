@@ -2115,8 +2115,10 @@ function drawPresetPreviews() {
         document.querySelector(`[data-preset="${preset.id}"] .preset-preview`),
         preset,
       );
-    } catch {
-      // A preview is decoration; the preset itself reports its own errors.
+    } catch (e) {
+      // A preview is decoration and must not stop the panel opening, but a
+      // broken one is a bug: say so in the console.
+      console.error(`Preset preview "${preset.id}" failed:`, e);
     }
 }
 function drawPreview(el, preset) {

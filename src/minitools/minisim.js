@@ -10,6 +10,7 @@ import { styleCanvas } from "../site/canvas-style.js";
 import { reportFrame } from "../site/dev-hooks.js";
 import { renderIcons } from "../site/icons.js";
 import { startRun } from "./runner.js";
+import { numberText } from "./format.js";
 import { explain } from "./sims.js";
 
 const root = new URL("../../", import.meta.url);
@@ -75,9 +76,21 @@ const sandboxDriver = {
     // of the last few frames, so that the one-step force of an impact (which
     // is drawn, up to the renderer's longest arrow) does not shrink every
     // other arrow for the rest of the run.
+    // A net force that is rounding error beside the forces acting (a drop
+    // held still, weight against an electric push) is no force at all: it
+    // must not set the scale and then be drawn 56 px long.
+    const net = (id) => {
+      const f = model.netForce(id),
+        o = model.objects.get(id),
+        e = model.fields.at(model.potentialPoint(id)),
+        acting =
+          o.mass * Math.abs(model.settings.gravity) +
+          Math.abs(o.charge ?? 0) * Math.hypot(e.ex, e.ey);
+      return Math.hypot(f.x, f.y) <= 1e-9 * acting ? { x: 0, y: 0 } : f;
+    };
     let largest = 0;
     for (const id of model.objects.keys()) {
-      const f = model.netForce(id);
+      const f = net(id);
       largest = Math.max(largest, Math.hypot(f.x, f.y));
     }
     const recent = (model.tags.forceRecent ??= []);
@@ -87,10 +100,21 @@ const sandboxDriver = {
     const forceScale = model.tags.forceRef > 0 ? 56 / model.tags.forceRef : 4;
     // The region to show: the scene's own, grown to keep every body in view.
     // A strip below the floor holds its metre labels.
-    const fit = (model.tags.fit ??= {
+    // The region shown never shrinks below the one the page opened with
+    // (shown.base), so that changing a distance moves things on the screen;
+    // only when they would leave it does the view zoom out.
+    const own = {
       ...model.tags.view,
       minY: Math.min(model.tags.view.minY, -0.5),
-    });
+    };
+    shown.base.sandbox ??= { ...own };
+    const b = shown.base.sandbox,
+      fit = (model.tags.fit ??= {
+        minX: Math.min(own.minX, b.minX),
+        maxX: Math.max(own.maxX, b.maxX),
+        minY: Math.min(own.minY, b.minY),
+        maxY: Math.max(own.maxY, b.maxY),
+      });
     for (const id of model.objects.keys()) {
       const s = model.state(id);
       fit.minX = Math.min(fit.minX, s.x - 0.6);
@@ -116,8 +140,9 @@ const sandboxDriver = {
       locks: false,
       vectors: shown.velocity,
       forceVectors: shown.force,
-      forceOf: (id) => model.netForce(id),
+      forceOf: net,
       forceScale,
+      labels: true,
       iconWeight: prefs.iconWeight,
       angleUnit: prefs.angleUnit,
     });
@@ -176,10 +201,13 @@ const orbitDriver = {
           maxRadius: model.rangeFactor * aim.radius,
         }),
       };
-    let extent = (model.tags.extent ??= Math.max(
+    const own = Math.max(
       aim.radius * 1.25,
       p.elements.bound ? p.elements.apoapsis * 1.1 : aim.radius * 3,
-    ));
+    );
+    // Never closer in than the view the page opened with (see the sandbox).
+    shown.base.orbit ??= own;
+    let extent = (model.tags.extent ??= Math.max(own, shown.base.orbit));
     for (const s of model.list())
       extent = Math.max(extent, Math.hypot(s.x, s.y) * 1.1);
     model.tags.extent = extent;
@@ -205,7 +233,8 @@ const orbitDriver = {
         prediction: true,
         trails: true,
         areas: false,
-        labels: false,
+        potential: !!model.tags.potential,
+        labels: true,
       },
       selected: model.tags.satellite,
       aim,
@@ -226,7 +255,8 @@ const fieldDriver = {
   arrows: (model) => ({ velocity: false, force: !!model.tags.forces }),
   renderer: (R, ctx, view) => R.createFieldRenderer(ctx, view),
   draw(model, renderer, view, size, prefs, R, E, ctx, shown) {
-    const half = model.tags.view,
+    shown.base.field ??= model.tags.view;
+    const half = Math.max(model.tags.view, shown.base.field),
       state = {
         mode: model.tags.mode,
         density: model.tags.density ?? 1,
@@ -280,7 +310,7 @@ const DOT_SPEED = 3.2; // grid squares a second, as on the circuits page
 const circuitDriver = {
   still: false,
   // A circuit has no velocity or force arrows.
-  arrows: () => ({ velocity: false, force: false }),
+  arrows: () => ({ velocity: false, force: false, electrons: true }),
   renderer: (R, ctx, view) => R.createCircuitRenderer(ctx, view),
   draw(model, renderer, view, size, prefs, R, E, ctx, shown) {
     // The current dots flow as on the circuits page: the largest current
@@ -294,10 +324,12 @@ const circuitDriver = {
     model.tags.peak = peak;
     if (peak > 0 && shown.elapsed > 0) {
       const step = Math.min(DOT_SPEED * shown.elapsed, 0.45 * R.DOT_SPACING);
+      // Electron flow runs the other way round from conventional current.
+      const sense = shown.electrons ? -1 : 1;
       for (const run of runs)
         phase.set(
           run.key,
-          (phase.get(run.key) || 0) + (step * run.current) / peak,
+          (phase.get(run.key) || 0) + (sense * step * run.current) / peak,
         );
     }
     let minX = Infinity,
@@ -329,11 +361,121 @@ const circuitDriver = {
       potential: false,
       ac: false,
       current: true,
-      electrons: false,
+      electrons: shown.electrons,
       phase,
     });
   },
 };
+
+// ---------------------------------------------------------------- bars
+
+// Quantities that cannot be seen in the picture (energies, momentum) as
+// bars in the top-right corner, read from the engine every frame, like the
+// energy panel of the sandbox. `sim.bars` names which: "energy" or
+// "momentum". Returns [{ label, value, unit, colour }].
+const BARS = {
+  energy(model) {
+    if (model.energy) {
+      const e = model.energy(),
+        rows = [
+          ["Kinetic", e.kinetic, "energy-kinetic"],
+          ["Gravitational", e.gravitational, "energy-gravitational"],
+          ["Elastic", e.elastic, "energy-elastic"],
+          ["Electric", e.electric, "energy-electric"],
+          // Work done by field regions, which have no potential energy.
+          ["Work by field", e.fieldWork, "field-electric"],
+        ];
+      return rows.map(([label, value, colour]) => ({
+        label,
+        value,
+        unit: "J",
+        colour,
+      }));
+    }
+    // Orbits: the satellite's kinetic and potential energy and their sum.
+    const m = model.measure(model.tags.satellite);
+    if (!m) return [];
+    return [
+      ["Kinetic", m.kinetic, "energy-kinetic"],
+      ["Potential", m.potential, "energy-gravitational"],
+      ["Total", m.total, "ink"],
+    ].map(([label, value, colour]) => ({ label, value, unit: "J", colour }));
+  },
+  momentum(model) {
+    const ids = [...model.objects.keys()].filter(
+      (id) => !model.objects.get(id).lockPosition,
+    );
+    const rows = ids.map((id, i) => ({
+      label: ids.length > 1 ? `Ball ${i + 1}` : "Momentum",
+      value: model.measure(id).momentum.x,
+      unit: "kg m/s",
+      colour: "vector-velocity",
+    }));
+    if (rows.length > 1)
+      rows.push({
+        label: "Total",
+        value: rows.reduce((t, r) => t + r.value, 0),
+        unit: "kg m/s",
+        colour: "ink",
+      });
+    return rows;
+  },
+};
+
+// Draws the bars. The scale is the largest size seen so far in this run, so
+// the bars do not jump about; a quantity that has stayed at zero is left out.
+function drawBars(ctx, size, rows, tags) {
+  const seen = (tags.barsSeen ??= new Set());
+  for (const r of rows) if (Math.abs(r.value) > 1e-9) seen.add(r.label);
+  rows = rows.filter((r) => seen.has(r.label));
+  if (!rows.length) return;
+  tags.barMax = Math.max(tags.barMax ?? 0, ...rows.map((r) => Math.abs(r.value)));
+  tags.barNegative ||= rows.some((r) => r.value < -1e-9 * tags.barMax);
+  const dark = isDark(),
+    col = (name) => color(name, dark),
+    w = 210,
+    rowH = 18,
+    x = size.width - w - 8,
+    y = 8,
+    h = rows.length * rowH + 10,
+    track = { x: x + 84, w: w - 92 },
+    zero = tags.barNegative ? track.x + track.w / 2 : track.x,
+    half = tags.barNegative ? track.w / 2 : track.w;
+  ctx.save();
+  ctx.globalAlpha = 0.88;
+  ctx.fillStyle = col("panel");
+  ctx.fillRect(x, y, w, h);
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = col("line");
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, w, h);
+  ctx.font = "11px system-ui, sans-serif";
+  ctx.textBaseline = "middle";
+  rows.forEach((r, i) => {
+    const cy = y + 5 + rowH * i + rowH / 2,
+      len = (half * r.value) / (tags.barMax || 1);
+    ctx.fillStyle = col("ink-soft");
+    ctx.textAlign = "left";
+    ctx.fillText(r.label, x + 6, cy);
+    ctx.fillStyle = col(r.colour);
+    ctx.fillRect(Math.min(zero, zero + len), cy - 5, Math.abs(len), 10);
+    ctx.fillStyle = col("ink");
+    ctx.textAlign = len < 0 ? "left" : "right";
+    ctx.font = "10px system-ui, sans-serif";
+    ctx.fillText(
+      `${numberText(r.value)} ${r.unit}`,
+      len < 0 ? zero + 3 : zero - 3 + (tags.barNegative ? 0 : track.w),
+      cy,
+    );
+    ctx.font = "11px system-ui, sans-serif";
+  });
+  ctx.strokeStyle = col("ink-soft");
+  ctx.beginPath();
+  ctx.moveTo(zero + 0.5, y + 4);
+  ctx.lineTo(zero + 0.5, y + h - 4);
+  ctx.stroke();
+  ctx.restore();
+}
 
 // ---------------------------------------------------------------- host
 
@@ -357,6 +499,12 @@ export async function createMiniSim(box, options) {
           data-icon="force"
           data-icon-label="Net force vectors"
           data-icon-only="true"
+        ></span></label
+      ><label class="icon-toggle mt-show-electrons" title="Electron flow (off: conventional current)"
+        ><input type="checkbox" /><span
+          data-icon="electrons"
+          data-icon-label="Electron flow"
+          data-icon-only="true"
         ></span></label>
       <span class="mt-sim-time" aria-live="off"></span>
     </div>
@@ -368,6 +516,7 @@ export async function createMiniSim(box, options) {
     toggles = {
       velocity: box.querySelector(".mt-show-velocity"),
       force: box.querySelector(".mt-show-force"),
+      electrons: box.querySelector(".mt-show-electrons"),
     };
   renderIcons(prefs.iconWeight);
   canvas.setAttribute("aria-label", `Simulation: ${sim.caption}`);
@@ -378,6 +527,8 @@ export async function createMiniSim(box, options) {
     renderer = driver.renderer(driver.R, ctx, view);
   // Nothing moves until Play is pressed; after that, changing a value
   // restarts the scene playing, and Pause holds it across changes too.
+  // The views the page opened with, kept across rebuilds.
+  const base = {};
   let run = null,
     wanted = false,
     running = false;
@@ -398,11 +549,12 @@ export async function createMiniSim(box, options) {
       canvas.hidden = false;
       // Only the arrows this scene can show have a button.
       const can = driver.arrows(run.model);
-      for (const key of ["velocity", "force"]) toggles[key].hidden = !can[key];
+      for (const key of ["velocity", "force", "electrons"])
+        toggles[key].hidden = !can[key];
     } catch (error) {
       message.hidden = false;
       canvas.hidden = true;
-      message.textContent = `The simulation cannot show these values: ${explain(error)} The equation above still holds.`;
+      message.textContent = `The simulation cannot show these values: ${explain(error)} The equation still holds.`;
       clock.textContent = "";
     }
     setRunning(wanted);
@@ -459,10 +611,13 @@ export async function createMiniSim(box, options) {
           {
             velocity: toggles.velocity.querySelector("input").checked,
             force: toggles.force.querySelector("input").checked,
+            electrons: toggles.electrons.querySelector("input").checked,
+            base,
             // Real seconds of playing in this frame.
             elapsed: playing ? elapsed : 0,
           },
         );
+        if (sim.bars) drawBars(ctx, r, BARS[sim.bars](run.model), run.model.tags);
       } catch (error) {
         message.hidden = false;
         message.textContent = `The simulation could not be drawn: ${error.message}`;
@@ -487,7 +642,16 @@ export async function createMiniSim(box, options) {
   let last = 0;
   build();
   requestAnimationFrame(frame);
-  return { rebuild: build };
+  return {
+    rebuild: build,
+    // Whether the scene can be built for this full set of values (used to
+    // keep the sliders to values the simulation can show).
+    works(values) {
+      const model = sim.build(values, driver.E);
+      model.dispose?.();
+      return true;
+    },
+  };
 }
 
 function formatTime(s) {

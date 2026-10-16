@@ -263,6 +263,23 @@ class Ring {
 
 // ---------------------------------------------------------------------------
 
+// [cos, sin] of an angle, exact at whole right angles, so that
+// "horizontal", "straight up" and a launch point a quarter of the way round
+// are not spoiled by cos 90° ≠ 0 in floating point.
+function turn(angle) {
+  const quarter = angle / (Math.PI / 2);
+  if (Math.abs(quarter - Math.round(quarter)) < 1e-12) {
+    const k = ((Math.round(quarter) % 4) + 4) % 4;
+    return [
+      [1, 0],
+      [0, 1],
+      [-1, 0],
+      [0, -1],
+    ][k];
+  }
+  return [Math.cos(angle), Math.sin(angle)];
+}
+
 export class OrbitLab {
   constructor(options = {}) {
     this.body = { key: "earth", ...BODIES.earth };
@@ -315,13 +332,16 @@ export class OrbitLab {
     this.satelliteMass = mass;
   }
 
-  // Launch conditions → state vector. The launch point is straight above
-  // the centre (on +y); `angle` is the direction of the velocity above the
-  // local horizontal, which there points along +x. Give `radius` (from the
-  // centre) or `altitude` (above the surface).
+  // Launch conditions → state vector. The launch point is a distance
+  // `radius` from the centre (or `altitude` above the surface) at `bearing`
+  // radians anticlockwise round from straight above the centre (+y; the
+  // default, 0). `angle` is the direction of the velocity above the local
+  // horizontal, whose forward direction is +x at the top and turns with the
+  // bearing: the whole launch is the top one turned through `bearing`.
   launchState(params) {
     const radius = params.radius ?? this.body.radius + params.altitude,
-      { speed, angle } = params;
+      { speed, angle } = params,
+      bearing = params.bearing ?? 0;
     if (!Number.isFinite(radius) || radius < this.body.radius * (1 - SKIM))
       throw new Error("The launch point must be on or above the surface.");
     if (radius > LIMITS.orbitRadius)
@@ -331,14 +351,18 @@ export class OrbitLab {
     inRange("Launch speed", speed, 0, LIMITS.speed, "km/s", 1e-3);
     if (!Number.isFinite(angle) || Math.abs(angle) > Math.PI + 1e-9)
       throw new Error("Launch angle must be between −180° and 180°.");
-    // Exact components for the common directions, so that "horizontal" and
-    // "straight up" are not spoiled by cos(90°) ≠ 0 in floating point.
-    const quarter = angle / (Math.PI / 2),
-      exact = Math.abs(quarter - Math.round(quarter)) < 1e-12,
-      k = ((Math.round(quarter) % 4) + 4) % 4,
-      c = exact ? [1, 0, -1, 0][k] : Math.cos(angle),
-      s = exact ? [0, 1, 0, -1][k] : Math.sin(angle);
-    return { x: 0, y: radius, vx: speed * c, vy: speed * s };
+    if (!Number.isFinite(bearing) || Math.abs(bearing) > Math.PI + 1e-9)
+      throw new Error("Launch bearing must be between −180° and 180°.");
+    const [c, s] = turn(angle),
+      [cb, sb] = turn(bearing),
+      vx = speed * c,
+      vy = speed * s;
+    return {
+      x: sb === 0 ? 0 : -radius * sb,
+      y: radius * cb,
+      vx: vx * cb - vy * sb,
+      vy: vx * sb + vy * cb,
+    };
   }
 
   // What a launch would do, without launching: the state, the orbit it
@@ -349,8 +373,8 @@ export class OrbitLab {
     return {
       state,
       elements: orbitElements(mu, state, this.body.radius),
-      circularSpeed: circularSpeed(mu, state.y),
-      escapeSpeed: escapeSpeed(mu, state.y),
+      circularSpeed: circularSpeed(mu, Math.hypot(state.x, state.y)),
+      escapeSpeed: escapeSpeed(mu, Math.hypot(state.x, state.y)),
     };
   }
 
@@ -387,7 +411,12 @@ export class OrbitLab {
       s = {
         id: this.nextId++,
         colour,
-        launch: { radius: r0, speed: Math.sqrt(v2), angle: params.angle },
+        launch: {
+          radius: r0,
+          speed: Math.sqrt(v2),
+          angle: params.angle,
+          bearing: params.bearing ?? 0,
+        },
         launchedAt: this.time,
         ...state,
         // Seconds since launch, and the time it is due to have reached.
@@ -441,6 +470,7 @@ export class OrbitLab {
         radius: s.launch.radius,
         speed: s.launch.speed,
         angle: s.launch.angle,
+        bearing: s.launch.bearing,
         launchedAt: s.launchedAt,
       })),
     };
@@ -473,6 +503,7 @@ export class OrbitLab {
         radius: s.radius,
         speed: s.speed,
         angle: s.angle,
+        bearing: s.bearing ?? 0,
         launchedAt: s.launchedAt ?? 0,
       })),
       end = data.time ?? 0;
