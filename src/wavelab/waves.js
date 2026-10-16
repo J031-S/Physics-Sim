@@ -226,12 +226,20 @@ export class WaveLab {
     this.steps = 0;
     this.carry = 0;
     this.samples = 0;
+    this.tracking = true;
     this.sources = [];
     this.histories = new Map();
     this.#build();
   }
   get time() {
     return this.steps * this.dt;
+  }
+  // Whether the running mean of u² (the intensity view and the screens) is
+  // kept up to date; it costs a third of each step. Turning it back on
+  // starts it afresh.
+  trackIntensity(on) {
+    if (on && !this.tracking) this.avg.fill(0);
+    this.tracking = !!on;
   }
   // Left edge and bottom edge of the grid (the tank and its absorbing
   // layer), in metres.
@@ -296,7 +304,7 @@ export class WaveLab {
 
   // The shortest wavelength anywhere in the tank, in cells. A moving source
   // shortens the waves ahead of it to (c − v)/f in each medium slower than
-  // it; at or above a medium's speed there is no wave ahead to resolve.
+  // it. (On a shock cone they are squeezed without limit: see the README.)
   cellsPerWavelength(tank = this.tank, items = this.list()) {
     const speeds = [tank.speed, ...items.filter((i) => i.kind === "medium").map((m) => tank.speed / m.index)];
     let shortest = Infinity;
@@ -304,8 +312,9 @@ export class WaveLab {
       if (!isSource(s.kind)) continue;
       for (const c of speeds) {
         const v = s.kind === "moving" ? s.speed * tank.speed : 0;
-        if (v >= c) continue;
-        shortest = Math.min(shortest, (c - v) / s.frequency);
+        // At or above a medium's speed there is no wave ahead; the waves
+        // left behind are (c + v)/f long.
+        shortest = Math.min(shortest, (v >= c ? c + v : c - v) / s.frequency);
       }
     }
     return shortest / tank.cell;
@@ -386,8 +395,8 @@ export class WaveLab {
       }
   }
 
-  // Adds the source terms for this step, times dt², into u2 (which step()
-  // then completes).
+  // Adds the source terms for this step, times dt² and each cell's damping
+  // factor, to u2.
   #inject(t) {
     const h = this.cell,
       dt2 = this.dt * this.dt,
@@ -401,10 +410,11 @@ export class WaveLab {
           b = fy - j;
         if (i < 1 || j < 1 || i >= this.nx - 2 || j >= this.ny - 2) return false;
         const k = j * this.nx + i;
-        this.u2[k] += s * (1 - a) * (1 - b);
-        this.u2[k + 1] += s * a * (1 - b);
-        this.u2[k + this.nx] += s * (1 - a) * b;
-        this.u2[k + this.nx + 1] += s * a * b;
+        const K = this.keep;
+        this.u2[k] += s * (1 - a) * (1 - b) * K[k];
+        this.u2[k + 1] += s * a * (1 - b) * K[k + 1];
+        this.u2[k + this.nx] += s * (1 - a) * b * K[k + this.nx];
+        this.u2[k + this.nx + 1] += s * a * b * K[k + this.nx + 1];
         return true;
       },
       // A point term spread as a Gaussian one cell wide (normalised over
@@ -428,7 +438,10 @@ export class WaveLab {
             total += w[q];
           }
         for (let dj = -R, q = 0; dj <= R; dj++)
-          for (let di = -R; di <= R; di++, q++) this.u2[(cj + dj) * this.nx + ci + di] += (s * w[q]) / total;
+          for (let di = -R; di <= R; di++, q++) {
+            const k = (cj + dj) * this.nx + ci + di;
+            this.u2[k] += ((s * w[q]) / total) * this.keep[k];
+          }
         return true;
       };
     for (const src of this.sources) {
@@ -439,7 +452,7 @@ export class WaveLab {
       if (src.kind === "line") {
         // 1D: u_tt = c²u_xx + K g'(t) δ(x) radiates (K/2c) g(t ∓ x/c) each
         // way, so K = 2cA gives waves of amplitude A.
-        const c = this.speed / this.#indexAt(src.x, src.y),
+        const c = this.speed / this.indexAt(src.x, src.y),
           K = 2 * c * src.amplitude,
           a = unit(src.angle),
           p = { x: -a.y, y: a.x },
@@ -461,12 +474,13 @@ export class WaveLab {
         x += a.x * v * local;
         y += a.y * v * local;
       }
-      const c = this.speed / this.#indexAt(x, y),
+      const c = this.speed / this.indexAt(x, y),
         K = (4 * Math.PI * c * c * src.amplitude) / w;
       blob(x, y, (dt2 * K * dg) / (h * h));
     }
   }
-  #indexAt(x, y) {
+  // The refractive index of the medium at a point (1 outside every region).
+  indexAt(x, y) {
     let n = 1;
     for (const m of this.items.values()) if (m.kind === "medium" && inMedium(m, x, y)) n = m.index;
     return n;
@@ -474,18 +488,38 @@ export class WaveLab {
 
   // One timestep: u2 = (2u1 − (1 − γdt/2)u0 + (c dt/h)² ∇²u1 + dt² s)
   // / (1 + γdt/2), walls held at zero, Mur's condition on the outer rows.
+  // The running mean of u² is updated in the same pass (memory, not
+  // arithmetic, is what limits this loop).
   step() {
-    const { nx, ny, u0, u1, u2, c2, keep, back } = this;
-    u2.fill(0);
-    this.#inject(this.time);
-    for (let j = 1; j < ny - 1; j++) {
-      let k = j * nx + 1;
-      for (let i = 1; i < nx - 1; i++, k++) {
-        const c = u1[k],
-          lap = u1[k - 1] + u1[k + 1] + u1[k - nx] + u1[k + nx] - 4 * c;
-        u2[k] = (u2[k] + 2 * c - back[k] * u0[k] + c2[k] * lap) * keep[k];
+    const { nx, ny, u0, u1, u2, c2, keep, back, avg, sum } = this;
+    let f = Infinity;
+    for (const s of this.sources) f = Math.min(f, s.frequency);
+    // Running mean of u² over about two periods of the slowest source.
+    const alpha = Math.min(1, this.dt / (2 / (Number.isFinite(f) ? f : 1))),
+      averaging = !!this.averaging;
+    if (this.tracking || averaging)
+      for (let j = 1; j < ny - 1; j++) {
+        let k = j * nx + 1;
+        for (let i = 1; i < nx - 1; i++, k++) {
+          const c = u1[k],
+            v = (2 * c - back[k] * u0[k] + c2[k] * (u1[k - 1] + u1[k + 1] + u1[k - nx] + u1[k + nx] - 4 * c)) * keep[k];
+          u2[k] = v;
+          avg[k] += (v * v - avg[k]) * alpha;
+          if (averaging) sum[k] += v * v;
+        }
       }
-    }
+    else
+      // The same without the running mean, when nothing shows it.
+      for (let j = 1; j < ny - 1; j++) {
+        let k = j * nx + 1;
+        for (let i = 1; i < nx - 1; i++, k++) {
+          const c = u1[k];
+          u2[k] = (2 * c - back[k] * u0[k] + c2[k] * (u1[k - 1] + u1[k + 1] + u1[k - nx] + u1[k + nx] - 4 * c)) * keep[k];
+        }
+      }
+    // Source terms: the update is linear, so they are added afterwards,
+    // with the same damping factor.
+    this.#inject(this.time);
     if (this.edges === "absorb") {
       // Mur: u_t = ±c u_n at each edge, to first order.
       const C = COURANT,
@@ -507,24 +541,7 @@ export class WaveLab {
     this.u1 = u2;
     this.u2 = u0;
     this.steps++;
-    this.#afterStep();
-  }
-  #afterStep() {
-    const { u1, avg, sum } = this,
-      n = u1.length;
-    // Running mean of u² over about two periods of the slowest source.
-    let f = Infinity;
-    for (const s of this.sources) f = Math.min(f, s.frequency);
-    const tau = 2 / (Number.isFinite(f) ? f : 1),
-      alpha = Math.min(1, this.dt / tau);
-    for (let k = 0; k < n; k++) {
-      const v = u1[k] * u1[k];
-      avg[k] += (v - avg[k]) * alpha;
-    }
-    if (this.averaging) {
-      for (let k = 0; k < n; k++) sum[k] += u1[k] * u1[k];
-      this.samples++;
-    }
+    if (averaging) this.samples++;
     for (const [id, h] of this.histories) {
       const p = this.items.get(id);
       h.t.push(this.time);
@@ -666,7 +683,7 @@ export class WaveLab {
       at = (t) => ({ x: sc.x + p.x * t, y: sc.y + p.y * t }),
       sources = this.sources.filter((s) => s.kind !== "moving");
     if (!sources.length) return null;
-    const lambda = this.speed / this.#indexAt(sc.x, sc.y) / sources[0].frequency,
+    const lambda = this.speed / this.indexAt(sc.x, sc.y) / sources[0].frequency,
       wall = this.list().find((w) => w.kind === "wall" && w.slits > 0);
     // Zero crossings of f(t) − m along the screen, for each whole m.
     const solve = (f) => {
