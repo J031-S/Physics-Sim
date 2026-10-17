@@ -75,8 +75,14 @@
   font-size: 11px;
   border: 1px solid var(--line);
   border-radius: 5px;
-  background: transparent;
-  color: inherit;
+  /* Not transparent: the open list takes the select's background, and a
+     transparent one falls back to the browser's white under light text. */
+  background: var(--panel);
+  color: var(--ink);
+}
+.wave-lab select option {
+  background: var(--panel);
+  color: var(--ink);
 }
 .wl-panel .fl-form .prop-row:has(select) {
   grid-template-columns: 8.4em minmax(0, 1fr);

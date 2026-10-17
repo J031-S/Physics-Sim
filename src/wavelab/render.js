@@ -9,7 +9,9 @@
 // so panning and zooming move the picture without changing it.
 import { paletteOf, spectralColour, value } from "../site/theme.js";
 import { arrowheadScale, endGrid, gridDash, vectorWeight } from "../site/canvas-style.js";
-import { focalLength, frame, isSource as isRaySource, outlineOf } from "./rays.js";
+import { WHITE, focalLength, frame, isSource as isRaySource, outlineOf } from "./rays.js";
+
+const WHITE_COUNT = WHITE.length;
 import { slitOffsets } from "./waves.js";
 import { pipePattern } from "./sound.js";
 
@@ -295,15 +297,43 @@ export function createWaveRenderer(ctx, view) {
     for (const el of items) if (!isRaySource(el.kind)) drawElement(el, c, el.id === o.selected);
     if (o.foci) for (const el of items) if (!isRaySource(el.kind)) drawFoci(el, c);
     // Rays: their own colour, as bright as the share of light they carry.
-    const width = Math.max(1, vectorWeight() * 0.6);
+    // White light is traced as one ray per wavelength; until something
+    // disperses them they follow exactly the same path, so a segment that
+    // every wavelength of a white source shares is drawn once, in white
+    // (otherwise the colour drawn last would hide the rest).
+    const width = Math.max(1, vectorWeight() * 0.6),
+      key = (s) => [s.source, s.x1, s.y1, s.x2, s.y2].join(),
+      white = new Set(),
+      shared = new Map();
     for (const s of o.trace.segments) {
+      if (lab.get(s.source)?.wavelength !== "white") continue;
+      const k = key(s),
+        group = shared.get(k) ?? { waves: new Set(), intensity: 0 };
+      group.waves.add(s.wavelength);
+      group.intensity += s.intensity;
+      shared.set(k, group);
+    }
+    for (const [k, g] of shared) if (g.waves.size === WHITE_COUNT) white.add(k);
+    const drawn = new Set();
+    // On the dark canvas light adds as light does: where coloured rays still
+    // overlap (just after a prism splits them) they sum towards white. On
+    // the pale canvas adding would wash them out, so they are laid over
+    // each other as usual there.
+    if (c.dark) ctx.globalCompositeOperation = "lighter";
+    for (const s of o.trace.segments) {
+      const k = white.size && white.has(key(s)) ? key(s) : null;
+      if (k && drawn.has(k)) continue;
       ctx.beginPath();
       if (!worldLine(s.x1, s.y1, s.x2, s.y2)) continue;
-      ctx.strokeStyle = spectralColour(s.wavelength, c.dark);
-      ctx.globalAlpha = Math.min(1, 0.08 + 0.92 * s.intensity);
+      if (k) drawn.add(k);
+      // A shared segment carries the mean share over its wavelengths.
+      const intensity = k ? shared.get(k).intensity / WHITE_COUNT : s.intensity;
+      ctx.strokeStyle = spectralColour(k ? "white" : s.wavelength, c.dark);
+      ctx.globalAlpha = Math.min(1, 0.08 + 0.92 * intensity);
       ctx.lineWidth = width;
       ctx.stroke();
     }
+    ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = 1;
     // Images: real ones solid, virtual ones dashed, with the rays' backward
     // extensions dashed to them.

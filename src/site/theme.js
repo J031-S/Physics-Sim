@@ -1097,6 +1097,9 @@ export function tokensCss() {
 // and green rays stay visible on a pale canvas. Not part of a scheme: it is
 // physics, like the charge colours' meanings.
 export function spectralColour(wavelength, dark = pageIsDark()) {
+  // White light (every wavelength together): white on the dark canvas; on
+  // the pale light-theme canvas, where white would vanish, a neutral grey.
+  if (wavelength === "white") return dark ? "#ffffff" : "#7c8090";
   const nm = wavelength * 1e9;
   let r = 0,
     g = 0,
