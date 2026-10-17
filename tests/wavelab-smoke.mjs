@@ -120,6 +120,26 @@ await import("../src/wavelab/app.js");
   assert.equal(text("selected-name"), "Block");
   assert.ok(!$("selection").hidden);
 
+  // The site's control scheme: Grab and Pan, Z for snapping (the view-bar
+  // toggle and the Settings box agree), the Resize tool, G back to Grab.
+  const press = (k, init = {}) => document.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, bubbles: true, ...init }));
+  assert.ok(document.querySelector('[data-tool="grab"]') && document.querySelector('[data-tool="pan"]'));
+  assert.ok(text("snap-status").startsWith("Snap off"));
+  press("z");
+  await frame();
+  assert.ok($("snap-toggle").checked && $("setting-snapping").checked, "snapping on everywhere");
+  assert.ok(text("snap-status").startsWith("Snap on"));
+  $("snap-toggle").click();
+  assert.ok(!$("setting-snapping").checked, "and off again");
+  $("resize-object").click();
+  assert.equal(text("tool-name"), "Resize");
+  press("g");
+  assert.equal(text("tool-name"), "Grab");
+  press("h");
+  assert.equal(text("tool-name"), "Pan");
+  press("Escape");
+  assert.equal(text("tool-name"), "Grab");
+
   // The volume control starts low.
   $("mode-sound").click();
   await frame();

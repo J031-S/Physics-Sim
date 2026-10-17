@@ -85,6 +85,26 @@
         aria-label="Waves, light and sound. Choose something in the toolbar, then click the scene to place it; drag things to move them. The readings are listed in the panels on the right."
       ></canvas>
       <div class="fl-top wl-top">
+        <div
+          class="edit-tools"
+          role="toolbar"
+          aria-label="Edit tools"
+          data-for="rays waves"
+        >
+          <button
+            data-tool="grab"
+            aria-pressed="true"
+            title="Grab: move things; Ctrl-drag turns them; hold R and drag to resize (G)"
+          >
+            Grab</button
+          ><button
+            data-tool="pan"
+            aria-pressed="false"
+            title="Pan the view (H)"
+          >
+            Pan
+          </button>
+        </div>
         <div class="fl-centre">
           <div class="fl-toolbar" role="toolbar" aria-label="View and tools">
             <div class="fl-modes" role="group" aria-label="View">
@@ -159,6 +179,12 @@
               <strong id="selected-name"></strong
               ><span class="header-actions"
                 ><button
+                  id="resize-object"
+                  aria-pressed="false"
+                  title="Resize tool: drag something to resize it about its centre; Z snaps sizes (or hold R and drag)"
+                >
+                  Resize (R)</button
+                ><button
                   id="delete"
                   title="Delete this (Delete)"
                   data-icon="delete"
@@ -219,11 +245,21 @@
         ><span id="zoom-level">100%</span
         ><button id="zoom-in" title="Zoom in (+)">+</button
         ><button id="fit-scene" title="Fit the scene in view (F)">
-          Fit scene
-        </button>
+          Fit scene</button
+        ><span class="cluster-divider" aria-hidden="true"></span
+        ><label
+          class="icon-toggle"
+          title="Snapping (Z): positions and sizes to the grid on show, angles to 15°"
+          ><input type="checkbox" id="snap-toggle" /><span
+            data-icon="snap"
+            data-icon-label="Snapping"
+            data-icon-only="true"
+          ></span
+        ></label>
       </div>
       <div class="status">
-        <span id="scene-status"></span><span id="time"></span>
+        <span id="snap-status"></span><span id="scene-status"></span
+        ><span id="time"></span>
       </div>
       <div id="toast" role="status" aria-live="polite"></div>
     </main>
@@ -233,6 +269,13 @@
         ><button id="close-settings" aria-label="Close settings">×</button>
       </div>
       <p>Changes apply immediately.</p>
+      <details class="settings-section" open>
+        <summary>Editing</summary>
+        <label class="setting-toggle"
+          ><input id="setting-snapping" type="checkbox" /> Snapping (Z): to
+          the grid on show and 15°</label
+        >
+      </details>
       <details id="website-settings" class="settings-section" open></details>
     </section>
     <section
@@ -268,19 +311,34 @@
         ><button id="close-keys" aria-label="Close shortcuts">×</button>
       </div>
       <dl>
-        <dt>Click a tool, then the scene</dt>
-        <dd>Places it there. Placing something returns to Grab.</dd>
-        <dt>Drag</dt>
+        <dt>Click</dt>
         <dd>
-          Moves what is under the pointer; on empty space, moves the view.
-          Scroll to zoom.
+          With something chosen in the toolbar, places it (on the grid with
+          snapping) and returns to Grab. Otherwise selects what is under the
+          pointer: its values appear on the right.
         </dd>
-        <dt>Click something</dt>
-        <dd>Selects it: its values appear on the right.</dd>
-        <dt>R · Shift+R</dt>
-        <dd>Turn the selection 15° anticlockwise · clockwise</dd>
+        <dt>Drag</dt>
+        <dd>Moves what is under the pointer. Dragging empty space pans the view.</dd>
+        <dt>Ctrl + drag</dt>
+        <dd>Turns it about its centre (15° steps with snapping).</dd>
+        <dt>R + drag · Resize button</dt>
+        <dd>
+          Resizes it about its centre: a mirror, lens, screen or beam along
+          its length, a block or region in both directions, a prism in
+          proportion, an object's height, a point source's fan.
+        </dd>
         <dt>Arrow keys · Delete</dt>
-        <dd>Nudge the selection · delete it</dd>
+        <dd>
+          Nudge the selection (one grid step with snapping, a fifth of one
+          without) · delete it
+        </dd>
+        <dt>Z</dt>
+        <dd>
+          Toggle snapping: positions and sizes to the minor grid step on show
+          (it follows the zoom), angles to 15°
+        </dd>
+        <dt>G · H</dt>
+        <dd>Grab · Pan. Scroll to zoom; middle-drag pans in any tool.</dd>
         <dt>1 · 2 · 3</dt>
         <dd>Rays · Waves · Sound view</dd>
         <dt>Space · . · 0</dt>
@@ -290,7 +348,7 @@
         <dt>F · + · −</dt>
         <dd>Fit the scene in view · zoom in · zoom out</dd>
         <dt>Escape</dt>
-        <dd>Back to Grab; closes any open panel</dd>
+        <dd>Cancels a drag (puts it back); otherwise back to Grab, closing any open panel</dd>
       </dl>
       <p>
         Rays: geometric optics only (no diffraction or interference), each lens

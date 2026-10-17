@@ -13,7 +13,8 @@ import { RayLab, MATERIALS, kindName as rayName, isSource as isRaySource, outlin
 import { WaveLab, kindName as waveName, MIN_CELLS, FORMAT as WAVES_FORMAT } from "./waves.js";
 import { SoundLab, MEDIA, soundLevel, pointIntensity, doppler, passing, beatFrequency, FORMAT as SOUND_FORMAT } from "./sound.js";
 import { presets } from "./presets.js";
-import { createWaveRenderer, drawSound, wavePalette } from "./render.js";
+import { createWaveRenderer, drawSound, gridStep, wavePalette } from "./render.js";
+import { resizable, resizePatch, snapTo, startResize, turnAngle } from "./edit.js";
 import { createPlayer } from "./audio.js";
 
 const canvas = $("canvas"),
@@ -34,6 +35,7 @@ const state = {
   warp: { waves: 1, sound: 0.002 },
   achieved: 1,
   show: { foci: true, partial: true, display: "wave", gain: 1.2, labels: "light" },
+  snapping: false,
 };
 const renderer = createWaveRenderer(ctx, view),
   { screen, world } = renderer,
@@ -47,6 +49,8 @@ let last = 0,
   fitted = false,
   levelMap = null,
   dirty = true,
+  resizeHeld = false, // R is held down: a drag resizes
+  pointer = null, // the pointer's last place on the canvas
   framing = null; // the region the current preset asked to show
 
 const WARPS = {
@@ -163,24 +167,60 @@ const PALETTES = {
     ["doppler", "Doppler", "A moving source"],
   ],
 };
+// Toolbar glyphs, drawn as the circuits and fields pages draw theirs (24 ×
+// 24, the shared glyph classes in base.css).
+const L_ = (d) => `<path d="${d}" class="glyph-line" />`,
+  D_ = (cx, cy, r = 1.8) => `<circle cx="${cx}" cy="${cy}" r="${r}" class="glyph-dot" />`;
+const GLYPHS = {
+  mirror: L_("M12 3v18") + L_("M12 6l3-3M12 11l3-3M12 16l3-3M12 21l3-3"),
+  sphericalMirror: L_("M9 3a12 12 0 0 1 0 18") + L_("M12 5l2-2M13 11l3 0M12 17l2 2"),
+  parabolicMirror: L_("M7 3q12 9 0 18") + D_(15, 12, 1.5),
+  block: L_("M4 7h16v10H4z"),
+  prism: L_("M12 4l8 15H4z"),
+  lens: L_("M12 3q5 9 0 18q-5-9 0-18z"),
+  thinLens: L_("M12 4v16M9 7l3-3 3 3M9 17l3 3 3-3"),
+  screen: L_("M14 3v18") + L_("M11 3v18"),
+  stop: L_("M12 3v6M12 15v6"),
+  ray: L_("M3 18L21 6") + L_("M15 6h6v6"),
+  beam: L_("M3 6h18M3 12h18M3 18h18"),
+  point: D_(5, 12, 2.4) + L_("M8 12h13M8 10L20 5M8 14l12 5"),
+  object: L_("M12 21V5M8 9l4-4 4 4"),
+  line: L_("M8 3v18") + L_("M11 12h9M17 9l3 3-3 3"),
+  moving: D_(7, 12, 2.4) + `<circle cx="9" cy="12" r="5" class="glyph-ring" /><circle cx="11" cy="12" r="8.5" class="glyph-ring" />`,
+  wall: L_("M12 3v18M12 6l3-3M12 11l3-3M12 16l3-3M12 21l3-3"),
+  slits: L_("M12 3v4M12 10v4M12 17v4"),
+  medium: L_("M4 6h16v12H4z") + L_("M7 15l4-6M12 15l4-6"),
+  lensRegion: L_("M12 3q6 9 0 18q-6-9 0-18z") + L_("M10 12h4"),
+  probe: `<circle cx="12" cy="12" r="5" class="glyph-ring" />` + L_("M12 3v18M3 12h18"),
+  string: L_("M3 12q9-8 18 0") + D_(3, 12) + D_(21, 12),
+  pipe: L_("M3 8h18M3 16h18M3 8v8"),
+  beats: L_("M2 12c2-6 3-6 5 0s3 6 5 0 3-6 5 0 3 6 5 0"),
+  level: L_("M5 15v-3M9 15V9M13 15V7M17 15V4") + L_("M3 19h18"),
+  doppler: D_(9, 12, 2) + `<circle cx="11" cy="12" r="5" class="glyph-ring" /><circle cx="13.5" cy="12" r="8.5" class="glyph-ring" />`,
+};
 const ADD_PROPS = {
   slits: ["wall", { slits: 2, slitWidth: 1, separation: 4, length: 12 }],
   lensRegion: ["medium", { shape: "lens", radius: 6, thickness: 2.4, index: 1.5 }],
   medium: ["medium", { shape: "rect", width: 6, height: 6, index: 1.5 }],
 };
 const TOOL_HELP = {
-  rays: "Drag to move what is under the pointer, or the view. Click something to select it; R turns it.",
-  waves: "Drag to move a source, wall or probe, or the view. Click something to select it; R turns it.",
-  sound: "Choose an experiment in the toolbar; set its values on the right. Press Play to hear it.",
+  rays: ["Grab", "Drag something to move it; Ctrl-drag turns it; hold R and drag to resize it. Drag empty space to move the view."],
+  waves: ["Grab", "Drag a source, wall, screen or region to move it; Ctrl-drag turns it; hold R and drag to resize it. Drag empty space to move the view."],
+  sound: ["Sound", "Choose an experiment in the toolbar; set its values on the right. Press Play to hear it."],
+  pan: ["Pan", "Drag to move the view. Scroll to zoom."],
+  resize: ["Resize", "Drag something to resize it about its centre. Z snaps sizes; G returns to Grab."],
 };
 
 function buildPalette() {
   const bar = $("palette");
   bar.replaceChildren();
   for (const [key, text, title] of PALETTES[state.mode]) {
-    const b = document.createElement("button");
+    const b = document.createElement("button"),
+      label = document.createElement("span");
     b.type = "button";
-    b.textContent = text;
+    label.textContent = text;
+    b.innerHTML = `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">${GLYPHS[key] ?? ""}</svg>`;
+    b.append(label);
     b.title = title;
     if (state.mode === "sound") {
       b.dataset.experiment = key;
@@ -204,10 +244,35 @@ function buildPalette() {
 function setTool(tool) {
   state.tool = tool;
   for (const b of document.querySelectorAll("[data-add]")) b.setAttribute("aria-pressed", String(b.dataset.add === tool));
-  const entry = PALETTES[state.mode].find(([k]) => k === tool);
-  put($("tool-name"), entry ? entry[1] : state.mode === "sound" ? "Sound" : "Grab");
-  put($("tool-help"), entry ? `${entry[2]}. Click the scene to place it.` : TOOL_HELP[state.mode]);
-  canvas.style.cursor = entry ? "crosshair" : "";
+  for (const b of document.querySelectorAll("[data-tool]")) {
+    b.setAttribute("aria-pressed", String(b.dataset.tool === tool));
+    b.classList.toggle("active", b.dataset.tool === tool);
+  }
+  $("resize-object").setAttribute("aria-pressed", String(tool === "resize"));
+  const entry = PALETTES[state.mode].find(([k]) => k === tool),
+    [name, help] = entry
+      ? [entry[1], `${entry[2]}. Click the scene to place it${state.snapping ? " (on the snapping grid)" : ""}; the tool then returns to Grab.`]
+      : TOOL_HELP[tool === "grab" ? state.mode : tool];
+  put($("tool-name"), name);
+  put($("tool-help"), help);
+  canvas.style.cursor = entry ? "crosshair" : tool === "pan" ? "grab" : tool === "resize" ? "nwse-resize" : "";
+}
+// The snapping step: the minor grid step on show (it follows the zoom), in
+// metres (rays) or wavelengths (waves), and 15° for angles.
+const snapStep = () => gridStep(view.scale);
+function setSnapping(on) {
+  state.snapping = on;
+  $("snap-toggle").checked = $("setting-snapping").checked = on;
+  snapStatus();
+  setTool(state.tool);
+}
+function snapStatus() {
+  const el = $("snap-status");
+  if (state.mode === "sound") return put(el, "");
+  const unit = state.mode === "rays" ? "m" : "λ",
+    step = `${fmt(snapStep(), 3)} ${unit} / 15°`;
+  put(el, state.snapping ? `Snap on · ${step}` : `Snap off · Z toggles ${step}`);
+  el.classList.toggle("snapping", state.snapping);
 }
 
 function setMode(mode, keep) {
@@ -223,6 +288,7 @@ function setMode(mode, keep) {
   setRunning(false);
   buildPalette();
   setTool("grab");
+  snapStatus();
   buildWarp();
   buildDisplay();
   buildForm();
@@ -366,6 +432,7 @@ function zoomAt(sx, sy, factor) {
   view.scale = clamp(view.scale * factor, lo, hi);
   view.x = sx - p.x * view.scale;
   view.y = sy + p.y * view.scale;
+  snapStatus();
 }
 
 // ---------------------------------------------------------------- forms
@@ -576,16 +643,31 @@ function buildForm() {
       continue;
     }
     if (raw.shapes && !raw.shapes.includes(item.shape)) continue;
-    const f = fieldSpec(raw);
-    numberRow(
-      form,
-      f.label,
-      Number((item[f.key] * f.factor).toPrecision(f.digits ?? 6)),
-      f.unit,
-      (v) => update({ [f.key]: v / f.factor }),
-      f.help,
-      f.step,
-    );
+    const f = fieldSpec(raw),
+      input = numberRow(
+        form,
+        f.label,
+        Number((item[f.key] * f.factor).toPrecision(f.digits ?? 6)),
+        f.unit,
+        (v) => update({ [f.key]: v / f.factor }),
+        f.help,
+        f.step,
+      );
+    input.dataset.key = f.key;
+    input.dataset.factor = String(f.factor);
+    input.dataset.digits = String(f.digits ?? 6);
+  }
+}
+
+// Refreshes the selected item's numbers while it is dragged, leaving alone
+// a box being typed in.
+function syncForm() {
+  const item = lab().get?.(state.selected);
+  if (!item) return;
+  for (const input of $("item-form").querySelectorAll("input[data-key]")) {
+    if (input === document.activeElement) continue;
+    const v = item[input.dataset.key];
+    if (typeof v === "number") input.value = String(Number((v * Number(input.dataset.factor)).toPrecision(Number(input.dataset.digits))));
   }
 }
 
@@ -1110,6 +1192,7 @@ function draw() {
     put($("scene-status"), st.mode === "level" ? "" : `slowed ${fmt(1 / state.warp.sound, 3)} times`);
     put($("time"), st.mode === "level" ? "" : ` · t = ${si(soundTime, "s", 4)}`);
   }
+  snapStatus();
   put($("zoom-level"), state.mode === "sound" ? "" : `${si(view.scale, "px/" + (state.mode === "waves" ? "λ" : "m"), 3)}`);
   canvas.dataset.view = [view.x, view.y, view.scale].map((v) => +v.toFixed(3)).join(",");
 }
@@ -1263,22 +1346,49 @@ function hitTest(sx, sy) {
       if (near([{ x: it.x - dir.x * h, y: it.y - dir.y * h }, { x: it.x + dir.x * h, y: it.y + dir.y * h }], false)) return it;
     }
   }
+  // A region by its label or its outline (inside it, a drag moves the view).
   for (const it of items) {
     if (it.kind !== "medium") continue;
     const [x, y] = screen(it.x, it.y);
-    if (Math.hypot(sx - x, sy - y) < 16) return it;
+    if (Math.hypot(sx - x, sy - y) < 16 || near(mediumOutline(it), true)) return it;
   }
   return null;
+}
+// The outline of a medium region, as the renderer draws it.
+function mediumOutline(m) {
+  const a = { x: Math.cos(m.angle), y: Math.sin(m.angle) },
+    p = { x: -a.y, y: a.x },
+    at = (u, v) => ({ x: m.x + a.x * u + p.x * v, y: m.y + a.y * u + p.y * v }),
+    pts = [];
+  if (m.shape === "rect") return [at(-m.width / 2, -m.height / 2), at(m.width / 2, -m.height / 2), at(m.width / 2, m.height / 2), at(-m.width / 2, m.height / 2)];
+  if (m.shape === "circle") {
+    for (let i = 0; i < 48; i++) pts.push(at(m.radius * Math.cos((i * Math.PI) / 24), m.radius * Math.sin((i * Math.PI) / 24)));
+    return pts;
+  }
+  const off = m.radius - m.thickness / 2,
+    half = Math.sqrt(m.radius ** 2 - off ** 2);
+  for (let i = 0; i <= 24; i++) {
+    const v = -half + (2 * half * i) / 24;
+    pts.push(at(off - Math.sqrt(m.radius ** 2 - v * v), v));
+  }
+  for (let i = 24; i >= 0; i--) {
+    const v = -half + (2 * half * i) / 24;
+    pts.push(at(-off + Math.sqrt(m.radius ** 2 - v * v), v));
+  }
+  return pts;
 }
 function select(id) {
   state.selected = id;
   buildForm();
   dirty = true;
 }
+const snapPoint = (p) => (state.snapping ? { x: snapTo(p.x, snapStep()), y: snapTo(p.y, snapStep()) } : p);
 function place(kind, at) {
-  const [model, extra] = ADD_PROPS[kind] ?? [kind, {}];
+  const [model, extra] = ADD_PROPS[kind] ?? [kind, {}],
+    p = snapPoint(at);
   let id = null;
-  if (!attempt(() => (id = lab().add(model, { ...extra, x: at.x, y: at.y })))) return;
+  if (!attempt(() => (id = lab().add(model, { ...extra, x: p.x, y: p.y })))) return;
+  // As everywhere on the site, placing something returns to Grab.
   setTool("grab");
   select(id);
   changed();
@@ -1289,60 +1399,90 @@ function removeSelected() {
   select(null);
   changed();
 }
-function turnSelected(by) {
-  const item = lab().get?.(state.selected);
-  if (!item || item.angle === undefined) return;
-  if (attempt(() => lab().update(item.id, { angle: item.angle + by }))) {
-    changed();
-    buildForm();
-  }
-}
+// Arrow keys: one snapping step with snapping on, a fifth of one without.
 function nudge(dx, dy) {
   const item = lab().get?.(state.selected);
   if (!item) return;
-  const step = state.mode === "waves" ? labs.waves.cell * 2 : gridStepNow();
-  if (attempt(() => lab().update(item.id, { x: item.x + dx * step, y: item.y + dy * step }))) {
+  const step = snapStep(),
+    d = state.snapping ? step : step / 5,
+    to = { x: item.x + dx * d, y: item.y + dy * d },
+    p = state.snapping ? { x: dx ? snapTo(to.x, step) : item.x, y: dy ? snapTo(to.y, step) : item.y } : to;
+  if (attempt(() => lab().update(item.id, p))) {
     changed();
-    buildForm();
+    syncForm();
   }
 }
-const gridStepNow = () => {
-  const raw = 14 / view.scale,
-    e = 10 ** Math.floor(Math.log10(raw));
-  return [1, 2, 5, 10].map((m) => m * e).find((v) => v >= raw);
-};
+// An edit made during a drag: refused values leave the item as it last
+// was, without a message for every movement of the pointer.
+function tryUpdate(id, patch) {
+  try {
+    lab().update(id, patch);
+    changed();
+    syncForm();
+    return true;
+  } catch (error) {
+    drag.refused = error.message;
+    return false;
+  }
+}
+// What a gesture changes, so that Escape can put it back.
+const KEEP = ["x", "y", "angle", "length", "width", "height", "aperture", "thickness", "side", "opening", "spread", "radius"];
+const snapshot = (item) => Object.fromEntries(KEEP.filter((k) => typeof item[k] === "number").map((k) => [k, item[k]]));
+const isResize = () => resizeHeld || state.tool === "resize";
 
 canvas.addEventListener("pointerdown", (e) => {
-  canvas.focus();
-  const { sx, sy } = eventPoint(e);
-  try {
-    canvas.setPointerCapture?.(e.pointerId);
-  } catch {}
+  canvas.focus({ preventScroll: true });
+  // A click on the scene closes an open panel and does nothing else.
+  if (closePanels()) return;
+  const { sx, sy } = eventPoint(e),
+    capture = () => {
+      try {
+        canvas.setPointerCapture?.(e.pointerId);
+      } catch {}
+    },
+    pan = () => {
+      drag = { type: "pan", sx, sy, x: view.x, y: view.y };
+      capture();
+    };
   if (state.mode === "sound") {
     const h = levelMap?.handle;
-    if (labs.sound.state.mode === "level" && h && Math.hypot(sx - h.x, sy - h.y) < h.rad) drag = { type: "listener" };
+    if (e.button === 0 && labs.sound.state.mode === "level" && h && Math.hypot(sx - h.x, sy - h.y) < h.rad) {
+      drag = { type: "listener" };
+      capture();
+    }
     return;
   }
+  // Middle-drag pans in any tool, as on the other pages.
+  if (e.button === 1 || (e.button === 0 && state.tool === "pan")) {
+    e.preventDefault();
+    return pan();
+  }
+  if (e.button !== 0) return;
   const at = world(sx, sy);
-  if (state.tool !== "grab") {
-    place(state.tool, at);
-    return;
-  }
+  if (PALETTES[state.mode].some(([k]) => k === state.tool)) return place(state.tool, at);
   const item = hitTest(sx, sy);
-  if (item) {
-    select(item.id);
-    drag = { type: "move", id: item.id, from: at, start: { x: item.x, y: item.y }, moved: false };
-  } else {
+  if (!item) {
     if (state.selected !== null) select(null);
-    drag = { type: "pan", sx, sy, x: view.x, y: view.y };
+    return pan();
   }
+  select(item.id);
+  const start = snapshot(item);
+  if (isResize() && resizable(state.mode, item)) {
+    const min = Math.max(4 / view.scale, state.mode === "waves" ? labs.waves.cell : 1e-4);
+    drag = { type: "resize", id: item.id, start, gesture: startResize(state.mode, item, at, { min, step: state.snapping ? snapStep() : 0 }) };
+  } else if (e.ctrlKey && item.angle !== undefined) {
+    drag = { type: "turn", id: item.id, start, offset: item.angle - Math.atan2(at.y - item.y, at.x - item.x) };
+  } else drag = { type: "move", id: item.id, start, dx: item.x - at.x, dy: item.y - at.y };
+  capture();
 });
 canvas.addEventListener("pointermove", (e) => {
-  if (!drag) return;
   const { sx, sy } = eventPoint(e);
+  pointer = { sx, sy };
+  if (!drag) return hover(sx, sy, e.ctrlKey);
   if (drag.type === "pan") {
     view.x = drag.x + sx - drag.sx;
     view.y = drag.y + sy - drag.sy;
+    snapStatus();
     return;
   }
   if (drag.type === "listener") {
@@ -1354,23 +1494,53 @@ canvas.addEventListener("pointermove", (e) => {
     }
     return;
   }
-  const at = world(sx, sy),
-    x = drag.start.x + at.x - drag.from.x,
-    y = drag.start.y + at.y - drag.from.y;
+  const item = lab().get(drag.id);
+  if (!item) return (drag = null);
+  const p = world(sx, sy);
   drag.moved = true;
-  try {
-    lab().update(drag.id, { x, y });
-    changed();
-  } catch {
-    // Refused (out of range): it stays where it last was.
-  }
+  if (drag.type === "move") tryUpdate(item.id, snapPoint({ x: p.x + drag.dx, y: p.y + drag.dy }));
+  else if (drag.type === "turn") tryUpdate(item.id, { angle: turnAngle(item, p, drag.offset, state.snapping) });
+  else tryUpdate(item.id, resizePatch(drag.gesture, p));
 });
-const endDrag = () => {
-  if (drag?.type === "move" && drag.moved) buildForm();
+// The cursor says what a drag would do.
+function hover(sx, sy, ctrl) {
+  if (state.mode === "sound" || state.tool !== "grab") return;
+  const item = hitTest(sx, sy);
+  canvas.style.cursor = !item
+    ? ""
+    : resizeHeld && resizable(state.mode, item)
+      ? "nwse-resize"
+      : ctrl && item.angle !== undefined
+        ? "alias"
+        : "move";
+}
+function endDrag() {
+  if (drag?.refused && drag.type !== "move") toast(drag.refused);
+  if (drag?.moved) buildForm();
   drag = null;
-};
+}
+// Escape during a drag puts the item back as it was.
+function cancelDrag() {
+  if (!drag) return false;
+  if (drag.start && lab().get(drag.id)) {
+    try {
+      lab().update(drag.id, drag.start);
+    } catch {}
+    changed();
+    buildForm();
+  }
+  drag = null;
+  return true;
+}
 canvas.addEventListener("pointerup", endDrag);
 canvas.addEventListener("pointercancel", endDrag);
+canvas.addEventListener("pointerleave", () => (pointer = null));
+canvas.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  const { sx, sy } = eventPoint(e),
+    item = state.mode === "sound" ? null : hitTest(sx, sy);
+  if (item) select(item.id);
+});
 canvas.addEventListener(
   "wheel",
   (e) => {
@@ -1378,6 +1548,7 @@ canvas.addEventListener(
     e.preventDefault();
     const { sx, sy } = eventPoint(e);
     zoomAt(sx, sy, Math.exp(-e.deltaY * 0.0015));
+    snapStatus();
   },
   { passive: false },
 );
@@ -1412,15 +1583,38 @@ function fitHeader() {
 }
 const typing = (e) => {
   const t = e.target;
-  return t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA");
+  return t && (["INPUT", "SELECT", "TEXTAREA", "BUTTON", "A", "SUMMARY"].includes(t.tagName) || t.isContentEditable);
 };
-window.addEventListener("keydown", (e) => {
-  if (typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
-  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  if (key === "Escape") {
+// R held down turns the next drag into a resize, as on the other pages
+// (Ctrl+R is still the browser's reload).
+document.addEventListener("keyup", (e) => {
+  if (e.key.toLowerCase() === "r") {
+    resizeHeld = false;
+    if (pointer) hover(pointer.sx, pointer.sy, e.ctrlKey);
+  }
+});
+window.addEventListener("blur", () => (resizeHeld = false));
+document.addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() === "r" && !typing(e) && !e.ctrlKey && !e.metaKey) {
+    resizeHeld = true;
+    if (pointer) hover(pointer.sx, pointer.sy, false);
+  }
+  if (e.key === "Escape") {
+    if (cancelDrag()) return;
     if (!closePanels()) setTool("grab");
     return;
   }
+  if (typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (key === "Delete" || key === "Backspace") {
+    e.preventDefault();
+    return removeSelected();
+  }
+  if (key.startsWith("Arrow") && state.mode !== "sound" && state.selected !== null) {
+    e.preventDefault();
+    return nudge(key === "ArrowLeft" ? -1 : key === "ArrowRight" ? 1 : 0, key === "ArrowDown" ? -1 : key === "ArrowUp" ? 1 : 0);
+  }
+  if (e.repeat) return;
   if (key === " ") {
     e.preventDefault();
     setRunning(!state.running);
@@ -1431,20 +1625,19 @@ window.addEventListener("keydown", (e) => {
   else if (key === "1") setMode("rays");
   else if (key === "2") setMode("waves");
   else if (key === "3") setMode("sound");
-  else if (key === "r") turnSelected((e.shiftKey ? -15 : 15) * deg);
-  else if (key === "Delete" || key === "Backspace") removeSelected();
-  else if (key === "ArrowLeft") nudge(-1, 0);
-  else if (key === "ArrowRight") nudge(1, 0);
-  else if (key === "ArrowUp") nudge(0, 1);
-  else if (key === "ArrowDown") nudge(0, -1);
-  else if (key === "f") fit();
+  else if (key === "z" && state.mode !== "sound") setSnapping(!state.snapping);
+  else if (key === "g" && state.mode !== "sound") setTool("grab");
+  else if (key === "h" && state.mode !== "sound") setTool("pan");
+  else if (key === "f" && state.mode !== "sound") fit();
   else if (key === "?") togglePanel("keys-panel");
-  else if (key === "+" || key === "=") zoomAt(view.width / 2, view.height / 2, 1.25);
-  else if (key === "-") zoomAt(view.width / 2, view.height / 2, 0.8);
-  else return;
-  if (key.startsWith("Arrow")) e.preventDefault();
+  else if ((key === "+" || key === "=") && state.mode !== "sound") zoomAt(view.width / 2, view.height / 2, 1.25);
+  else if (key === "-" && state.mode !== "sound") zoomAt(view.width / 2, view.height / 2, 0.8);
 });
 
+for (const b of document.querySelectorAll("[data-tool]")) b.addEventListener("click", () => setTool(b.dataset.tool));
+$("resize-object").addEventListener("click", () => setTool(state.tool === "resize" ? "grab" : "resize"));
+$("snap-toggle").addEventListener("change", (e) => setSnapping(e.target.checked));
+$("setting-snapping").addEventListener("change", (e) => setSnapping(e.target.checked));
 for (const b of document.querySelectorAll("[data-mode]")) b.addEventListener("click", () => setMode(b.dataset.mode));
 $("pause").addEventListener("click", () => setRunning(!state.running));
 $("step").addEventListener("click", stepOnce);

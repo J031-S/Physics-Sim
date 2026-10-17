@@ -181,3 +181,6 @@
     order: 3;
   }
 }
+.wave-lab .edit-tools[hidden] {
+  display: none;
+}
