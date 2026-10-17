@@ -978,12 +978,20 @@ test("a strong background field still has evenly spaced lines right across the r
       ys = lines.map((l) => l[0][1]).sort((a, b) => a - b),
       gaps = ys.slice(1).map((y, i) => y - ys[i]);
     // They reach both the bottom and the top of the region…
-    assert.ok(ys[0] < bounds.minY + 1.5 && ys.at(-1) > bounds.maxY - 1.5, `E=${E}: lines from y = ${ys[0]} to ${ys.at(-1)}`);
+    assert.ok(
+      ys[0] < bounds.minY + 1.5 && ys.at(-1) > bounds.maxY - 1.5,
+      `E=${E}: lines from y = ${ys[0]} to ${ys.at(-1)}`,
+    );
     // …one whole number of flux quanta apart (Δψ = E Δy), never crowded.
     const quantum = 1e-9 / (EPS0 * 8 * 2);
     for (const gap of gaps) {
       const n = (E * gap) / quantum;
-      near(n, Math.round(n), 1e-6, `E=${E}: flux between neighbours, in quanta`);
+      near(
+        n,
+        Math.round(n),
+        1e-6,
+        `E=${E}: flux between neighbours, in quanta`,
+      );
       assert.ok(gap >= 3 * step - 1e-9, `E=${E}: lines ${gap} m apart`);
       near(gap, gaps[0], 1e-9, `E=${E}: even spacing`);
     }
@@ -996,4 +1004,74 @@ test("a strong background field still has evenly spaced lines right across the r
     ).length;
     assert.equal(fromCharge, Math.max(1, Math.round(32 / scale)), `E=${E}`);
   }
+});
+
+test("field lines leave a charge at the same angles wherever the other charges are", () => {
+  // Lines start at fixed angles in the scene (k · 360°/n from +x), so moving
+  // another charge bends them but never turns the whole fan round.
+  const starts = (negative) => {
+    const lab = new FieldLab();
+    const plus = lab.add("charge", { x: 0, y: 0, charge: 2 * nC });
+    if (negative) lab.add("charge", { ...negative, charge: -2 * nC });
+    return electricFieldLines(lab, BOUNDS, { linesPerNC: 8, startRadius: 0.05 })
+      .filter((l) => Math.hypot(...l[0]) < 0.051)
+      .map((l) => Math.atan2(l[0][1], l[0][0]))
+      .map((a) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI))
+      .sort((a, b) => a - b);
+  };
+  const alone = starts(null);
+  assert.equal(alone.length, 16);
+  alone.forEach((a, k) => near(a, (2 * Math.PI * k) / 16, 1e-9, "fixed angle"));
+  for (const negative of [
+    { x: 3, y: 0 },
+    { x: 2, y: 2 },
+    { x: -1, y: -2.5 },
+  ]) {
+    const moved = starts(negative);
+    assert.equal(moved.length, 16);
+    moved.forEach((a, k) => near(a, alone[k], 1e-9, "same start"));
+  }
+  // A negative charge on its own: lines arrive at the same fixed angles.
+  const lone = new FieldLab();
+  lone.add("charge", { x: 1, y: 1, charge: -1 * nC });
+  const ends = electricFieldLines(lone, BOUNDS, {
+    linesPerNC: 8,
+    startRadius: 0.05,
+  })
+    .map((l) => Math.atan2(l.at(-1)[1] - 1, l.at(-1)[0] - 1))
+    .map((a) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI))
+    .sort((a, b) => a - b);
+  assert.equal(ends.length, 8);
+  ends.forEach((a, k) => near(a, (2 * Math.PI * k) / 8, 1e-9));
+});
+
+test("one scene can be saved and restored without touching the other", () => {
+  const lab = new FieldLab();
+  lab.add("charge", { x: 1, y: 0, charge: 2 * nC });
+  lab.setUniform("electric", { x: 5, y: 0 });
+  lab.add("wire", { x: 0, y: 0, current: 10 });
+  const saved = lab.exportMode("electric");
+  assert.equal(saved.sources.length, 1);
+  assert.deepEqual(saved.uniform, { electric: { x: 5, y: 0 } });
+  // Edit both scenes, then restore only the electric one.
+  lab.update(lab.list("electric")[0].id, { x: 3 });
+  lab.add("charge", { x: -2, y: 0, charge: -1 * nC });
+  lab.setUniform("electric", { x: 0, y: 0 });
+  lab.update(lab.list("magnetic")[0].id, { current: -4 });
+  lab.loadMode(saved, "electric");
+  assert.deepEqual(
+    lab.list("electric").map(({ id, ...s }) => s),
+    [{ kind: "charge", x: 1, y: 0, charge: 2 * nC }],
+  );
+  assert.deepEqual(lab.uniform.electric, { x: 5, y: 0 });
+  assert.equal(lab.list("magnetic")[0].current, -4, "magnetic scene untouched");
+  // A damaged one changes nothing.
+  assert.throws(() =>
+    lab.loadMode(
+      { ...saved, sources: [{ kind: "charge", charge: 1 }] },
+      "electric",
+    ),
+  );
+  assert.equal(lab.list("electric").length, 1);
+  assert.equal(lab.list("magnetic").length, 1);
 });

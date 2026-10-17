@@ -214,6 +214,26 @@ export class FieldLab {
       sources: this.sources.map(({ id, ...source }) => ({ ...source })),
     };
   }
+  // One scene only (electric or magnetic) and its background field, in the
+  // same format, for restoring that scene alone.
+  exportMode(mode) {
+    const all = this.exportScene();
+    return {
+      ...all,
+      uniform: { [mode]: all.uniform[mode] },
+      sources: all.sources.filter((s) => KINDS[s.kind]?.mode === mode),
+    };
+  }
+  // Replaces one scene with the one in `data`, leaving the other alone. It is
+  // checked in a spare lab first, so a bad one changes nothing.
+  loadMode(data, mode) {
+    const spare = FieldLab.fromScene(data);
+    this.sources = this.sources.filter((s) => KINDS[s.kind].mode !== mode);
+    for (const { id, kind, ...props } of spare.list(mode))
+      this.add(kind, props);
+    this.uniform[mode] = { ...spare.uniform[mode] };
+    this.cache = null;
+  }
   static fromScene(data) {
     const lab = new FieldLab();
     lab.#apply(data);
@@ -790,17 +810,12 @@ export function electricFieldLines(lab, bounds, options = {}) {
   const wanted = (p) =>
     Math.min(
       64,
-      Math.max(
-        1,
-        Math.round((linesPerNC * Math.abs(p.q)) / (1e-9 * coarsen)),
-      ),
+      Math.max(1, Math.round((linesPerNC * Math.abs(p.q)) / (1e-9 * coarsen))),
     );
-  const reference = (p, sign) => {
-    lab.electricField(p.x, p.y, p.id, e);
-    return Math.hypot(e[0], e[1]) > 1e-12
-      ? Math.atan2(sign * e[1], sign * e[0])
-      : 0;
-  };
+  // Lines leave (or reach) a charge at fixed angles in the scene, k·360°/n
+  // from +x. Moving another charge then bends the lines without turning the
+  // whole fan round to face it.
+  const reference = () => 0;
 
   // Net flux leaving each face of a plate, sampled just off its surface.
   const SAMPLES = 160;
