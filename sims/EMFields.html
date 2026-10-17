@@ -37,6 +37,13 @@
           Keys ?</button
         ><span class="header-divider" aria-hidden="true"></span
         ><button
+          id="reset"
+          title="Reset this scene to the preset or file as it was loaded"
+          disabled
+        >
+          Reset</button
+        ><span class="header-divider" aria-hidden="true"></span
+        ><button
           id="presets-toggle"
           title="Ready-made arrangements"
           aria-expanded="false"
@@ -289,13 +296,19 @@
             data-icon-label="Field arrows"
             data-icon-only="true"
           ></span></label
-        ><label class="icon-toggle" title="Equipotentials and potential shading (electric field)" id="equipotentials-toggle"
+        ><label
+          class="icon-toggle"
+          title="Equipotentials and potential shading (electric field)"
+          id="equipotentials-toggle"
           ><input type="checkbox" id="show-equipotentials" /><span
             data-icon="equipotentials"
             data-icon-label="Equipotentials"
             data-icon-only="true"
           ></span></label
-        ><label class="icon-toggle" title="Forces on charges (F)" id="show-forces-label"
+        ><label
+          class="icon-toggle"
+          title="Forces on charges (F)"
+          id="show-forces-label"
           ><input type="checkbox" id="show-forces" /><span
             data-icon="force"
             data-icon-label="Forces on charges"

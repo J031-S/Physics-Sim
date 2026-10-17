@@ -368,4 +368,35 @@ key("Escape");
 assert.equal($("keys-panel").hidden, true);
 assert.equal($("tool-name").textContent, "Grab");
 
+// Reset returns the scene on show to the preset (or file) as loaded. The
+// electric scene is the parallel-plates preset, unchanged so far.
+frame();
+assert.equal($("reset").disabled, true);
+assert.match($("reset").title, /Parallel plates/);
+key("t");
+click([origin.left + 120, origin.top + 600]);
+frame();
+assert.equal($("reset").disabled, false, "a test charge counts as a change");
+$("reset").click();
+frame();
+assert.equal($("test-row").hidden, true);
+assert.equal($("reset").disabled, true);
+$("clear").click();
+$("clear-yes").click();
+frame();
+assert.equal(count(), 0);
+assert.equal($("reset").disabled, false);
+$("reset").click();
+frame();
+assert.equal(count(), 2, "both plates back");
+assert.equal($("reset").disabled, true);
+// The magnetic scene has its own starting point and is not affected.
+key("m");
+frame();
+assert.equal(count(), 1);
+assert.match($("reset").title, /Solenoid/);
+assert.equal($("reset").disabled, true);
+key("e");
+frame();
+
 console.log("field lab smoke test passed");

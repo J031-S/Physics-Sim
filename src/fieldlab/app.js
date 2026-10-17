@@ -347,6 +347,7 @@ function fillTestGrid() {
 }
 
 function draw() {
+  updateReset();
   const r = canvas.getBoundingClientRect(),
     dpr = window.devicePixelRatio || 1;
   if (view.width !== r.width || view.height !== r.height) {
@@ -633,10 +634,46 @@ function zoomAt(sx, sy, factor) {
   invalidate();
 }
 
+// What Reset returns each scene to: that scene as the last preset or file
+// left it, with a name for the button's tooltip.
+const start = { electric: null, magnetic: null };
+function remember(mode, name) {
+  start[mode] = { scene: lab.exportMode(mode), name };
+}
+function resetScene() {
+  const saved = start[state.mode];
+  if (!saved) return;
+  lab.loadMode(saved.scene, state.mode);
+  if (state.mode === "electric") tests.clear();
+  state.selected[state.mode] = null;
+  drag = null;
+  syncUniform();
+  buildForm();
+  updateTests();
+  status();
+  invalidate();
+}
+// Reset is offered only once the scene on show differs from where it began.
+function updateReset() {
+  const saved = start[state.mode],
+    button = $("reset");
+  if (!button) return;
+  const changed =
+    saved &&
+    (JSON.stringify(lab.exportMode(state.mode)) !==
+      JSON.stringify(saved.scene) ||
+      (state.mode === "electric" && tests.items.length > 0));
+  button.disabled = !changed;
+  button.title = saved
+    ? `Reset this scene to “${saved.name}” as it was loaded`
+    : "Reset this scene to the preset or file as it was loaded";
+}
+
 function loadPreset(preset) {
   lab.clear(preset.mode);
   if (preset.mode === "electric") tests.clear();
   preset.build(lab);
+  remember(preset.mode, preset.title);
   state.selected[preset.mode] = null;
   setMode(preset.mode);
   syncUniform();
@@ -650,6 +687,8 @@ setupSceneFiles({
   save: () => ({ ...lab.exportScene(), view: { mode: state.mode } }),
   load(data) {
     lab.loadScene(data);
+    remember("electric", "the loaded file");
+    remember("magnetic", "the loaded file");
     tests.clear();
     state.selected.electric = state.selected.magnetic = null;
     const saved = data.view?.mode;
@@ -800,12 +839,12 @@ canvas.addEventListener("pointerdown", (e) => {
     resizeHeld && long
       ? { type: "resize", id: hit.id }
       : e.ctrlKey && long
-      ? {
-          type: "rotate",
-          id: hit.id,
-          offset: hit.angle - Math.atan2(p.y - hit.y, p.x - hit.x),
-        }
-      : { type: "move", id: hit.id, dx: hit.x - p.x, dy: hit.y - p.y };
+        ? {
+            type: "rotate",
+            id: hit.id,
+            offset: hit.angle - Math.atan2(p.y - hit.y, p.x - hit.x),
+          }
+        : { type: "move", id: hit.id, dx: hit.x - p.x, dy: hit.y - p.y };
   capture(e);
 });
 
@@ -1220,6 +1259,9 @@ if (window.innerWidth < 820) $("display-panel").open = false;
 const starter = (id) => presets.find((p) => p.id === id).build(lab);
 starter("dipole");
 starter("parallel-currents");
+remember("electric", presets.find((p) => p.id === "dipole").title);
+remember("magnetic", presets.find((p) => p.id === "parallel-currents").title);
+$("reset").addEventListener("click", resetScene);
 syncUniform();
 setSnapping(false);
 setMode("electric");
